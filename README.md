@@ -8,45 +8,73 @@ Web-based firmware flasher and build system for [CrossPoint Reader](https://gith
 - **Early access builds** — Nightly firmware builds compiled automatically from the master branch, gated behind a [Royalty.dev](https://royalty.dev) subscription
 - **Stock firmware** — Restore original Xteink firmware (English or Chinese) for both X3 and X4
 - **Full flash backup/restore** — Save and restore the entire 16MB flash contents
-- **Admin dashboard** — Manually trigger builds and view build logs
+- **Admin dashboard** — Manually trigger builds and monitor build status
 
 ## How it works
 
-The project runs on [Cloudflare Workers](https://workers.cloudflare.com/) with the following infrastructure:
+The project runs on [Cloudflare Workers](https://workers.cloudflare.com/) with [GitHub Actions](https://github.com/features/actions) handling firmware compilation:
 
 - **Worker** (`src/index.ts`) — Handles API routes, firmware proxying, early access gating via Royalty.dev, and serves static assets
-- **Cloudflare Durable Objects + Containers** — Runs PlatformIO builds inside sandboxed Docker containers to compile firmware from source
+- **GitHub Actions** (`.github/workflows/build-firmware.yml`) — Compiles firmware from the upstream CrossPoint repo using PlatformIO, matching the exact CI toolchain
 - **R2** — Stores compiled firmware binaries
 - **KV** — Caches build metadata for fast reads
 - **Static assets** (`public/`) — HTML pages, the WebSerial flasher module, and bundled X3 firmware
 
 ### Build pipeline
 
-1. A GitHub webhook or daily cron job detects new commits on the upstream CrossPoint repo
-2. A Durable Object spins up a Docker container with PlatformIO pre-installed
-3. The container clones the repo, compiles firmware, and uploads the binary to R2
-4. Build metadata (version, commit, changelog) is stored in KV
+1. A daily cron job (or manual trigger from `/admin`) dispatches the GitHub Actions workflow
+2. The workflow checks for new commits on the upstream [crosspoint-reader/crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader) master branch
+3. If there's a new commit (or a previous build failed), it clones the repo with submodules, installs the [pioarduino PlatformIO fork](https://github.com/pioarduino/platformio-core), and runs `pio run -e gh_release`
+4. The compiled `firmware.bin` is uploaded to R2 via the Worker API
+5. Build metadata (version, commit, changelog since last tag) is stored in KV
 
 ### Flashing
 
 The browser-based flasher (`public/js/flasher.js`) uses [esptool-js](https://github.com/nicholasgasior/nicholasgasior.github.io) via WebSerial to perform OTA flashing:
 
 1. Connects to the ESP32-C3 over USB serial
-2. Reads and validates the partition table
+2. Reads and validates the partition table (X3 or X4)
 3. Writes firmware to the backup OTA partition
 4. Updates the OTA boot selector to swap partitions on next boot
 
-## Development
+## Setup
+
+### Prerequisites
+
+- Node.js 20+
+- A [Cloudflare Workers Paid plan](https://www.cloudflare.com/plans/developer-platform/)
+- A GitHub classic personal access token with `workflow` scope
+
+### Deploy
 
 ```bash
 npm install
-npm run dev      # Start local dev server (wrangler dev)
-npm run deploy   # Deploy to Cloudflare
+
+# Create Cloudflare resources (first time only)
+npx wrangler r2 bucket create crosspoint-firmware
+npx wrangler kv namespace create BUILD_META
+# Update the KV namespace ID in wrangler.jsonc
+
+# Set secrets
+npx wrangler secret put GITHUB_WEBHOOK_SECRET   # Generate with: openssl rand -hex 32
+npx wrangler secret put GITHUB_TOKEN             # Classic PAT with workflow scope
+
+# Deploy
+npm run deploy
 ```
 
-Secrets are managed via `wrangler secret put`:
-- `GITHUB_WEBHOOK_SECRET` — Webhook signature verification and admin auth
-- `GITHUB_TOKEN` (optional) — For private repo access
+### GitHub Actions secrets
+
+Set these on the `SoFriendly/crosspoint-tools` repo (Settings > Secrets > Actions):
+
+- `WEBHOOK_SECRET` — Same value as `GITHUB_WEBHOOK_SECRET` in Cloudflare (used to authenticate CI callbacks to the Worker API)
+- `GH_PAT` — GitHub classic PAT with no scopes (for reading the upstream public repo without rate limits)
+
+### Local development
+
+```bash
+npm run dev   # Starts wrangler dev server on localhost:8787
+```
 
 ## Acknowledgments
 
