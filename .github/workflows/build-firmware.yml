@@ -104,10 +104,9 @@ jobs:
           VERSION=$(grep -oP 'version\s*=\s*\K.*' platformio.ini | head -1)
           echo "version=${VERSION}-dev+${{ steps.check.outputs.commit_short }}" >> "$GITHUB_OUTPUT"
 
-          # Changelog as JSON array — use jq to safely escape commit messages
+          # Changelog as JSON array — build with jq for safe escaping
           BASE_REF=$(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)
-          git log "${BASE_REF}..HEAD" --pretty=format:"%H%x00%h%x00%an%x00%aI%x00%s" | while IFS= read -r line; do
-            IFS=$'\0' read -r hash short author date msg <<< "$line"
+          git log "${BASE_REF}..HEAD" --pretty=format:"%H%x09%h%x09%an%x09%aI%x09%s" | while IFS=$'\t' read -r hash short author date msg; do
             jq -n --arg h "$hash" --arg s "$short" --arg a "$author" --arg d "$date" --arg m "$msg" \
               '{hash:$h, hashShort:$s, author:$a, date:$d, message:$m}'
           done | jq -s '.' > /tmp/changelog.json
@@ -138,7 +137,7 @@ jobs:
             --arg version "${{ steps.info.outputs.version }}" \
             --argjson firmwareSize "$SIZE" \
             --argjson changelog "$CHANGELOG" \
-            '{status: $status, commit: $commit, commitShort: $commitShort, commitMessage: $commitMessage, version: $version, firmwareSize: $firmwareSize, changelog: $changelog}' \
+            '{status: $status, commit: $commit, commitShort: $commitShort, commitMessage: $commitMessage, version: $version, firmwareSize: $firmwareSize, changelog: $changelog, error: null, buildLog: null}' \
             | curl -s -X POST "https://crosspointreader.com/api/build/status" \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
               -H "Content-Type: application/json" \
