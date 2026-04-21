@@ -17,29 +17,39 @@ jobs:
             "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/commits/master")
 
           LATEST=$(echo "$COMMIT_JSON" | jq -r '.sha')
-          echo "commit=$LATEST" >> "$GITHUB_OUTPUT"
-          echo "commit_short=${LATEST:0:7}" >> "$GITHUB_OUTPUT"
+          SHORT="${LATEST:0:7}"
+          # Use heredoc for multiline-safe output
+          {
+            echo "commit=$LATEST"
+            echo "commit_short=$SHORT"
+          } >> "$GITHUB_OUTPUT"
 
-          # Get first line of commit message only (safe for GITHUB_OUTPUT)
-          MSG=$(echo "$COMMIT_JSON" | jq -r '.commit.message' | head -1)
-          echo "message=$MSG" >> "$GITHUB_OUTPUT"
+          # Get first line of commit message only
+          MSG=$(echo "$COMMIT_JSON" | jq -r '.commit.message' | head -1 | tr -d '\r')
+          # Use heredoc delimiter for message to handle special chars
+          {
+            echo "message<<MSG_EOF"
+            echo "$MSG"
+            echo "MSG_EOF"
+          } >> "$GITHUB_OUTPUT"
 
-          # For workflow_dispatch, always build regardless
+          # For workflow_dispatch, always build
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "Manual trigger — building ${LATEST:0:7}"
+            echo "Manual trigger — building $SHORT"
             exit 0
           fi
 
-          # Check if we already built this commit
-          CURRENT=$(curl -s "https://crosspointreader.com/api/build/latest" | jq -r '.commit // empty')
-          CURRENT_STATUS=$(curl -s "https://crosspointreader.com/api/build/latest" | jq -r '.status // empty')
+          # Check if we already built this commit successfully
+          BUILD_JSON=$(curl -s "https://crosspointreader.com/api/build/latest")
+          CURRENT=$(echo "$BUILD_JSON" | jq -r '.commit // empty')
+          CURRENT_STATUS=$(echo "$BUILD_JSON" | jq -r '.status // empty')
           if [ "$CURRENT" = "$LATEST" ] && [ "$CURRENT_STATUS" = "success" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Already built $LATEST successfully, skipping"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "New commit or previous build failed: ${LATEST:0:7} (status: $CURRENT_STATUS)"
+            echo "New commit or previous build not successful: $SHORT (status: $CURRENT_STATUS)"
           fi
 
       - name: Mark build as started
