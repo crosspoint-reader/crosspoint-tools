@@ -70,7 +70,7 @@
     </div>
 
     <div class="my-6 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
-      <span class="font-semibold">Heads up:</span> These builds haven't been through full QA. They contain the newest features and fixes but may introduce regressions. You can always <a href="/" class="font-medium text-brand-500 underline underline-offset-2">flash the stable release</a>.
+      <span class="font-semibold">Heads up:</span> These builds have been tested internally but have not passed the release QA. They contain the newest features and fixes but may introduce regressions. You can always <a href="/" class="font-medium text-brand-500 underline underline-offset-2">flash the stable release</a>.
     </div>
 
     <!-- Browser check -->
@@ -147,6 +147,13 @@
           <h2 class="font-serif text-lg font-medium text-stone-900 sm:text-base/6" id="progress-title">Flashing Early Access Build...</h2>
           <ul id="steps-list" role="list" class="mt-4 divide-y divide-stone-100"></ul>
           <div class="mt-4" id="progress-status"></div>
+        </div>
+
+        <!-- Restart Instructions -->
+        <div class="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+          <h2 class="font-serif text-lg font-medium text-stone-900 sm:text-base/6">Device Restart Instructions</h2>
+          <p class="mt-2 text-sm/6 text-stone-500 text-pretty"><strong class="text-stone-700">X4:</strong> After flashing, press the small Reset button near the bottom right, then press and hold the power button for 3 seconds.</p>
+          <p class="mt-2 text-sm/6 text-stone-500 text-pretty"><strong class="text-stone-700">X3:</strong> After flashing, disconnect and reconnect the USB cable.</p>
         </div>
 
         <!-- Changelog Card -->
@@ -313,6 +320,7 @@
       flashBtn.disabled = true;
       progressCard.classList.remove('hidden');
       progressStatus.innerHTML = '';
+      progressCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       const states = STEPS.map(() => 'pending');
       renderSteps(states);

@@ -36,7 +36,7 @@ export default {
       Accept: 'application/vnd.github.v3+json',
     };
     if (env.GITHUB_TOKEN) {
-      ghHeaders.Authorization = `token ${env.GITHUB_TOKEN}`;
+      ghHeaders.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
     }
 
     const ghRes = await fetch(apiUrl, { headers: ghHeaders });
@@ -94,10 +94,10 @@ async function handleApi(
         return handleManualTrigger(request, env, ctx, corsHeaders);
 
       case '/api/release/latest':
-        return handleLatestRelease(corsHeaders);
+        return handleLatestRelease(env, corsHeaders);
 
       case '/api/release/firmware':
-        return handleReleaseFirmware(corsHeaders);
+        return handleReleaseFirmware(env, corsHeaders);
 
       case '/api/firmware/stock':
         return handleStockFirmware(url, corsHeaders);
@@ -225,7 +225,7 @@ async function handleManualTrigger(
     Accept: 'application/vnd.github.v3+json',
   };
   if (env.GITHUB_TOKEN) {
-    ghHeaders.Authorization = `token ${env.GITHUB_TOKEN}`;
+    ghHeaders.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
   }
 
   console.log(`Fetching commit from: ${apiUrl}`);
@@ -248,17 +248,24 @@ async function handleManualTrigger(
 
 // --- Stable Release (from GitHub Releases) ---
 
+function ghFetchHeaders(env: Env): Record<string, string> {
+  const h: Record<string, string> = {
+    'User-Agent': 'crosspoint-tools',
+    Accept: 'application/vnd.github.v3+json',
+  };
+  if (env.GITHUB_TOKEN) {
+    h.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
+  }
+  return h;
+}
+
 async function handleLatestRelease(
+  env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
   const res = await fetch(
     'https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases/latest',
-    {
-      headers: {
-        'User-Agent': 'crosspoint-tools',
-        Accept: 'application/vnd.github.v3+json',
-      },
-    }
+    { headers: ghFetchHeaders(env) }
   );
 
   if (!res.ok) {
@@ -286,17 +293,12 @@ async function handleLatestRelease(
 }
 
 async function handleReleaseFirmware(
+  env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  // Fetch latest release info
   const res = await fetch(
     'https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases/latest',
-    {
-      headers: {
-        'User-Agent': 'crosspoint-tools',
-        Accept: 'application/vnd.github.v3+json',
-      },
-    }
+    { headers: ghFetchHeaders(env) }
   );
 
   if (!res.ok) {

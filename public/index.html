@@ -178,10 +178,10 @@
       </div>
 
       <!-- Info -->
-      <div class="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+      <div class="rounded-xl bg-white p-6 ring-1 ring-stone-950/5" style="margin-top: 0.5rem">
         <h2 class="font-serif text-lg font-medium text-stone-900 sm:text-base/6">Device Restart Instructions</h2>
-        <p class="mt-2 text-sm/6 text-stone-500 text-pretty">After flashing, press the small <strong class="text-stone-700">Reset</strong> button near the bottom right, then press and hold the power button for 3 seconds.</p>
-        <p class="mt-2 text-sm/6 text-stone-400" id="x3-restart-note" style="display:none">For CrossPoint firmware on X3, disconnect and reconnect the USB cable instead.</p>
+        <p class="mt-2 text-sm/6 text-stone-500 text-pretty" id="x4-restart-note">After flashing, press the small <strong class="text-stone-700">Reset</strong> button near the bottom right, then press and hold the power button for 3 seconds.</p>
+        <p class="mt-2 text-sm/6 text-stone-500 text-pretty" id="x3-restart-note" style="display:none">After flashing, disconnect and reconnect the USB cable.</p>
       </div>
 
       <div class="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
@@ -222,6 +222,7 @@
         }`;
       });
       // Show/hide X3 restart note
+      document.getElementById('x4-restart-note').style.display = deviceModel === 'x4' ? '' : 'none';
       document.getElementById('x3-restart-note').style.display = deviceModel === 'x3' ? '' : 'none';
     }
     updateModelButtons();
@@ -319,6 +320,7 @@
       setRunning(true);
       progressCard.classList.remove('hidden');
       progressStatus.innerHTML = '';
+      progressCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       try {
         if (action === 'save-full') {

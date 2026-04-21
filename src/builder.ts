@@ -20,19 +20,35 @@ export async function triggerBuild(env: Env, commit: string, commitMessage: stri
   try {
     // Reuse the same sandbox — the Docker image has the repo pre-cloned
     // and a full build already done, so we just git pull + incremental compile
-    const sandbox = getSandbox(env.SANDBOX, 'firmware-builder', {
+    const sandbox = getSandbox(env.SANDBOX, 'firmware-builder-v3', {
       sleepAfter: '30m',
       keepAlive: true,
     });
 
-    // Pull latest changes (repo is pre-cloned in the Docker image)
-    console.log(`Pulling latest from ${env.REPO_BRANCH}...`);
-    const pullResult = await sandbox.exec(
-      `git fetch origin ${env.REPO_BRANCH} && git reset --hard origin/${env.REPO_BRANCH} && git submodule update --init --recursive`,
-      { cwd: REPO_DIR, timeout: 120_000 }
-    );
-    if (!pullResult.success) {
-      throw new Error(`Git pull failed: ${pullResult.stderr}`);
+    // Check if repo exists (pre-cloned in Docker image), clone if not
+    const checkRepo = await sandbox.exec(`test -d ${REPO_DIR}/.git`, { timeout: 5_000 });
+    if (checkRepo.success) {
+      console.log(`Pulling latest from ${env.REPO_BRANCH}...`);
+      const pullResult = await sandbox.exec(
+        `git fetch origin ${env.REPO_BRANCH} && git reset --hard origin/${env.REPO_BRANCH} && git submodule update --init --recursive`,
+        { cwd: REPO_DIR, timeout: 120_000 }
+      );
+      if (!pullResult.success) {
+        throw new Error(`Git pull failed: ${pullResult.stderr}`);
+      }
+    } else {
+      console.log(`Cloning ${env.REPO_URL} @ ${env.REPO_BRANCH}...`);
+      await sandbox.exec(`rm -rf ${REPO_DIR}`, { timeout: 30_000 });
+      const cloneUrl = env.GITHUB_TOKEN
+        ? env.REPO_URL.replace('https://', `https://x-access-token:${env.GITHUB_TOKEN}@`)
+        : env.REPO_URL;
+      const cloneResult = await sandbox.exec(
+        `git clone --depth 50 --branch ${env.REPO_BRANCH} --recurse-submodules ${cloneUrl} ${REPO_DIR}`,
+        { timeout: 180_000 }
+      );
+      if (!cloneResult.success) {
+        throw new Error(`Clone failed: ${cloneResult.stderr}`);
+      }
     }
 
     // Get changelog — commits since last tag (use --unshallow if needed)
