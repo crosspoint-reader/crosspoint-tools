@@ -135,103 +135,134 @@
         <span class="font-semibold">Browser not supported.</span> WebSerial requires Chrome or Edge on desktop. Please switch browsers to use the web flasher.
       </div>
 
-      <div id="main-content" class="mt-8 space-y-4">
+      <div id="main-content" class="mt-10 space-y-6">
 
-        <!-- Device Model Selector -->
-        <div class="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
-          <h3 class="text-sm font-semibold text-stone-900">Device Model</h3>
-          <div class="mt-3 flex gap-2">
-            <button class="model-btn flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors" data-model="x4" aria-pressed="true">Xteink X4</button>
-            <button class="model-btn flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors" data-model="x3" aria-pressed="false">Xteink X3</button>
+        <!-- Step 1: Device -->
+        <div id="step-device">
+          <div class="flex items-center gap-2.5">
+            <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white" id="step-num-1">1</span>
+            <h3 class="text-sm font-semibold text-stone-900">Select your device</h3>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            <button class="model-btn group relative rounded-xl p-4 text-left ring-1 ring-stone-950/5" data-model="x4">
+              <div class="text-sm font-semibold text-stone-900">Xteink X4</div>
+              <div class="mt-0.5 text-xs text-stone-400">480 &times; 800</div>
+            </button>
+            <button class="model-btn group relative rounded-xl p-4 text-left ring-1 ring-stone-950/5" data-model="x3">
+              <div class="text-sm font-semibold text-stone-900">Xteink X3</div>
+              <div class="mt-0.5 text-xs text-stone-400">528 &times; 792</div>
+            </button>
           </div>
         </div>
 
-        <!-- Caution Alert -->
-        <div class="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
-          <span class="font-semibold">Proceed with caution.</span> Take a backup using <strong>Save full flash</strong> before flashing. Avoid disconnecting your device or closing the tab during a flash operation.
+        <!-- Step 2: Firmware -->
+        <div id="step-firmware" class="hidden">
+          <div class="flex items-center gap-2.5">
+            <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white" id="step-num-2">2</span>
+            <h3 class="text-sm font-semibold text-stone-900">Choose firmware</h3>
+          </div>
+          <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <button class="fw-btn group relative rounded-xl p-4 text-left ring-1 ring-stone-950/5" data-fw="crosspoint" id="fw-btn-crosspoint">
+              <div class="text-sm font-semibold text-stone-900">CrossPoint</div>
+              <div class="mt-0.5 text-xs text-brand-500">Community</div>
+            </button>
+            <button class="fw-btn group relative rounded-xl p-4 text-left ring-1 ring-stone-950/5" data-fw="stock-en">
+              <div class="text-sm font-semibold text-stone-900">Stock English</div>
+              <div class="mt-0.5 text-xs text-stone-400">Official</div>
+            </button>
+            <button class="fw-btn group relative rounded-xl p-4 text-left ring-1 ring-stone-950/5" data-fw="stock-ch">
+              <div class="text-sm font-semibold text-stone-900">Stock Chinese</div>
+              <div class="mt-0.5 text-xs text-stone-400">Official</div>
+            </button>
+            <button class="fw-btn group relative rounded-xl p-4 text-left ring-1 ring-stone-950/5" data-fw="custom">
+              <div class="text-sm font-semibold text-stone-900">Custom .bin</div>
+              <div class="mt-0.5 text-xs text-stone-400">Upload file</div>
+            </button>
+            <button class="fw-btn group relative rounded-xl p-4 text-left ring-1 ring-stone-950/5" data-fw="backup">
+              <div class="text-sm font-semibold text-stone-900">Backup / Restore</div>
+              <div class="mt-0.5 text-xs text-stone-400">Full 16MB flash</div>
+            </button>
+          </div>
         </div>
 
-        <!-- OTA Fast Flash -->
-        <div class="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
-          <h3 class="text-sm font-semibold text-stone-900">OTA Fast Flash</h3>
-          <p class="mt-1 text-sm/6 text-stone-400 text-pretty">Writes firmware to the backup OTA partition and swaps boot. Your settings and books are preserved.</p>
-
-          <div class="mt-4 space-y-2">
-            <!-- CrossPoint firmware -->
-            <div class="rounded-lg bg-stone-50 p-4">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="text-sm font-semibold text-stone-900">CrossPoint Firmware</div>
-                  <div class="mt-0.5 font-mono text-xs text-stone-400 tabular-nums" id="crosspoint-version">Loading...</div>
-                </div>
-                <span class="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-500">Community</span>
-              </div>
-              <button class="flash-btn mt-3 flex w-full items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50 disabled:cursor-not-allowed" data-action="crosspoint" disabled>
-                Flash CrossPoint
-              </button>
-            </div>
-
-            <!-- Stock English -->
-            <div class="rounded-lg bg-stone-50 p-4">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="text-sm font-semibold text-stone-900">Official English Firmware</div>
-                  <div class="mt-0.5 font-mono text-xs text-stone-400 tabular-nums" id="stock-en-version">Loading...</div>
-                </div>
-                <span class="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-semibold text-stone-500">Stock</span>
-              </div>
-              <button class="flash-btn mt-3 flex w-full items-center justify-center rounded-lg bg-stone-800 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-800 disabled:opacity-50 disabled:cursor-not-allowed" data-action="stock-en" disabled>
-                Flash English Firmware
-              </button>
-            </div>
-
-            <!-- Stock Chinese -->
-            <div class="rounded-lg bg-stone-50 p-4">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="text-sm font-semibold text-stone-900">Official Chinese Firmware</div>
-                  <div class="mt-0.5 font-mono text-xs text-stone-400 tabular-nums" id="stock-ch-version">Loading...</div>
-                </div>
-                <span class="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-semibold text-stone-500">Stock</span>
-              </div>
-              <button class="flash-btn mt-3 flex w-full items-center justify-center rounded-lg bg-stone-800 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-800 disabled:opacity-50 disabled:cursor-not-allowed" data-action="stock-ch" disabled>
-                Flash Chinese Firmware
-              </button>
-            </div>
-
-            <!-- Custom Firmware from File -->
-            <div class="rounded-lg bg-stone-50 p-4">
-              <div class="text-sm font-semibold text-stone-900">Custom Firmware</div>
-              <p class="mt-0.5 text-xs text-stone-400">Upload a .bin file to flash to the OTA partition</p>
-              <div class="mt-3 flex gap-2">
-                <label class="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
-                  <span id="custom-file-label">Choose file...</span>
-                  <input type="file" accept=".bin" id="custom-file-input" class="hidden">
-                </label>
-                <button class="flash-btn shrink-0 rounded-lg bg-stone-800 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed" data-action="custom" disabled>
-                  Flash
+        <!-- Step 3: Flash -->
+        <div id="step-flash" class="hidden">
+          <div class="flex items-center gap-2.5">
+            <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white" id="step-num-3">3</span>
+            <h3 class="text-sm font-semibold text-stone-900">Flash</h3>
+          </div>
+          <div class="mt-4">
+            <div class="rounded-xl bg-stone-50 p-5">
+              <!-- CrossPoint panel -->
+              <div id="fw-panel-crosspoint" class="hidden">
+                <div class="text-sm font-semibold text-stone-900">CrossPoint Firmware</div>
+                <div class="mt-1 font-mono text-xs text-stone-400 tabular-nums" id="crosspoint-version">Loading...</div>
+                <button class="flash-btn mt-4 inline-flex items-center justify-center rounded-lg bg-brand-500 py-2 pr-4 pl-3 text-sm font-semibold text-white hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50 disabled:cursor-not-allowed" data-action="crosspoint" disabled>
+                  <svg class="mr-1.5 size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+                  Flash CrossPoint
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Full Flash Controls -->
-        <div class="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
-          <h3 class="text-sm font-semibold text-stone-900">Full Flash Controls</h3>
-          <p class="mt-1 text-sm/6 text-stone-400 text-pretty">Back up or restore the entire 16MB flash memory. A full backup takes about 25 minutes.</p>
-          <div class="mt-4 space-y-2">
-            <button class="flash-btn flex w-full items-center justify-center rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed" data-action="save-full">
-              Save Full Flash
-            </button>
-            <div class="flex gap-2">
-              <label class="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
-                <span id="fullflash-file-label">Choose backup file...</span>
-                <input type="file" accept=".bin" id="fullflash-file-input" class="hidden">
-              </label>
-              <button class="flash-btn shrink-0 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed" data-action="write-full" disabled>
-                Write Full Flash
-              </button>
+              <!-- Stock English panel -->
+              <div id="fw-panel-stock-en" class="hidden">
+                <div class="text-sm font-semibold text-stone-900">Official English Firmware</div>
+                <div class="mt-1 font-mono text-xs text-stone-400 tabular-nums" id="stock-en-version">Loading...</div>
+                <button class="flash-btn mt-4 inline-flex items-center justify-center rounded-lg bg-stone-800 py-2 pr-4 pl-3 text-sm font-semibold text-white hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-800 disabled:opacity-50 disabled:cursor-not-allowed" data-action="stock-en" disabled>
+                  <svg class="mr-1.5 size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+                  Flash English Firmware
+                </button>
+              </div>
+
+              <!-- Stock Chinese panel -->
+              <div id="fw-panel-stock-ch" class="hidden">
+                <div class="text-sm font-semibold text-stone-900">Official Chinese Firmware</div>
+                <div class="mt-1 font-mono text-xs text-stone-400 tabular-nums" id="stock-ch-version">Loading...</div>
+                <button class="flash-btn mt-4 inline-flex items-center justify-center rounded-lg bg-stone-800 py-2 pr-4 pl-3 text-sm font-semibold text-white hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-800 disabled:opacity-50 disabled:cursor-not-allowed" data-action="stock-ch" disabled>
+                  <svg class="mr-1.5 size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+                  Flash Chinese Firmware
+                </button>
+              </div>
+
+              <!-- Custom panel -->
+              <div id="fw-panel-custom" class="hidden">
+                <div class="text-sm font-semibold text-stone-900">Custom Firmware</div>
+                <p class="mt-1 text-xs text-stone-400">Upload a .bin file to flash to the OTA partition.</p>
+                <div class="mt-4 flex gap-2">
+                  <label class="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
+                    <span id="custom-file-label">Choose file...</span>
+                    <input type="file" accept=".bin" id="custom-file-input" class="hidden">
+                  </label>
+                  <button class="flash-btn shrink-0 rounded-lg bg-stone-800 py-2 pr-4 pl-3 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed" data-action="custom" disabled>
+                    <svg class="mr-1.5 inline size-4 shrink-0 align-text-bottom" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+                    Flash
+                  </button>
+                </div>
+              </div>
+
+              <!-- Backup / Restore panel -->
+              <div id="fw-panel-backup" class="hidden">
+                <div class="text-sm font-semibold text-stone-900">Backup / Restore</div>
+                <p class="mt-1 text-xs text-stone-400">Back up or restore the entire 16MB flash. A full backup takes about 25 minutes.</p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <button class="flash-btn inline-flex items-center justify-center rounded-lg border border-stone-950/10 bg-white py-2 pr-3 pl-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed" data-action="save-full">
+                    <svg class="mr-1.5 size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 12l4.5 4.5m0 0l4.5-4.5M12 16.5V3"/></svg>
+                    Save Full Flash
+                  </button>
+                </div>
+                <div class="mt-3 flex gap-2">
+                  <label class="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
+                    <span id="fullflash-file-label">Choose backup file...</span>
+                    <input type="file" accept=".bin" id="fullflash-file-input" class="hidden">
+                  </label>
+                  <button class="flash-btn shrink-0 rounded-lg border border-stone-950/10 bg-white py-2 pr-3 pl-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed" data-action="write-full" disabled>
+                    <svg class="mr-1.5 inline size-4 shrink-0 align-text-bottom" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+                    Restore
+                  </button>
+                </div>
+              </div>
+
+              <!-- Prompt to select -->
+              <p id="fw-panel-empty" class="text-sm text-stone-400">Select a firmware option above.</p>
             </div>
           </div>
         </div>
@@ -244,10 +275,10 @@
         </div>
 
         <!-- Restart Instructions -->
-        <div class="rounded-xl bg-white p-6 ring-1 ring-stone-950/5" style="margin-top: 0.5rem">
-          <h3 class="text-sm font-semibold text-stone-900">Device Restart Instructions</h3>
-          <p class="mt-2 text-sm/6 text-stone-500 text-pretty" id="x4-restart-note">After flashing, press the small <strong class="text-stone-700">Reset</strong> button near the bottom right, then press and hold the power button for 3 seconds.</p>
-          <p class="mt-2 text-sm/6 text-stone-500 text-pretty" id="x3-restart-note" style="display:none">After flashing, disconnect and reconnect the USB cable.</p>
+        <div class="hidden rounded-xl bg-stone-50 p-5" id="restart-card">
+          <div class="text-sm font-semibold text-stone-700">After flashing</div>
+          <p class="mt-1 text-sm/6 text-stone-500" id="x4-restart-note">Press the small <strong class="text-stone-600">Reset</strong> button near the bottom right, then press and hold the power button for 3 seconds.</p>
+          <p class="mt-1 text-sm/6 text-stone-500" id="x3-restart-note" style="display:none">Disconnect and reconnect the USB cable.</p>
         </div>
       </div>
     </div>
@@ -283,7 +314,8 @@
   <script type="module">
     import { CrossPointFlasher, fetchReleaseFirmware, fetchReleaseMeta, fetchStockFirmware, fetchStockFirmwareInfo, downloadBlob } from '/js/flasher.js';
 
-    let deviceModel = 'x4';
+    let deviceModel = null;
+    let selectedFw = null;
     let isRunning = false;
     let customFile = null;
     let fullFlashFile = null;
@@ -294,42 +326,80 @@
       document.getElementById('main-content').classList.add('hidden');
     }
 
-    // --- Device model switcher ---
-    function updateModelButtons() {
-      document.querySelectorAll('.model-btn').forEach(btn => {
-        const m = btn.dataset.model;
-        const active = m === deviceModel;
-        btn.setAttribute('aria-pressed', active);
-        btn.className = `model-btn flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-          active
-            ? 'bg-brand-500 text-white'
-            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-        }`;
+    // --- Card styling helper ---
+    function styleCards(selector, activeValue, dataAttr) {
+      document.querySelectorAll(selector).forEach(btn => {
+        const active = btn.dataset[dataAttr] === activeValue;
+        if (active) {
+          btn.className = `${selector.replace('.', '')} group relative rounded-xl border-2 border-brand-500 bg-brand-50/40 p-4 text-left`;
+        } else {
+          btn.className = `${selector.replace('.', '')} group relative rounded-xl border border-stone-200 p-4 text-left hover:border-stone-300`;
+        }
       });
+    }
+
+    // --- Step 1: Device model ---
+    function updateDevice() {
+      styleCards('.model-btn', deviceModel, 'model');
       document.getElementById('x4-restart-note').style.display = deviceModel === 'x4' ? '' : 'none';
       document.getElementById('x3-restart-note').style.display = deviceModel === 'x3' ? '' : 'none';
+      document.getElementById('step-firmware').classList.toggle('hidden', !deviceModel);
+      // Update step indicator
+      document.getElementById('step-num-1').className = deviceModel
+        ? 'flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white'
+        : 'flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-200 font-mono text-xs font-semibold text-stone-500';
+      // Reset firmware selection when device changes
+      selectedFw = null;
+      updateFirmware();
+      if (deviceModel) loadFirmwareVersions();
     }
-    updateModelButtons();
+
+    updateDevice();
 
     document.querySelectorAll('.model-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         if (isRunning) return;
         deviceModel = btn.dataset.model;
-        updateModelButtons();
-        loadFirmwareVersions();
+        updateDevice();
+      });
+    });
+
+    // --- Step 2: Firmware selection ---
+    function updateFirmware() {
+      styleCards('.fw-btn', selectedFw, 'fw');
+      document.getElementById('step-flash').classList.toggle('hidden', !selectedFw);
+      document.getElementById('step-num-2').className = selectedFw
+        ? 'flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white'
+        : 'flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-200 font-mono text-xs font-semibold text-stone-500';
+      const panels = ['crosspoint', 'stock-en', 'stock-ch', 'custom', 'backup'];
+      panels.forEach(p => {
+        document.getElementById(`fw-panel-${p}`).classList.toggle('hidden', p !== selectedFw);
+      });
+      document.getElementById('fw-panel-empty').classList.toggle('hidden', selectedFw !== null);
+    }
+    updateFirmware();
+
+    document.querySelectorAll('.fw-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (isRunning) return;
+        selectedFw = btn.dataset.fw;
+        updateFirmware();
       });
     });
 
     // --- Load firmware version info ---
     async function loadFirmwareVersions() {
       document.getElementById('crosspoint-version').textContent = 'Loading...';
+      document.getElementById('fw-btn-crosspoint').textContent = 'CrossPoint';
       if (deviceModel === 'x3') {
         document.getElementById('crosspoint-version').textContent = '1.2.0+ — Apr 20, 2026';
+        document.getElementById('fw-btn-crosspoint').textContent = 'CrossPoint 1.2.0+';
         document.querySelector('[data-action="crosspoint"]').disabled = false;
       } else {
         const meta = await fetchReleaseMeta();
         if (meta) {
           document.getElementById('crosspoint-version').textContent = `${meta.tag} — ${new Date(meta.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`;
+          document.getElementById('fw-btn-crosspoint').textContent = `CrossPoint ${meta.tag}`;
           document.querySelector('[data-action="crosspoint"]').disabled = false;
         } else {
           document.getElementById('crosspoint-version').textContent = 'Failed to load';
@@ -348,7 +418,6 @@
         }
       }
     }
-    loadFirmwareVersions();
 
     // --- File inputs ---
     document.getElementById('custom-file-input').addEventListener('change', (e) => {
@@ -400,6 +469,7 @@
 
       setRunning(true);
       progressCard.classList.remove('hidden');
+      document.getElementById('restart-card').classList.remove('hidden');
       progressStatus.innerHTML = '';
       progressCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
