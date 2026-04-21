@@ -163,7 +163,7 @@
             <span class="font-mono text-xs text-stone-400 tabular-nums" id="commit-count"></span>
           </div>
           <p class="mt-1 text-sm/6 text-stone-400">Commits since the last tagged release</p>
-          <ul id="changelog-list" role="list" class="mt-4 max-h-96 divide-y divide-stone-100 overflow-y-auto">
+          <ul id="changelog-list" role="list" class="mt-4 max-h-96 divide-y divide-stone-100 overflow-y-auto pr-4">
             <li class="py-3 text-sm text-stone-400">No commits found</li>
           </ul>
         </div>
@@ -267,16 +267,21 @@
 
       if (meta.changelog?.length > 0) {
         commitCount.textContent = `${meta.changelog.length} commit${meta.changelog.length !== 1 ? 's' : ''}`;
-        changelogList.innerHTML = meta.changelog.map(c => `
+        changelogList.innerHTML = meta.changelog.map(c => {
+          // Strip conventional commit prefixes
+          const msg = c.message.split('\n')[0]
+            .replace(/^(feat|fix|chore|refactor|docs|style|test|perf|ci|build|revert)(\(.+?\))?:\s*/i, '');
+          // Capitalize first letter
+          const cleanMsg = msg.charAt(0).toUpperCase() + msg.slice(1);
+          return `
           <li class="flex gap-3 py-3 text-sm">
-            <span class="shrink-0 font-mono text-xs text-brand-500 pt-0.5 tabular-nums">${c.hashShort}</span>
             <div class="flex-1 min-w-0">
-              <div class="text-stone-800">${escapeHtml(c.message.split('\n')[0])}</div>
-              <div class="text-xs text-stone-400">${escapeHtml(c.author)}</div>
+              <div class="text-stone-800">${escapeHtml(cleanMsg)}</div>
+              <div class="mt-0.5 text-xs text-stone-400">${escapeHtml(c.author)}</div>
             </div>
             <span class="shrink-0 text-xs text-stone-400 pt-0.5 tabular-nums">${c.date ? relativeTime(c.date) : ''}</span>
-          </li>
-        `).join('');
+          </li>`;
+        }).join('');
       } else {
         commitCount.textContent = '';
         changelogList.innerHTML = '<li class="py-3 text-sm text-stone-400">No changelog available</li>';
