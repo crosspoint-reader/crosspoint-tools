@@ -3,7 +3,6 @@ name: Build CrossPoint Firmware
 on:
   workflow_dispatch:
   schedule:
-    # Check for new upstream commits daily at 6am UTC
     - cron: '0 6 * * *'
 
 jobs:
@@ -14,26 +13,33 @@ jobs:
         id: check
         run: |
           # Get latest upstream commit
-          LATEST=$(curl -s -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
-            "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/commits/master" \
-            | jq -r '.sha')
+          COMMIT_JSON=$(curl -s -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/commits/master")
+
+          LATEST=$(echo "$COMMIT_JSON" | jq -r '.sha')
           echo "commit=$LATEST" >> "$GITHUB_OUTPUT"
           echo "commit_short=${LATEST:0:7}" >> "$GITHUB_OUTPUT"
 
-          # Get commit message
-          MSG=$(curl -s -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
-            "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/commits/master" \
-            | jq -r '.commit.message')
+          # Get first line of commit message only (safe for GITHUB_OUTPUT)
+          MSG=$(echo "$COMMIT_JSON" | jq -r '.commit.message' | head -1)
           echo "message=$MSG" >> "$GITHUB_OUTPUT"
 
-          # Check if we already built this commit (query KV via Worker API)
+          # For workflow_dispatch, always build regardless
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "Manual trigger — building ${LATEST:0:7}"
+            exit 0
+          fi
+
+          # Check if we already built this commit
           CURRENT=$(curl -s "https://crosspointreader.com/api/build/latest" | jq -r '.commit // empty')
-          if [ "$CURRENT" = "$LATEST" ]; then
+          CURRENT_STATUS=$(curl -s "https://crosspointreader.com/api/build/latest" | jq -r '.status // empty')
+          if [ "$CURRENT" = "$LATEST" ] && [ "$CURRENT_STATUS" = "success" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Already built $LATEST, skipping"
+            echo "Already built $LATEST successfully, skipping"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "New commit: ${LATEST:0:7}"
+            echo "New commit or previous build failed: ${LATEST:0:7} (status: $CURRENT_STATUS)"
           fi
 
       - name: Mark build as started
@@ -42,12 +48,12 @@ jobs:
           curl -s -X POST "https://crosspointreader.com/api/build/status" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "status": "building",
-              "commit": "${{ steps.check.outputs.commit }}",
-              "commitShort": "${{ steps.check.outputs.commit_short }}",
-              "commitMessage": "${{ steps.check.outputs.message }}"
-            }'
+            -d "{
+              \"status\": \"building\",
+              \"commit\": \"${{ steps.check.outputs.commit }}\",
+              \"commitShort\": \"${{ steps.check.outputs.commit_short }}\",
+              \"commitMessage\": \"${{ steps.check.outputs.message }}\"
+            }"
 
       - name: Checkout crosspoint-reader
         if: steps.check.outputs.skip == 'false'
@@ -56,7 +62,7 @@ jobs:
           repository: crosspoint-reader/crosspoint-reader
           ref: master
           submodules: recursive
-          fetch-depth: 50
+          fetch-depth: 0
           fetch-tags: true
 
       - name: Setup Python
@@ -80,53 +86,52 @@ jobs:
         if: steps.check.outputs.skip == 'false'
         run: pio run -e gh_release
 
-      - name: Get changelog
+      - name: Get version and changelog
         if: steps.check.outputs.skip == 'false'
-        id: changelog
+        id: info
         run: |
-          # Get commits since last tag
-          CHANGELOG=$(git log $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD --pretty=format:'{"hash":"%H","hashShort":"%h","author":"%an","date":"%aI","message":"%s"},' | sed '$ s/,$//')
-          echo "changelog=[$CHANGELOG]" >> "$GITHUB_OUTPUT"
-
-          # Get version from platformio.ini
+          # Version from platformio.ini
           VERSION=$(grep -oP 'version\s*=\s*\K.*' platformio.ini | head -1)
           echo "version=${VERSION}-dev+${{ steps.check.outputs.commit_short }}" >> "$GITHUB_OUTPUT"
+
+          # Changelog as JSON array
+          CHANGELOG=$(git log $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD \
+            --pretty=format:'{"hash":"%H","hashShort":"%h","author":"%an","date":"%aI","message":"%s"}' \
+            | jq -s '.')
+          # Write to file to avoid GITHUB_OUTPUT line length issues
+          echo "$CHANGELOG" > /tmp/changelog.json
 
       - name: Upload firmware to R2
         if: steps.check.outputs.skip == 'false'
         run: |
-          FIRMWARE=".pio/build/gh_release/firmware.bin"
-          SIZE=$(stat -c%s "$FIRMWARE")
-          COMMIT="${{ steps.check.outputs.commit }}"
-          SHORT="${{ steps.check.outputs.commit_short }}"
-          VERSION="${{ steps.changelog.outputs.version }}"
-
-          # Upload to R2 via Worker API
           curl -s -X PUT "https://crosspointreader.com/api/build/upload" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/octet-stream" \
-            -H "X-Build-Commit: $COMMIT" \
-            -H "X-Build-Version: $VERSION" \
-            --data-binary @"$FIRMWARE"
+            -H "X-Build-Commit: ${{ steps.check.outputs.commit }}" \
+            -H "X-Build-Version: ${{ steps.info.outputs.version }}" \
+            --data-binary @".pio/build/gh_release/firmware.bin"
 
-      - name: Update build metadata
+      - name: Update build metadata (success)
         if: steps.check.outputs.skip == 'false'
         run: |
           FIRMWARE=".pio/build/gh_release/firmware.bin"
           SIZE=$(stat -c%s "$FIRMWARE")
+          CHANGELOG=$(cat /tmp/changelog.json)
 
-          curl -s -X POST "https://crosspointreader.com/api/build/status" \
-            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"status\": \"success\",
-              \"commit\": \"${{ steps.check.outputs.commit }}\",
-              \"commitShort\": \"${{ steps.check.outputs.commit_short }}\",
-              \"commitMessage\": $(echo '${{ steps.check.outputs.message }}' | jq -Rs .),
-              \"version\": \"${{ steps.changelog.outputs.version }}\",
-              \"firmwareSize\": $SIZE,
-              \"changelog\": ${{ steps.changelog.outputs.changelog }}
-            }"
+          # Build the JSON payload carefully
+          jq -n \
+            --arg status "success" \
+            --arg commit "${{ steps.check.outputs.commit }}" \
+            --arg commitShort "${{ steps.check.outputs.commit_short }}" \
+            --arg commitMessage "${{ steps.check.outputs.message }}" \
+            --arg version "${{ steps.info.outputs.version }}" \
+            --argjson firmwareSize "$SIZE" \
+            --argjson changelog "$CHANGELOG" \
+            '{status: $status, commit: $commit, commitShort: $commitShort, commitMessage: $commitMessage, version: $version, firmwareSize: $firmwareSize, changelog: $changelog}' \
+            | curl -s -X POST "https://crosspointreader.com/api/build/status" \
+              -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+              -H "Content-Type: application/json" \
+              -d @-
 
       - name: Mark build as failed
         if: failure() && steps.check.outputs.skip == 'false'
@@ -134,9 +139,9 @@ jobs:
           curl -s -X POST "https://crosspointreader.com/api/build/status" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "status": "failed",
-              "commit": "${{ steps.check.outputs.commit }}",
-              "commitShort": "${{ steps.check.outputs.commit_short }}",
-              "error": "Build failed — check GitHub Actions logs"
-            }'
+            -d "{
+              \"status\": \"failed\",
+              \"commit\": \"${{ steps.check.outputs.commit }}\",
+              \"commitShort\": \"${{ steps.check.outputs.commit_short }}\",
+              \"error\": \"Build failed — check GitHub Actions logs\"
+            }"
