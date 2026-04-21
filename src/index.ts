@@ -1,8 +1,4 @@
-import type { Env, BuildMetadata, GitHubPushEvent } from './types';
-import { verifyGitHubSignature, isPushToMaster } from './webhook';
-import { triggerBuild } from './builder';
-
-export { Sandbox } from '@cloudflare/sandbox';
+import type { Env, BuildMetadata } from './types';
 
 const ROYALTY_REPO_ID = 'SoFriendly/crosspoint-tools';
 
@@ -22,44 +18,6 @@ export default {
 
     // Let static assets handle everything else
     return env.ASSETS.fetch(request);
-  },
-
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
-    // Poll upstream repo for new commits and trigger build if needed
-    const repoPath = env.REPO_URL
-      .replace(/^https?:\/\/github\.com\//, '')
-      .replace(/\.git$/, '');
-    const apiUrl = `https://api.github.com/repos/${repoPath}/commits/${env.REPO_BRANCH}`;
-
-    const ghHeaders: Record<string, string> = {
-      'User-Agent': 'crosspoint-tools',
-      Accept: 'application/vnd.github.v3+json',
-    };
-    if (env.GITHUB_TOKEN) {
-      ghHeaders.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
-    }
-
-    const ghRes = await fetch(apiUrl, { headers: ghHeaders });
-    if (!ghRes.ok) {
-      console.error('Failed to fetch latest commit:', ghRes.status);
-      return;
-    }
-
-    const commitData = await ghRes.json() as { sha: string; commit: { message: string } };
-    const latestCommit = commitData.sha;
-
-    // Check if we already built this commit
-    const raw = await env.BUILD_META.get('latest-build');
-    if (raw) {
-      const meta: BuildMetadata = JSON.parse(raw);
-      if (meta.commit === latestCommit) {
-        // Already built this commit, skip
-        return;
-      }
-    }
-
-    console.log(`New commit detected: ${latestCommit.substring(0, 7)}, triggering build`);
-    ctx.waitUntil(triggerBuild(env, latestCommit, commitData.commit.message));
   },
 };
 
@@ -81,9 +39,6 @@ async function handleApi(
 
   try {
     switch (url.pathname) {
-      case '/api/webhook':
-        return handleWebhook(request, env, ctx);
-
       case '/api/build/latest':
         return handleLatestBuild(env, corsHeaders);
 
@@ -91,7 +46,13 @@ async function handleApi(
         return handleFirmwareDownload(env, corsHeaders);
 
       case '/api/build/trigger':
-        return handleManualTrigger(request, env, ctx, corsHeaders);
+        return handleManualTrigger(request, env, corsHeaders);
+
+      case '/api/build/status':
+        return handleBuildStatus(request, env, corsHeaders);
+
+      case '/api/build/upload':
+        return handleBuildUpload(request, env, corsHeaders);
 
       case '/api/release/latest':
         return handleLatestRelease(env, corsHeaders);
@@ -118,41 +79,6 @@ async function handleApi(
     console.error('API error:', err);
     return json({ error: 'Internal server error' }, 500, corsHeaders);
   }
-}
-
-// --- GitHub Webhook ---
-
-async function handleWebhook(
-  request: Request,
-  env: Env,
-  ctx: ExecutionContext
-): Promise<Response> {
-  if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405);
-  }
-
-  const event = request.headers.get('x-github-event');
-  if (event !== 'push') {
-    return json({ message: 'Ignored event', event }, 200);
-  }
-
-  const { valid, body } = await verifyGitHubSignature(request, env.GITHUB_WEBHOOK_SECRET);
-  if (!valid) {
-    return json({ error: 'Invalid signature' }, 401);
-  }
-
-  const payload: GitHubPushEvent = JSON.parse(body);
-  if (!isPushToMaster(payload, env.REPO_BRANCH)) {
-    return json({ message: 'Not target branch, ignoring' }, 200);
-  }
-
-  const commit = payload.after;
-  const commitMessage = payload.head_commit?.message || 'No message';
-
-  // Run build in background (don't block webhook response)
-  ctx.waitUntil(triggerBuild(env, commit, commitMessage));
-
-  return json({ message: 'Build triggered', commit: commit.substring(0, 7) }, 202);
 }
 
 // --- Build Metadata ---
@@ -195,55 +121,108 @@ async function handleFirmwareDownload(
   });
 }
 
-// --- Manual Build Trigger ---
+// --- Manual Build Trigger (dispatches GitHub Actions workflow) ---
 
 async function handleManualTrigger(
   request: Request,
   env: Env,
-  ctx: ExecutionContext,
   headers: Record<string, string>
 ): Promise<Response> {
   if (request.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  // Auth check — use the webhook secret as a bearer token
   const auth = request.headers.get('Authorization');
   if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
-  // Fetch latest commit from GitHub
-  // Derive API URL: "https://github.com/org/repo.git" -> "org/repo"
-  const repoPath = env.REPO_URL
-    .replace(/^https?:\/\/github\.com\//, '')
-    .replace(/\.git$/, '');
-  const apiUrl = `https://api.github.com/repos/${repoPath}/commits/${env.REPO_BRANCH}`;
+  // Dispatch the GitHub Actions workflow
+  const ghRes = await fetch(
+    'https://api.github.com/repos/SoFriendly/crosspoint-tools/actions/workflows/build-firmware.yml/dispatches',
+    {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'crosspoint-tools',
+        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+      body: JSON.stringify({ ref: 'master' }),
+    }
+  );
 
-  const ghHeaders: Record<string, string> = {
-    'User-Agent': 'crosspoint-tools',
-    Accept: 'application/vnd.github.v3+json',
-  };
-  if (env.GITHUB_TOKEN) {
-    ghHeaders.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
-  }
-
-  console.log(`Fetching commit from: ${apiUrl}`);
-  const ghRes = await fetch(apiUrl, { headers: ghHeaders });
   if (!ghRes.ok) {
     const body = await ghRes.text();
-    console.error(`GitHub API error: ${ghRes.status} ${body.substring(0, 500)}`);
-    return json({ error: `Failed to fetch latest commit: ${ghRes.status}` }, 502, headers);
+    console.error(`GitHub Actions dispatch failed: ${ghRes.status} ${body}`);
+    return json({ error: `Failed to trigger build: ${ghRes.status}` }, 502, headers);
   }
 
-  const commitData = await ghRes.json() as { sha: string; commit: { message: string } };
-  ctx.waitUntil(triggerBuild(env, commitData.sha, commitData.commit.message));
+  return json({ message: 'Build dispatched to GitHub Actions' }, 202, headers);
+}
 
-  return json(
-    { message: 'Build triggered', commit: commitData.sha.substring(0, 7) },
-    202,
-    headers
-  );
+// --- Build Status Update (called by GitHub Actions) ---
+
+async function handleBuildStatus(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+
+  const auth = request.headers.get('Authorization');
+  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const body = await request.json() as Partial<BuildMetadata>;
+  const existing = await env.BUILD_META.get('latest-build');
+  const meta: BuildMetadata = existing ? JSON.parse(existing) : {} as BuildMetadata;
+
+  // Merge incoming fields
+  Object.assign(meta, {
+    ...body,
+    buildDate: body.buildDate || new Date().toISOString(),
+    buildTimestamp: body.buildTimestamp || Date.now(),
+  });
+
+  await env.BUILD_META.put('latest-build', JSON.stringify(meta));
+  return json({ ok: true }, 200, headers);
+}
+
+// --- Build Upload (receives firmware.bin from GitHub Actions) ---
+
+async function handleBuildUpload(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'PUT') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+
+  const auth = request.headers.get('Authorization');
+  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const commit = request.headers.get('X-Build-Commit') || 'unknown';
+  const version = request.headers.get('X-Build-Version') || '';
+  const buildDate = new Date().toISOString();
+
+  const firmwareData = await request.arrayBuffer();
+
+  // Upload to R2
+  const metadata = { commit, version, buildDate };
+  await env.FIRMWARE_BUCKET.put(`builds/${commit.substring(0, 7)}/firmware.bin`, firmwareData, {
+    customMetadata: metadata,
+  });
+  await env.FIRMWARE_BUCKET.put('builds/latest/firmware.bin', firmwareData, {
+    customMetadata: metadata,
+  });
+
+  return json({ ok: true, size: firmwareData.byteLength }, 200, headers);
 }
 
 // --- Stable Release (from GitHub Releases) ---

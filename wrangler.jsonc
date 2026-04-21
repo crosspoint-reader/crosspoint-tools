@@ -15,28 +15,10 @@
     "run_worker_first": true
   },
 
-  // Sandbox for firmware builds
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "SANDBOX",
-        "class_name": "Sandbox"
-      }
-    ]
-  },
+  // Migration to remove the old Sandbox Durable Object
   "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["Sandbox"]
-    }
-  ],
-  "containers": [
-    {
-      "class_name": "Sandbox",
-      "image": "./Dockerfile",
-      "instance_type": "standard-3",
-      "max_instances": 2
-    }
+    { "tag": "v1", "new_sqlite_classes": ["Sandbox"] },
+    { "tag": "v2", "deleted_classes": ["Sandbox"] }
   ],
 
   // R2 bucket for firmware storage
@@ -59,14 +41,7 @@
   //   GITHUB_WEBHOOK_SECRET - for verifying webhook payloads
   //   GITHUB_TOKEN - optional, for private repo access
 
-  // Poll upstream repo for new commits every 15 minutes
-  "triggers": {
-    "crons": ["0 6 * * *"]
-  },
-
   "vars": {
-    "REPO_URL": "https://github.com/crosspoint-reader/crosspoint-reader.git",
-    "REPO_BRANCH": "master",
-    "BUILD_ENV": "gh_release"
+    "REPO_URL": "https://github.com/crosspoint-reader/crosspoint-reader.git"
   }
 }

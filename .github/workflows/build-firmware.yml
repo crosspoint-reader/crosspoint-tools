@@ -1,0 +1,142 @@
+name: Build CrossPoint Firmware
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Check for new upstream commits daily at 6am UTC
+    - cron: '0 6 * * *'
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for new commits
+        id: check
+        run: |
+          # Get latest upstream commit
+          LATEST=$(curl -s -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/commits/master" \
+            | jq -r '.sha')
+          echo "commit=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "commit_short=${LATEST:0:7}" >> "$GITHUB_OUTPUT"
+
+          # Get commit message
+          MSG=$(curl -s -H "Authorization: Bearer ${{ secrets.GH_PAT }}" \
+            "https://api.github.com/repos/crosspoint-reader/crosspoint-reader/commits/master" \
+            | jq -r '.commit.message')
+          echo "message=$MSG" >> "$GITHUB_OUTPUT"
+
+          # Check if we already built this commit (query KV via Worker API)
+          CURRENT=$(curl -s "https://crosspointreader.com/api/build/latest" | jq -r '.commit // empty')
+          if [ "$CURRENT" = "$LATEST" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Already built $LATEST, skipping"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "New commit: ${LATEST:0:7}"
+          fi
+
+      - name: Mark build as started
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          curl -s -X POST "https://crosspointreader.com/api/build/status" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "status": "building",
+              "commit": "${{ steps.check.outputs.commit }}",
+              "commitShort": "${{ steps.check.outputs.commit_short }}",
+              "commitMessage": "${{ steps.check.outputs.message }}"
+            }'
+
+      - name: Checkout crosspoint-reader
+        if: steps.check.outputs.skip == 'false'
+        uses: actions/checkout@v6
+        with:
+          repository: crosspoint-reader/crosspoint-reader
+          ref: master
+          submodules: recursive
+          fetch-depth: 50
+          fetch-tags: true
+
+      - name: Setup Python
+        if: steps.check.outputs.skip == 'false'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install uv
+        if: steps.check.outputs.skip == 'false'
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: false
+
+      - name: Install PlatformIO Core
+        if: steps.check.outputs.skip == 'false'
+        run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
+
+      - name: Build CrossPoint
+        if: steps.check.outputs.skip == 'false'
+        run: pio run -e gh_release
+
+      - name: Get changelog
+        if: steps.check.outputs.skip == 'false'
+        id: changelog
+        run: |
+          # Get commits since last tag
+          CHANGELOG=$(git log $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD --pretty=format:'{"hash":"%H","hashShort":"%h","author":"%an","date":"%aI","message":"%s"},' | sed '$ s/,$//')
+          echo "changelog=[$CHANGELOG]" >> "$GITHUB_OUTPUT"
+
+          # Get version from platformio.ini
+          VERSION=$(grep -oP 'version\s*=\s*\K.*' platformio.ini | head -1)
+          echo "version=${VERSION}-dev+${{ steps.check.outputs.commit_short }}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload firmware to R2
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          FIRMWARE=".pio/build/gh_release/firmware.bin"
+          SIZE=$(stat -c%s "$FIRMWARE")
+          COMMIT="${{ steps.check.outputs.commit }}"
+          SHORT="${{ steps.check.outputs.commit_short }}"
+          VERSION="${{ steps.changelog.outputs.version }}"
+
+          # Upload to R2 via Worker API
+          curl -s -X PUT "https://crosspointreader.com/api/build/upload" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/octet-stream" \
+            -H "X-Build-Commit: $COMMIT" \
+            -H "X-Build-Version: $VERSION" \
+            --data-binary @"$FIRMWARE"
+
+      - name: Update build metadata
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          FIRMWARE=".pio/build/gh_release/firmware.bin"
+          SIZE=$(stat -c%s "$FIRMWARE")
+
+          curl -s -X POST "https://crosspointreader.com/api/build/status" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"status\": \"success\",
+              \"commit\": \"${{ steps.check.outputs.commit }}\",
+              \"commitShort\": \"${{ steps.check.outputs.commit_short }}\",
+              \"commitMessage\": $(echo '${{ steps.check.outputs.message }}' | jq -Rs .),
+              \"version\": \"${{ steps.changelog.outputs.version }}\",
+              \"firmwareSize\": $SIZE,
+              \"changelog\": ${{ steps.changelog.outputs.changelog }}
+            }"
+
+      - name: Mark build as failed
+        if: failure() && steps.check.outputs.skip == 'false'
+        run: |
+          curl -s -X POST "https://crosspointreader.com/api/build/status" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "status": "failed",
+              "commit": "${{ steps.check.outputs.commit }}",
+              "commitShort": "${{ steps.check.outputs.commit_short }}",
+              "error": "Build failed — check GitHub Actions logs"
+            }'

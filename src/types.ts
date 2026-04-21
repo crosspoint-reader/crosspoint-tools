@@ -1,15 +1,10 @@
-import type { Sandbox } from '@cloudflare/sandbox';
-
 export interface Env {
-  SANDBOX: DurableObjectNamespace<Sandbox>;
   FIRMWARE_BUCKET: R2Bucket;
   BUILD_META: KVNamespace;
   ASSETS: Fetcher;
   GITHUB_WEBHOOK_SECRET: string;
   GITHUB_TOKEN?: string;
   REPO_URL: string;
-  REPO_BRANCH: string;
-  BUILD_ENV: string;
 }
 
 export interface BuildMetadata {
