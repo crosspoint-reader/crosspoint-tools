@@ -19,9 +19,10 @@ export default {
 
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     // Poll upstream repo for new commits and trigger build if needed
-    const apiUrl = env.REPO_URL
-      .replace('https://github.com/', 'https://api.github.com/repos/')
-      .replace('.git', '') + `/commits/${env.REPO_BRANCH}`;
+    const repoPath = env.REPO_URL
+      .replace(/^https?:\/\/github\.com\//, '')
+      .replace(/\.git$/, '');
+    const apiUrl = `https://api.github.com/repos/${repoPath}/commits/${env.REPO_BRANCH}`;
 
     const ghHeaders: Record<string, string> = {
       'User-Agent': 'crosspoint-tools',
@@ -200,9 +201,11 @@ async function handleManualTrigger(
   }
 
   // Fetch latest commit from GitHub
-  const apiUrl = env.REPO_URL
-    .replace('https://github.com/', 'https://api.github.com/repos/')
-    .replace('.git', '') + `/commits/${env.REPO_BRANCH}`;
+  // Derive API URL: "https://github.com/org/repo.git" -> "org/repo"
+  const repoPath = env.REPO_URL
+    .replace(/^https?:\/\/github\.com\//, '')
+    .replace(/\.git$/, '');
+  const apiUrl = `https://api.github.com/repos/${repoPath}/commits/${env.REPO_BRANCH}`;
 
   const ghHeaders: Record<string, string> = {
     'User-Agent': 'crosspoint-tools',
@@ -212,9 +215,12 @@ async function handleManualTrigger(
     ghHeaders.Authorization = `token ${env.GITHUB_TOKEN}`;
   }
 
+  console.log(`Fetching commit from: ${apiUrl}`);
   const ghRes = await fetch(apiUrl, { headers: ghHeaders });
   if (!ghRes.ok) {
-    return json({ error: 'Failed to fetch latest commit' }, 502, headers);
+    const body = await ghRes.text();
+    console.error(`GitHub API error: ${ghRes.status} ${body.substring(0, 500)}`);
+    return json({ error: `Failed to fetch latest commit: ${ghRes.status}` }, 502, headers);
   }
 
   const commitData = await ghRes.json() as { sha: string; commit: { message: string } };
