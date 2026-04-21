@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CrossPoint Tools</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/" class="logo"><img src="/logo.png" alt="" style="width:28px;height:28px;border-radius:6px;vertical-align:middle;margin-right:0.4rem;">Cross<span>Point</span> Tools</a>
+    <div class="nav-links">
+      <a href="/" class="active">Stable</a>
+      <a href="/early-access">Early Access</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="hero">
+      <h1>Flash CrossPoint Firmware</h1>
+      <p>Flash the latest stable CrossPoint release to your Xteink X4 using WebSerial. No software install required.</p>
+    </div>
+
+    <!-- Browser check -->
+    <div id="browser-warning" class="browser-warning hidden">
+      <h2>Browser Not Supported</h2>
+      <p class="text-dim">WebSerial requires Chrome or Edge on desktop. Please switch browsers to flash your device.</p>
+    </div>
+
+    <div id="main-content">
+      <!-- Release Info -->
+      <div class="card" id="release-card">
+        <div class="flex justify-between items-center mb-1">
+          <h2>Latest Stable Release</h2>
+          <span class="badge badge-stable">Stable</span>
+        </div>
+        <p id="release-info">Loading release info...</p>
+        <div id="release-details" class="build-info hidden">
+          <div class="build-info-item">
+            <div class="label">Version</div>
+            <div class="value mono" id="release-version">—</div>
+          </div>
+          <div class="build-info-item">
+            <div class="label">Released</div>
+            <div class="value" id="release-date">—</div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-lg btn-block" id="flash-stable-btn" disabled>
+          Flash CrossPoint
+        </button>
+      </div>
+
+      <!-- Flash Progress -->
+      <div class="card hidden" id="progress-card">
+        <h2 id="progress-title">Flashing...</h2>
+        <ul class="steps" id="steps-list"></ul>
+        <div class="mt-2" id="progress-status"></div>
+      </div>
+
+      <!-- Info cards -->
+      <div class="card">
+        <h2>How It Works</h2>
+        <p>Connect your X4 via USB, click the flash button, and select your device. The firmware is written to the backup OTA partition, then the device reboots into the new firmware. Your settings and books are preserved.</p>
+        <div class="alert alert-info mt-1">
+          Make sure your X4 is powered on and connected via USB before flashing. Only Chrome and Edge support WebSerial.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Looking for Bleeding Edge?</h2>
+        <p>Early Access builds are compiled automatically from the latest master branch commits. They include the newest features and fixes, but may be less stable.</p>
+        <a href="/early-access" class="btn btn-early-access mt-1">View Early Access Builds</a>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { CrossPointFlasher, fetchReleaseFirmware, fetchReleaseMeta } from '/js/flasher.js';
+
+    // Browser check
+    if (!('serial' in navigator)) {
+      document.getElementById('browser-warning').classList.remove('hidden');
+      document.getElementById('main-content').classList.add('hidden');
+    }
+
+    // Load release info
+    const meta = await fetchReleaseMeta();
+    if (meta) {
+      document.getElementById('release-info').textContent = meta.name || meta.tag;
+      document.getElementById('release-version').textContent = meta.tag;
+      document.getElementById('release-date').textContent = new Date(meta.publishedAt).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric'
+      });
+      document.getElementById('release-details').classList.remove('hidden');
+      document.getElementById('flash-stable-btn').disabled = false;
+    } else {
+      document.getElementById('release-info').textContent = 'Failed to load release info.';
+    }
+
+    // Flash handler
+    const flashBtn = document.getElementById('flash-stable-btn');
+    const progressCard = document.getElementById('progress-card');
+    const stepsList = document.getElementById('steps-list');
+    const progressStatus = document.getElementById('progress-status');
+
+    const STEPS = [
+      'Connect to device',
+      'Validate partition table',
+      'Read OTA data',
+      'Flash firmware',
+      'Update boot partition',
+      'Reset device',
+    ];
+
+    function renderSteps(states) {
+      stepsList.innerHTML = STEPS.map((name, i) => {
+        const st = states[i] || 'pending';
+        return `<li class="${st}">
+          <span class="step-icon ${st}"></span>
+          <span>${name}</span>
+          ${st === 'running' && name === 'Flash firmware' ? '<div class="progress-bar"><div class="progress-bar-fill" id="flash-progress" style="width:0%"></div></div>' : ''}
+        </li>`;
+      }).join('');
+    }
+
+    flashBtn.addEventListener('click', async () => {
+      flashBtn.disabled = true;
+      progressCard.classList.remove('hidden');
+      progressStatus.innerHTML = '';
+
+      const states = STEPS.map(() => 'pending');
+      renderSteps(states);
+
+      // Download firmware first (before connecting device)
+      try {
+        progressStatus.innerHTML = '<span class="text-dim">Downloading firmware...</span>';
+        const firmware = await fetchReleaseFirmware();
+        progressStatus.innerHTML = '';
+
+        const flasher = new CrossPointFlasher();
+        await flasher.flashFirmware(firmware, {
+          onStepChange: (idx, name, status) => {
+            states[idx] = status;
+            renderSteps(states);
+          },
+          onProgress: (step, current, total) => {
+            if (step === 'Flash firmware') {
+              const bar = document.getElementById('flash-progress');
+              if (bar) bar.style.width = `${(current / total * 100).toFixed(1)}%`;
+            }
+          },
+        });
+
+        progressStatus.innerHTML = '<div class="alert alert-info">Flash complete! Your device will restart with the new firmware.</div>';
+      } catch (err) {
+        const failIdx = states.findIndex(s => s === 'running');
+        if (failIdx >= 0) states[failIdx] = 'error';
+        renderSteps(states);
+        progressStatus.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+      }
+
+      flashBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>

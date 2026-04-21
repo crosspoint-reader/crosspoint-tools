@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Early Access — CrossPoint Tools</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Early Access page-specific styles */
+    .ea-hero {
+      text-align: center;
+      padding: 2.5rem 0 1.5rem;
+      position: relative;
+    }
+
+    .ea-hero::before {
+      content: '';
+      position: absolute;
+      top: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 400px;
+      height: 200px;
+      background: radial-gradient(ellipse, var(--early-access-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .ea-hero h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, var(--early-access) 0%, #a29bfe 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .ea-hero .subtitle {
+      color: var(--text-dim);
+      font-size: 0.95rem;
+      margin-top: 0.4rem;
+    }
+
+    .build-card {
+      background: var(--bg-card);
+      border: 1px solid rgba(253, 121, 168, 0.2);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .build-card .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .build-card .header h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .changelog-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+
+    .changelog-header h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .commit-count {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .no-builds {
+      text-align: center;
+      padding: 3rem 0;
+      color: var(--text-muted);
+    }
+
+    .no-builds p {
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+    }
+
+    .flash-section {
+      text-align: center;
+      padding: 1rem 0;
+    }
+
+    .flash-section .size-info {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    .ea-warning {
+      background: rgba(253, 121, 168, 0.06);
+      border: 1px solid rgba(253, 121, 168, 0.15);
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1rem;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .ea-warning strong {
+      color: var(--early-access);
+    }
+
+    .refresh-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: var(--radius-sm);
+      transition: all 0.15s;
+    }
+
+    .refresh-btn:hover {
+      color: var(--text);
+      background: var(--bg-surface);
+    }
+
+    .timestamp {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="logo"><img src="/logo.png" alt="" style="width:28px;height:28px;border-radius:6px;vertical-align:middle;margin-right:0.4rem;">Cross<span>Point</span> Tools</a>
+    <div class="nav-links">
+      <a href="/">Stable</a>
+      <a href="/early-access" class="active">Early Access</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- Browser check -->
+    <div id="browser-warning" class="browser-warning hidden">
+      <h2>Browser Not Supported</h2>
+      <p class="text-dim">WebSerial requires Chrome or Edge on desktop.</p>
+    </div>
+
+    <div id="main-content">
+      <div class="ea-hero">
+        <h1>Early Access Builds</h1>
+        <p class="subtitle">Latest firmware built automatically from the master branch</p>
+      </div>
+
+      <div class="ea-warning">
+        <strong>Heads up:</strong> These builds are compiled directly from the latest source code and haven't been through the full release QA process. They contain the newest features and fixes, but may introduce regressions. You can always flash back to the stable release from the <a href="/" style="color: var(--early-access);">main page</a>.
+      </div>
+
+      <!-- Loading state -->
+      <div id="loading" class="no-builds">
+        <div class="step-icon running" style="font-size: 1.5rem; margin: 0 auto 0.5rem; width: 30px; height: 30px;"></div>
+        <p>Loading build info...</p>
+      </div>
+
+      <!-- No builds state -->
+      <div id="no-builds" class="no-builds hidden">
+        <h2>No Builds Yet</h2>
+        <p>No early access builds have been triggered. Builds run automatically when new commits are pushed to master.</p>
+      </div>
+
+      <!-- Build info -->
+      <div id="build-content" class="hidden">
+        <!-- Build Status Card -->
+        <div class="build-card">
+          <div class="header">
+            <h2>
+              <span class="status-dot" id="status-dot"></span>
+              <span id="build-status-text">Build</span>
+            </h2>
+            <div class="flex items-center gap-1">
+              <span class="badge" id="build-badge"></span>
+              <button class="refresh-btn" onclick="loadBuildInfo()" title="Refresh">&#8635;</button>
+            </div>
+          </div>
+
+          <div class="build-info">
+            <div class="build-info-item">
+              <div class="label">Version</div>
+              <div class="value mono" id="build-version">—</div>
+            </div>
+            <div class="build-info-item">
+              <div class="label">Build Date</div>
+              <div class="value" id="build-date">—</div>
+            </div>
+            <div class="build-info-item">
+              <div class="label">Commit</div>
+              <div class="value mono" id="build-commit">—</div>
+            </div>
+            <div class="build-info-item">
+              <div class="label">Firmware Size</div>
+              <div class="value" id="build-size">—</div>
+            </div>
+          </div>
+
+          <!-- Flash Button -->
+          <div id="flash-section" class="flash-section hidden">
+            <button class="btn btn-early-access btn-lg btn-block" id="flash-ea-btn" disabled>
+              Flash Early Access Build
+            </button>
+          </div>
+
+          <!-- Building state -->
+          <div id="building-section" class="flash-section hidden">
+            <div class="alert alert-warning">
+              A build is currently in progress. Check back in a few minutes.
+            </div>
+          </div>
+
+          <!-- Failed state -->
+          <div id="failed-section" class="flash-section hidden">
+            <div class="alert alert-danger" id="build-error"></div>
+          </div>
+        </div>
+
+        <!-- Flash Progress -->
+        <div class="card hidden" id="progress-card">
+          <h2 id="progress-title">Flashing Early Access Build...</h2>
+          <ul class="steps" id="steps-list"></ul>
+          <div class="mt-2" id="progress-status"></div>
+        </div>
+
+        <!-- Changelog Card -->
+        <div class="build-card" id="changelog-card" style="border-color: var(--border);">
+          <div class="changelog-header">
+            <h3>Changelog</h3>
+            <span class="commit-count" id="commit-count"></span>
+          </div>
+          <p class="text-dim mb-2" style="font-size: 0.8rem;">Commits since the last tagged release</p>
+          <ul class="changelog" id="changelog-list">
+            <li class="text-muted">No commits found</li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="timestamp" id="page-timestamp"></p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { CrossPointFlasher, fetchEarlyAccessFirmware, fetchBuildMeta } from '/js/flasher.js';
+
+    // Browser check
+    if (!('serial' in navigator)) {
+      document.getElementById('browser-warning').classList.remove('hidden');
+      document.getElementById('main-content').classList.add('hidden');
+    }
+
+    function formatDate(isoStr) {
+      return new Date(isoStr).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    }
+
+    function formatSize(bytes) {
+      if (!bytes) return '—';
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    function relativeTime(isoStr) {
+      const diff = Date.now() - new Date(isoStr).getTime();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return `${mins}m ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs}h ago`;
+      const days = Math.floor(hrs / 24);
+      return `${days}d ago`;
+    }
+
+    window.loadBuildInfo = async function loadBuildInfo() {
+      const loading = document.getElementById('loading');
+      const noBuilds = document.getElementById('no-builds');
+      const buildContent = document.getElementById('build-content');
+
+      loading.classList.remove('hidden');
+      noBuilds.classList.add('hidden');
+      buildContent.classList.add('hidden');
+
+      const meta = await fetchBuildMeta();
+      loading.classList.add('hidden');
+
+      if (!meta) {
+        noBuilds.classList.remove('hidden');
+        return;
+      }
+
+      buildContent.classList.remove('hidden');
+
+      // Status
+      const dot = document.getElementById('status-dot');
+      const badge = document.getElementById('build-badge');
+      const statusText = document.getElementById('build-status-text');
+
+      dot.className = 'status-dot ' + meta.status;
+      if (meta.status === 'success') {
+        badge.className = 'badge badge-early';
+        badge.textContent = 'Ready';
+        statusText.textContent = 'Latest Build';
+      } else if (meta.status === 'building') {
+        badge.className = 'badge badge-building';
+        badge.textContent = 'Building';
+        statusText.textContent = 'Build In Progress';
+      } else {
+        badge.className = 'badge badge-failed';
+        badge.textContent = 'Failed';
+        statusText.textContent = 'Build Failed';
+      }
+
+      // Info
+      document.getElementById('build-version').textContent = meta.version || '—';
+      document.getElementById('build-date').textContent = meta.buildDate ? formatDate(meta.buildDate) : '—';
+      document.getElementById('build-commit').textContent = meta.commitShort || '—';
+      document.getElementById('build-size').textContent = formatSize(meta.firmwareSize);
+
+      // Show appropriate section
+      document.getElementById('flash-section').classList.toggle('hidden', meta.status !== 'success');
+      document.getElementById('building-section').classList.toggle('hidden', meta.status !== 'building');
+      document.getElementById('failed-section').classList.toggle('hidden', meta.status !== 'failed');
+      document.getElementById('flash-ea-btn').disabled = meta.status !== 'success';
+
+      if (meta.status === 'failed' && meta.error) {
+        document.getElementById('build-error').textContent = `Build failed: ${meta.error}`;
+      }
+
+      // Changelog
+      const changelogList = document.getElementById('changelog-list');
+      const commitCount = document.getElementById('commit-count');
+
+      if (meta.changelog && meta.changelog.length > 0) {
+        commitCount.textContent = `${meta.changelog.length} commit${meta.changelog.length !== 1 ? 's' : ''}`;
+        changelogList.innerHTML = meta.changelog.map(c => `
+          <li>
+            <span class="commit-hash">${c.hashShort}</span>
+            <div style="flex:1; min-width:0;">
+              <div class="commit-msg">${escapeHtml(c.message.split('\n')[0])}</div>
+              <div class="commit-author">${escapeHtml(c.author)}</div>
+            </div>
+            <span class="commit-date">${c.date ? relativeTime(c.date) : ''}</span>
+          </li>
+        `).join('');
+      } else {
+        commitCount.textContent = '';
+        changelogList.innerHTML = '<li class="text-muted">No changelog available</li>';
+      }
+
+      // Timestamp
+      document.getElementById('page-timestamp').textContent =
+        meta.buildDate ? `Last build: ${formatDate(meta.buildDate)}` : '';
+    };
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Initial load
+    await loadBuildInfo();
+
+    // --- Flash Logic ---
+
+    const STEPS = [
+      'Connect to device',
+      'Validate partition table',
+      'Read OTA data',
+      'Flash firmware',
+      'Update boot partition',
+      'Reset device',
+    ];
+
+    function renderSteps(states) {
+      const stepsList = document.getElementById('steps-list');
+      stepsList.innerHTML = STEPS.map((name, i) => {
+        const st = states[i] || 'pending';
+        return `<li class="${st}">
+          <span class="step-icon ${st}"></span>
+          <span>${name}</span>
+          ${st === 'running' && name === 'Flash firmware' ? '<div class="progress-bar"><div class="progress-bar-fill" id="flash-progress" style="width:0%"></div></div>' : ''}
+        </li>`;
+      }).join('');
+    }
+
+    document.getElementById('flash-ea-btn').addEventListener('click', async () => {
+      const flashBtn = document.getElementById('flash-ea-btn');
+      const progressCard = document.getElementById('progress-card');
+      const progressStatus = document.getElementById('progress-status');
+
+      flashBtn.disabled = true;
+      progressCard.classList.remove('hidden');
+      progressStatus.innerHTML = '';
+
+      const states = STEPS.map(() => 'pending');
+      renderSteps(states);
+
+      try {
+        progressStatus.innerHTML = '<span class="text-dim">Downloading early access firmware...</span>';
+        const firmware = await fetchEarlyAccessFirmware();
+        progressStatus.innerHTML = '';
+
+        const flasher = new CrossPointFlasher();
+        await flasher.flashFirmware(firmware, {
+          onStepChange: (idx, name, status) => {
+            states[idx] = status;
+            renderSteps(states);
+          },
+          onProgress: (step, current, total) => {
+            if (step === 'Flash firmware') {
+              const bar = document.getElementById('flash-progress');
+              if (bar) bar.style.width = `${(current / total * 100).toFixed(1)}%`;
+            }
+          },
+        });
+
+        progressStatus.innerHTML = '<div class="alert alert-info">Flash complete! Your device will restart with the early access firmware.</div>';
+      } catch (err) {
+        const failIdx = states.findIndex(s => s === 'running');
+        if (failIdx >= 0) states[failIdx] = 'error';
+        renderSteps(states);
+        progressStatus.innerHTML = `<div class="alert alert-danger">${escapeHtml(err.message)}</div>`;
+      }
+
+      flashBtn.disabled = false;
+    });
+  </script>
+</body>
+</html>

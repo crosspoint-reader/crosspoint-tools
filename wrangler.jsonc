@@ -1,0 +1,52 @@
+{
+  "name": "crosspoint-tools",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Static frontend assets
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  // Sandbox for firmware builds
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SANDBOX",
+        "class_name": "Sandbox"
+      }
+    ]
+  },
+  "containers": {
+    "max_instances": 2,
+    "instance_type": "standard-2"
+  },
+
+  // R2 bucket for firmware storage
+  "r2_buckets": [
+    {
+      "binding": "FIRMWARE_BUCKET",
+      "bucket_name": "crosspoint-firmware"
+    }
+  ],
+
+  // KV for build metadata (fast reads)
+  "kv_namespaces": [
+    {
+      "binding": "BUILD_META",
+      "id": ""
+    }
+  ],
+
+  // Secrets (set via `wrangler secret put`):
+  //   GITHUB_WEBHOOK_SECRET - for verifying webhook payloads
+  //   GITHUB_TOKEN - optional, for private repo access
+
+  "vars": {
+    "REPO_URL": "https://github.com/crosspoint-reader/crosspoint-reader.git",
+    "REPO_BRANCH": "master",
+    "BUILD_ENV": "gh_release"
+  }
+}
