@@ -29,6 +29,14 @@
       "new_sqlite_classes": ["Sandbox"]
     }
   ],
+  "containers": [
+    {
+      "class_name": "Sandbox",
+      "image": "./Dockerfile",
+      "instance_type": "standard-2",
+      "max_instances": 2
+    }
+  ],
 
   // R2 bucket for firmware storage
   "r2_buckets": [
