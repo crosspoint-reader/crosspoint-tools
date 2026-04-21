@@ -11,7 +11,8 @@
   // Static frontend assets
   "assets": {
     "directory": "./public",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "run_worker_first": true
   },
 
   // Sandbox for firmware builds
@@ -33,7 +34,7 @@
     {
       "class_name": "Sandbox",
       "image": "./Dockerfile",
-      "instance_type": "standard-2",
+      "instance_type": "standard-3",
       "max_instances": 2
     }
   ],

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Early Access — CrossPoint Tools</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://rsms.me/inter/inter.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['InterVariable', 'Inter', 'sans-serif'],
+            serif: ['Lora', 'serif'],
+            mono: ['"Geist Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f5f3',
+              100: '#d6e5de',
+              200: '#b3cfc2',
+              300: '#8fb9a6',
+              400: '#69917D',
+              500: '#4a7a62',
+              600: '#3d6652',
+              700: '#315243',
+              800: '#253e33',
+              900: '#1a2c24',
+            },
+            royalty: {
+              DEFAULT: '#B8953A',
+              hover: '#9A7A2E',
+            },
+          },
+        },
+      },
+    }
+  </script>
+</head>
+<body class="min-h-dvh bg-stone-50 font-sans">
+  <nav class="sticky top-0 z-50 border-b border-stone-200 bg-white/90 backdrop-blur-sm">
+    <div class="mx-auto flex max-w-2xl items-center justify-between px-6 py-3">
+      <a href="/" class="flex items-center gap-2 text-stone-900 no-underline" aria-label="Homepage">
+        <img src="/logo.png" alt="" class="size-7 rounded-md">
+        <span class="text-base/6 font-medium tracking-tight sm:text-sm/6">CrossPoint Tools</span>
+      </a>
+      <div class="flex gap-1">
+        <a href="/" class="rounded-md px-3 py-1.5 text-sm/5 font-medium text-stone-500 no-underline hover:text-stone-700">Stable</a>
+        <a href="/early-access" class="rounded-md bg-stone-100 px-3 py-1.5 text-sm/5 font-medium text-stone-900 no-underline">Early Access</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="mx-auto max-w-md px-6">
+    <div class="flex min-h-[calc(100dvh-57px)] flex-col items-center justify-center py-16">
+
+      <div class="text-center">
+        <p class="text-sm font-medium text-brand-500">Early Access</p>
+        <h1 class="mt-2 font-serif text-3xl font-medium tracking-tight text-stone-900 text-balance sm:text-2xl">Nightly Builds</h1>
+        <p class="mt-3 text-base/7 text-stone-500 text-pretty sm:text-sm/6">Subscribe for as low as <span class="font-semibold text-stone-700">$2/month</span> for nightly CrossPoint builds</p>
+      </div>
+
+      <div class="mt-8 w-full space-y-4">
+        <a href="https://app.royalty.dev/SoFriendly/crosspoint-tools/release"
+           class="flex w-full items-center justify-center gap-2.5 rounded-lg bg-[#B8953A] px-5 py-3 text-sm font-semibold text-white no-underline shadow-sm hover:bg-[#9A7A2E] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B8953A] transition-colors">
+          <img src="/crown.svg" alt="" class="size-5 brightness-0 invert">
+          Subscribe on Royalty.dev
+        </a>
+
+        <div class="text-center">
+          <button id="show-login" class="text-sm text-stone-400 underline underline-offset-2 hover:text-stone-600 transition-colors">
+            Already a subscriber?
+          </button>
+        </div>
+      </div>
+
+      <!-- Magic link form (hidden by default) -->
+      <div id="login-form" class="mt-6 hidden w-full">
+        <div class="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+          <p class="text-sm/6 text-stone-600">Enter the email you subscribed with and we'll send you a login link.</p>
+          <form id="magic-link-form" class="mt-4 space-y-3">
+            <input type="email" id="email-input" required placeholder="you@example.com"
+                   class="w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+            <button type="submit" id="send-btn"
+                    class="flex w-full items-center justify-center rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              Send Login Link
+            </button>
+          </form>
+          <p id="form-status" class="mt-3 hidden text-center text-sm/6"></p>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+    document.getElementById('show-login').addEventListener('click', () => {
+      const form = document.getElementById('login-form');
+      form.classList.toggle('hidden');
+      if (!form.classList.contains('hidden')) {
+        document.getElementById('email-input').focus();
+      }
+    });
+
+    document.getElementById('magic-link-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('email-input').value.trim();
+      const status = document.getElementById('form-status');
+      const btn = document.getElementById('send-btn');
+
+      if (!email) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      status.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/auth/magic-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+
+        status.classList.remove('hidden');
+
+        if (res.ok) {
+          status.className = 'mt-3 text-center text-sm/6 text-brand-600';
+          status.textContent = 'Check your email for a login link.';
+        } else {
+          const data = await res.json();
+          status.className = 'mt-3 text-center text-sm/6 text-red-600';
+          status.textContent = data.error || 'No subscription found for this email.';
+        }
+      } catch {
+        status.classList.remove('hidden');
+        status.className = 'mt-3 text-center text-sm/6 text-red-600';
+        status.textContent = 'Something went wrong. Please try again.';
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Send Login Link';
+    });
+  </script>
+</body>
+</html>

@@ -4,6 +4,8 @@ import { triggerBuild } from './builder';
 
 export { Sandbox } from '@cloudflare/sandbox';
 
+const ROYALTY_REPO_ID = 'SoFriendly/crosspoint-tools';
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -11,6 +13,11 @@ export default {
     // API routes
     if (url.pathname.startsWith('/api/')) {
       return handleApi(request, url, env, ctx);
+    }
+
+    // Gate early access behind Royalty.dev subscription
+    if (url.pathname === '/early-access' || url.pathname === '/early-access.html') {
+      return handleEarlyAccess(request, url, env);
     }
 
     // Let static assets handle everything else
@@ -97,6 +104,12 @@ async function handleApi(
 
       case '/api/firmware/stock/info':
         return handleStockFirmwareInfo(url, corsHeaders);
+
+      case '/api/auth/magic-link':
+        return handleMagicLink(request, corsHeaders);
+
+      case '/api/auth/logout':
+        return handleLogout(request);
 
       default:
         return json({ error: 'Not found' }, 404, corsHeaders);
@@ -395,6 +408,112 @@ async function handleStockFirmware(
       'X-Firmware-Version': info.version,
     },
   });
+}
+
+// --- Early Access Gate ---
+
+async function verifyRoyaltyKey(token: string): Promise<{ valid: boolean; email?: string }> {
+  try {
+    const res = await fetch(
+      `https://api.royalty.dev/releases/verify/${encodeURIComponent(token)}?repo_id=${ROYALTY_REPO_ID}`
+    );
+    return await res.json() as { valid: boolean; email?: string };
+  } catch {
+    return { valid: false };
+  }
+}
+
+async function handleEarlyAccess(request: Request, url: URL, env: Env): Promise<Response> {
+  // Check for royalty_key in URL (new purchase or magic link callback)
+  const key = url.searchParams.get('royalty_key');
+  if (key) {
+    const data = await verifyRoyaltyKey(key);
+    if (data.valid) {
+      // Set cookie and redirect to clean URL
+      const cleanUrl = new URL(url.pathname, url.origin);
+      const response = Response.redirect(cleanUrl.toString(), 302);
+      // Response.redirect returns an immutable response, so we need to create a new one
+      const mutableResponse = new Response(null, {
+        status: 302,
+        headers: { Location: cleanUrl.toString() },
+      });
+      mutableResponse.headers.set(
+        'Set-Cookie',
+        `royalty_access=${key}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${30 * 24 * 60 * 60}`
+      );
+      return mutableResponse;
+    }
+  }
+
+  // Check for existing cookie
+  const cookies = request.headers.get('Cookie') || '';
+  const match = cookies.match(/royalty_access=([^;]+)/);
+  if (match) {
+    const data = await verifyRoyaltyKey(match[1]);
+    if (data.valid) {
+      // Verified subscriber — serve the early access page
+      return env.ASSETS.fetch(request);
+    }
+    // Invalid cookie — clear it and show gate
+    const gateRequest = new Request(new URL('/login.html', url.origin).toString(), request);
+    const gateResponse = await env.ASSETS.fetch(gateRequest);
+    const response = new Response(gateResponse.body, gateResponse);
+    response.headers.set(
+      'Set-Cookie',
+      'royalty_access=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0'
+    );
+    return response;
+  }
+
+  // No access — serve the login/gate page
+  const gateRequest = new Request(new URL('/login.html', url.origin).toString(), request);
+  return env.ASSETS.fetch(gateRequest);
+}
+
+// --- Auth API ---
+
+async function handleMagicLink(
+  request: Request,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+
+  const body = await request.json() as { email?: string };
+  if (!body.email) {
+    return json({ error: 'Email is required' }, 400, headers);
+  }
+
+  const res = await fetch('https://api.royalty.dev/releases/magic-link', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: body.email,
+      repoId: ROYALTY_REPO_ID,
+      redirectUrl: new URL('/early-access', request.url).toString(),
+    }),
+  });
+
+  if (res.ok) {
+    return json({ sent: true }, 200, headers);
+  }
+
+  const data = await res.json() as { error?: string };
+  return json({ error: data.error || 'No subscription found for this email.' }, res.status, headers);
+}
+
+function handleLogout(request: Request): Response {
+  const url = new URL(request.url);
+  const response = new Response(null, {
+    status: 302,
+    headers: { Location: new URL('/early-access', url.origin).toString() },
+  });
+  response.headers.set(
+    'Set-Cookie',
+    'royalty_access=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0'
+  );
+  return response;
 }
 
 // --- Helpers ---
