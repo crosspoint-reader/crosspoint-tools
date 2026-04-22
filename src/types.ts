@@ -39,6 +39,7 @@ export interface FontFile {
 
 export interface FontTree {
   families: Record<string, FontFile[]>;
+  defaultSizes: Record<string, number[]>;
   fetchedAt: string;
 }
 
@@ -53,6 +54,7 @@ export interface CustomBuildMetadata {
   error?: string;
   replacedFonts: Record<string, string>;  // path -> original filename
   fontLabels?: Record<string, string>;    // family -> custom display label
+  fontSizes?: Record<string, number[]>;   // family -> [small, medium, large, xlarge] point sizes
 }
 
 export interface GitHubPushEvent {

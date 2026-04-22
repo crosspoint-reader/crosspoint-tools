@@ -382,13 +382,16 @@ export async function fetchCustomBuildStatus() {
   return data.build;
 }
 
-export async function uploadCustomFonts(replacements, labels = {}) {
+export async function uploadCustomFonts(replacements, labels = {}, sizes = {}) {
   const formData = new FormData();
   for (const [path, file] of Object.entries(replacements)) {
     formData.append(path, file);
   }
   for (const [family, label] of Object.entries(labels)) {
     formData.append(`label:${family}`, label);
+  }
+  for (const [family, sizeArr] of Object.entries(sizes)) {
+    formData.append(`sizes:${family}`, sizeArr.join(','));
   }
   const res = await fetch('/api/custom-build/upload', {
     method: 'POST',

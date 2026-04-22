@@ -13,6 +13,10 @@ on:
         description: 'JSON object mapping family names to custom labels'
         required: false
         default: '{}'
+      fontSizes:
+        description: 'JSON object mapping family names to [s,m,l,xl] point sizes'
+        required: false
+        default: '{}'
 
 concurrency:
   group: custom-font-build
@@ -82,6 +86,76 @@ jobs:
             echo "Verified: $COUNT translation files updated"
           done < /tmp/labels.tsv
 
+      - name: Apply custom font sizes
+        run: |
+          SIZES='${{ inputs.fontSizes }}'
+          if [ "$SIZES" = "{}" ] || [ -z "$SIZES" ]; then
+            echo "No custom font sizes, skipping"
+            exit 0
+          fi
+
+          CONVERT_SCRIPT="lib/EpdFont/scripts/convert-builtin-fonts.sh"
+          FONT_IDS_SCRIPT="lib/EpdFont/scripts/build-font-ids.sh"
+          ALL_H="lib/EpdFont/builtinFonts/all.h"
+          SETTINGS_CPP="src/CrossPointSettings.cpp"
+
+          echo "$SIZES" | jq -r 'to_entries[] | "\(.key)\t\(.value | join(","))"' > /tmp/sizes.tsv
+
+          while IFS=$'\t' read -r family sizes_csv; do
+            IFS=',' read -ra NEW_SIZES <<< "$sizes_csv"
+
+            # Determine old default sizes and naming prefix
+            case "$family" in
+              NotoSerif)
+                OLD_SIZES=(12 14 16 18)
+                PREFIX="notoserif"
+                SIZES_VAR="NOTOSERIF_FONT_SIZES"
+                ID_PREFIX="NOTOSERIF"
+                ;;
+              NotoSans)
+                OLD_SIZES=(12 14 16 18)
+                PREFIX="notosans"
+                SIZES_VAR="NOTOSANS_FONT_SIZES"
+                ID_PREFIX="NOTOSANS"
+                ;;
+              OpenDyslexic)
+                OLD_SIZES=(8 10 12 14)
+                PREFIX="opendyslexic"
+                SIZES_VAR="OPENDYSLEXIC_FONT_SIZES"
+                ID_PREFIX="OPENDYSLEXIC"
+                ;;
+              *) echo "Unknown family: $family, skipping"; continue ;;
+            esac
+
+            echo "Customizing $family sizes: [${OLD_SIZES[*]}] -> [${NEW_SIZES[*]}]"
+
+            # 1. Update size array in convert-builtin-fonts.sh
+            sed -i "s|${SIZES_VAR}=(${OLD_SIZES[*]})|${SIZES_VAR}=(${NEW_SIZES[*]})|" "$CONVERT_SCRIPT"
+
+            # 2. Update all.h includes and build-font-ids.sh and CrossPointSettings.cpp
+            #    Replace each old size reference with the new size
+            for i in 0 1 2 3; do
+              OLD="${OLD_SIZES[$i]}"
+              NEW="${NEW_SIZES[$i]}"
+              if [ "$OLD" = "$NEW" ]; then continue; fi
+
+              echo "  Replacing ${PREFIX}_${OLD} -> ${PREFIX}_${NEW}"
+
+              # all.h: update #include lines
+              sed -i "s|${PREFIX}_${OLD}_|${PREFIX}_${NEW}_|g" "$ALL_H"
+
+              # build-font-ids.sh: update file references and #define names
+              sed -i "s|${ID_PREFIX}_${OLD}_FONT_ID|${ID_PREFIX}_${NEW}_FONT_ID|g" "$FONT_IDS_SCRIPT"
+              sed -i "s|${PREFIX}_${OLD}_|${PREFIX}_${NEW}_|g" "$FONT_IDS_SCRIPT"
+
+              # CrossPointSettings.cpp: update font ID references
+              sed -i "s|${ID_PREFIX}_${OLD}_FONT_ID|${ID_PREFIX}_${NEW}_FONT_ID|g" "$SETTINGS_CPP"
+            done
+
+            echo "Verified convert script:"
+            grep "$SIZES_VAR" "$CONVERT_SCRIPT"
+          done < /tmp/sizes.tsv
+
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
@@ -104,6 +178,14 @@ jobs:
         run: |
           cd lib/EpdFont/scripts
           bash convert-builtin-fonts.sh
+
+      - name: Regenerate font IDs
+        if: ${{ inputs.fontSizes != '{}' && inputs.fontSizes != '' }}
+        run: |
+          cd lib/EpdFont/scripts
+          bash build-font-ids.sh > ../../../src/fontIds.h
+          echo "Generated fontIds.h:"
+          cat ../../../src/fontIds.h
 
       - name: Build CrossPoint
         run: pio run -e gh_release

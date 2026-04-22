@@ -740,7 +740,12 @@ async function fetchFontTree(env: Env): Promise<FontTree> {
     }
   }
 
-  const tree: FontTree = { families, fetchedAt: new Date().toISOString() };
+  const defaultSizes: Record<string, number[]> = {
+    NotoSerif: [12, 14, 16, 18],
+    NotoSans: [12, 14, 16, 18],
+    OpenDyslexic: [8, 10, 12, 14],
+  };
+  const tree: FontTree = { families, defaultSizes, fetchedAt: new Date().toISOString() };
   await env.BUILD_META.put(FONT_CACHE_KEY, JSON.stringify(tree), { expirationTtl: FONT_CACHE_TTL * 2 });
   return tree;
 }
@@ -800,12 +805,26 @@ async function handleCustomBuildUpload(
   const formData = await request.formData();
   const replacements: Map<string, File> = new Map();
   const fontLabels: Record<string, string> = {};
+  const fontSizes: Record<string, number[]> = {};
 
   for (const [key, value] of formData.entries()) {
     // Font labels come as "label:FamilyName" -> "Custom Name"
     if (typeof value === 'string' && key.startsWith('label:')) {
       const family = key.slice(6);
       if (value.trim()) fontLabels[family] = value.trim();
+      continue;
+    }
+    // Font sizes come as "sizes:FamilyName" -> "10,12,14,16"
+    if (typeof value === 'string' && key.startsWith('sizes:')) {
+      const family = key.slice(6);
+      const sizes = value.split(',').map(s => parseInt(s.trim(), 10));
+      if (sizes.length !== 4 || sizes.some(s => isNaN(s) || s < 6 || s > 30)) {
+        return json({ error: `Invalid font sizes for ${family}: need 4 values between 6-30` }, 400, headers);
+      }
+      if (sizes[0] >= sizes[1] || sizes[1] >= sizes[2] || sizes[2] >= sizes[3]) {
+        return json({ error: `Font sizes for ${family} must be in ascending order` }, 400, headers);
+      }
+      fontSizes[family] = sizes;
       continue;
     }
     if (!(value instanceof File)) continue;
@@ -884,6 +903,7 @@ async function handleCustomBuildUpload(
     createdAt: new Date().toISOString(),
     replacedFonts,
     fontLabels: Object.keys(fontLabels).length > 0 ? fontLabels : undefined,
+    fontSizes: Object.keys(fontSizes).length > 0 ? fontSizes : undefined,
   };
   await env.BUILD_META.put(`custom-build:${buildId}`, JSON.stringify(meta));
 
@@ -903,6 +923,7 @@ async function handleCustomBuildUpload(
           buildId,
           fonts: JSON.stringify(Object.keys(replacedFonts)),
           fontLabels: JSON.stringify(fontLabels),
+          fontSizes: JSON.stringify(fontSizes),
         },
       }),
     }

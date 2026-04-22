@@ -530,7 +530,7 @@
         return;
       }
 
-      renderFontFamilies(tree.families);
+      renderFontFamilies(tree.families, tree.defaultSizes);
       showCfState('form');
     }
 
@@ -539,13 +539,14 @@
     function updateFamilyNotice(family) {
       const notice = document.getElementById(`cf-notice-${family}`);
       const labelRow = document.getElementById(`cf-label-${family}`);
+      const sizesRow = document.getElementById(`cf-sizes-${family}`);
       if (!notice) return;
       const allFiles = fontFamilies[family] || [];
       const replaced = allFiles.filter(f => pendingReplacements[f.path]);
-      // Show/hide label input when any font in the family is replaced
-      if (labelRow) {
-        labelRow.classList.toggle('hidden', replaced.length === 0);
-      }
+      const hasReplacements = replaced.length > 0;
+      // Show/hide label and sizes inputs when any font in the family is replaced
+      if (labelRow) labelRow.classList.toggle('hidden', !hasReplacements);
+      if (sizesRow) sizesRow.classList.toggle('hidden', !hasReplacements);
       if (replaced.length > 0 && replaced.length < allFiles.length) {
         const missing = allFiles.filter(f => !pendingReplacements[f.path]);
         const missingNames = missing.map(f => f.name.replace(/\.(ttf|otf)$/i, '').split('-').pop()).join(', ');
@@ -556,8 +557,11 @@
       }
     }
 
-    function renderFontFamilies(families) {
+    let fontSizeDefaults = {};
+
+    function renderFontFamilies(families, defaultSizes) {
       fontFamilies = families;
+      fontSizeDefaults = defaultSizes || {};
       const container = document.getElementById('cf-font-families');
       container.innerHTML = Object.entries(families).map(([family, files]) => `
         <details class="group rounded-lg border border-stone-200">
@@ -570,6 +574,17 @@
             <div id="cf-label-${family}" class="hidden px-4 py-2.5 bg-stone-50 flex items-center gap-2">
               <label class="text-xs font-medium text-stone-500 shrink-0">Display as</label>
               <input type="text" class="cf-label-input flex-1 rounded border border-stone-200 bg-white px-2.5 py-1 text-xs text-stone-700 placeholder:text-stone-400 focus:border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-500/20" data-family="${escapeHtml(family)}" placeholder="${escapeHtml(family)}">
+            </div>
+            <div id="cf-sizes-${family}" class="hidden px-4 py-2.5 bg-stone-50 border-t border-stone-100">
+              <div class="flex items-center gap-2">
+                <label class="text-xs font-medium text-stone-500 shrink-0">Sizes (pt)</label>
+                <div class="flex gap-1.5 flex-1">
+                  ${(fontSizeDefaults[family] || [12,14,16,18]).map((sz, i) => {
+                    const labels = ['S','M','L','XL'];
+                    return \`<div class="flex-1"><label class="text-[10px] text-stone-400">\${labels[i]}</label><input type="number" min="6" max="30" value="\${sz}" class="cf-size-input w-full rounded border border-stone-200 bg-white px-1.5 py-1 text-xs text-stone-700 text-center tabular-nums focus:border-indigo-300 focus:outline-none focus:ring-1 focus:ring-indigo-500/20" data-family="\${escapeHtml(family)}" data-index="\${i}"></div>\`;
+                  }).join('')}
+                </div>
+              </div>
             </div>
             <div id="cf-notice-${family}" class="hidden px-4 py-2 text-xs text-amber-700 bg-amber-50/60"></div>
             ${files.map(f => `
@@ -653,7 +668,22 @@
           const val = input.value.trim();
           if (val) labels[input.dataset.family] = val;
         });
-        await uploadCustomFonts(pendingReplacements, labels);
+        // Collect custom font sizes (only if changed from defaults)
+        const sizes = {};
+        const sizeInputs = document.querySelectorAll('.cf-size-input');
+        const familySizes = {};
+        sizeInputs.forEach(input => {
+          const fam = input.dataset.family;
+          if (!familySizes[fam]) familySizes[fam] = [];
+          familySizes[fam][parseInt(input.dataset.index)] = parseInt(input.value);
+        });
+        for (const [fam, vals] of Object.entries(familySizes)) {
+          const defaults = fontSizeDefaults[fam] || [];
+          if (vals.some((v, i) => v !== defaults[i])) {
+            sizes[fam] = vals;
+          }
+        }
+        await uploadCustomFonts(pendingReplacements, labels, sizes);
         renderReplacedFonts(
           Object.fromEntries(Object.entries(pendingReplacements).map(([k, f]) => [k, f.name])),
           'cf-replaced-list'
