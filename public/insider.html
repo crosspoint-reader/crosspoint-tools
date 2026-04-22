@@ -598,6 +598,7 @@
           if (!file) return;
 
           pendingReplacements[path] = file;
+          const family = path.split('/')[0];
           const row = e.target.closest('[data-font-path]');
           row.querySelector('.cf-replacement-name').textContent = file.name;
           row.querySelector('.cf-replacement-name').classList.remove('hidden');
@@ -606,7 +607,17 @@
           row.querySelector('.cf-replace-label').classList.remove('bg-stone-100', 'text-stone-600');
           row.querySelector('.cf-undo-btn').classList.remove('hidden');
           updateReplaceCount();
-          updateFamilyNotice(path.split('/')[0]);
+          updateFamilyNotice(family);
+
+          // Auto-populate label from filename if empty
+          const labelInput = document.querySelector(`.cf-label-input[data-family="${family}"]`);
+          if (labelInput && !labelInput.value.trim()) {
+            const baseName = file.name.replace(/\.(ttf|otf)$/i, '');
+            const parts = baseName.split('-');
+            if (parts.length > 1) {
+              labelInput.value = parts[0];
+            }
+          }
         });
       });
 
