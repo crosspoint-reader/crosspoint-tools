@@ -69,7 +69,7 @@ jobs:
 
       - name: Install font conversion dependencies
         run: |
-          uv pip install --system freetype-py brotli
+          uv pip install --system freetype-py brotli fonttools
 
       - name: Convert fonts
         run: |
