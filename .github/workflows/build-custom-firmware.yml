@@ -62,21 +62,25 @@ jobs:
           LABELS='${{ inputs.fontLabels }}'
           TRANSLATIONS_DIR="lib/I18n/translations"
 
-          # Map family directory names to translation string keys
-          declare -A FAMILY_TO_KEY
-          FAMILY_TO_KEY[NotoSerif]="STR_NOTO_SERIF"
-          FAMILY_TO_KEY[NotoSans]="STR_NOTO_SANS"
-          FAMILY_TO_KEY[OpenDyslexic]="STR_OPEN_DYSLEXIC"
+          # Process each label
+          echo "$LABELS" | jq -r 'to_entries[] | "\(.key)\t\(.value)"' > /tmp/labels.tsv
 
-          echo "$LABELS" | jq -r 'to_entries[] | "\(.key)\t\(.value)"' | while IFS=$'\t' read -r family label; do
-            KEY="${FAMILY_TO_KEY[$family]}"
-            if [ -z "$KEY" ]; then
-              echo "Unknown font family: $family, skipping"
-              continue
-            fi
+          while IFS=$'\t' read -r family label; do
+            # Map family directory names to translation string keys
+            case "$family" in
+              NotoSerif)    KEY="STR_NOTO_SERIF" ;;
+              NotoSans)     KEY="STR_NOTO_SANS" ;;
+              OpenDyslexic) KEY="STR_OPEN_DYSLEXIC" ;;
+              *)            echo "Unknown font family: $family, skipping"; continue ;;
+            esac
+
             echo "Renaming $family to '$label' ($KEY) across all translations"
             find "$TRANSLATIONS_DIR" -name "*.yaml" -exec sed -i "s|${KEY}: \".*\"|${KEY}: \"${label}\"|" {} +
-          done
+
+            # Verify
+            COUNT=$(grep -rl "\"${label}\"" "$TRANSLATIONS_DIR" | wc -l)
+            echo "Verified: $COUNT translation files updated"
+          done < /tmp/labels.tsv
 
       - name: Setup Python
         uses: actions/setup-python@v6

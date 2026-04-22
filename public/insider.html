@@ -667,22 +667,34 @@
     });
 
     // Poll for build completion
-    let cfPollTimer = null;
+    let cfPolling = false;
     function pollCustomBuild() {
-      if (cfPollTimer) clearInterval(cfPollTimer);
-      cfPollTimer = setInterval(async () => {
-        const build = await fetchCustomBuildStatus();
-        if (!build) return;
-        if (build.status === 'success') {
-          clearInterval(cfPollTimer);
-          showCustomBuildReady(build);
-        } else if (build.status === 'failed') {
-          clearInterval(cfPollTimer);
-          document.getElementById('cf-error-msg').textContent = build.error || 'Unknown error';
-          showCfState('failed');
-        }
-      }, 10000);
+      if (cfPolling) return;
+      cfPolling = true;
+      async function poll() {
+        if (!cfPolling) return;
+        try {
+          const build = await fetchCustomBuildStatus();
+          if (!build) { schedulePoll(); return; }
+          if (build.status === 'success') {
+            cfPolling = false;
+            showCustomBuildReady(build);
+            return;
+          } else if (build.status === 'failed') {
+            cfPolling = false;
+            document.getElementById('cf-error-msg').textContent = build.error || 'Unknown error';
+            showCfState('failed');
+            return;
+          }
+        } catch {}
+        schedulePoll();
+      }
+      function schedulePoll() {
+        setTimeout(poll, 10000);
+      }
+      poll();
     }
+    function stopPolling() { cfPolling = false; }
 
     function showCustomBuildReady(build) {
       document.getElementById('cf-ready-version').textContent = build.version || '';
@@ -767,8 +779,19 @@
     });
     document.getElementById('cf-retry-btn').addEventListener('click', clearCustomBuild);
     document.getElementById('cf-cancel-btn').addEventListener('click', () => {
-      if (cfPollTimer) clearInterval(cfPollTimer);
+      stopPolling();
       clearCustomBuild();
+    });
+
+    // Re-check build status when tab is refocused
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && cfPolling) {
+        fetchCustomBuildStatus().then(build => {
+          if (!build) return;
+          if (build.status === 'success') { cfPolling = false; showCustomBuildReady(build); }
+          else if (build.status === 'failed') { cfPolling = false; document.getElementById('cf-error-msg').textContent = build.error || 'Unknown error'; showCfState('failed'); }
+        }).catch(() => {});
+      }
     });
 
     // Initialize custom font section
