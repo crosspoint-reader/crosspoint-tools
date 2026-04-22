@@ -565,6 +565,7 @@
             <span>${escapeHtml(family)}</span>
             <span class="text-xs text-stone-400 group-open:hidden">${files.length} file${files.length !== 1 ? 's' : ''}</span>
           </summary>
+          ${family === 'NotoSans' ? '<div class="px-4 py-2 text-xs text-stone-400 bg-stone-50 border-t border-stone-200">Changing this will change your system UI font too</div>' : ''}
           <div class="divide-y divide-stone-100 border-t border-stone-200">
             <div id="cf-label-${family}" class="hidden px-4 py-2.5 bg-stone-50 flex items-center gap-2">
               <label class="text-xs font-medium text-stone-500 shrink-0">Display as</label>
