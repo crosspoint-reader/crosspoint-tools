@@ -150,6 +150,14 @@ jobs:
 
               # CrossPointSettings.cpp: update font ID references
               sed -i "s|${ID_PREFIX}_${OLD}_FONT_ID|${ID_PREFIX}_${NEW}_FONT_ID|g" "$SETTINGS_CPP"
+
+              # src/*.cpp and src/*.h: update all font references
+              # - data struct refs: notoserif_12_regular
+              # - variable names: notoserif12RegularFont
+              # - font ID constants: NOTOSERIF_12_FONT_ID
+              find src -name "*.cpp" -o -name "*.h" | xargs sed -i "s|${PREFIX}_${OLD}_|${PREFIX}_${NEW}_|g"
+              find src -name "*.cpp" -o -name "*.h" | xargs sed -i "s|${PREFIX}${OLD}|${PREFIX}${NEW}|g"
+              find src -name "*.cpp" -o -name "*.h" | xargs sed -i "s|${ID_PREFIX}_${OLD}_FONT_ID|${ID_PREFIX}_${NEW}_FONT_ID|g"
             done
 
             echo "Verified convert script:"
