@@ -92,6 +92,14 @@ jobs:
         if: steps.check.outputs.skip == 'false'
         run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
 
+      - name: Set build version
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          VERSION=$(grep -oP 'version\s*=\s*\K.*' platformio.ini | head -1)
+          BUILD_VERSION="${VERSION}-dev+${{ steps.check.outputs.commit_short }}"
+          sed -i "s|version = ${VERSION}|version = ${BUILD_VERSION}|" platformio.ini
+          echo "Firmware version: $BUILD_VERSION"
+
       - name: Build CrossPoint
         if: steps.check.outputs.skip == 'false'
         run: pio run -e gh_release
@@ -100,9 +108,9 @@ jobs:
         if: steps.check.outputs.skip == 'false'
         id: info
         run: |
-          # Version from platformio.ini
+          # Version was already patched in platformio.ini by "Set build version" step
           VERSION=$(grep -oP 'version\s*=\s*\K.*' platformio.ini | head -1)
-          echo "version=${VERSION}-dev+${{ steps.check.outputs.commit_short }}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
           # Changelog as JSON array — build with jq for safe escaping
           BASE_REF=$(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)
