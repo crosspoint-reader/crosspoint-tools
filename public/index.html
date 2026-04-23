@@ -301,8 +301,8 @@
         <!-- Restart Instructions -->
         <div class="hidden rounded-xl bg-stone-50 p-5" id="restart-card">
           <div class="text-sm font-semibold text-stone-700">After flashing</div>
-          <p class="mt-1 text-sm/6 text-stone-500" id="x4-restart-note">Press the small <strong class="text-stone-600">Reset</strong> button near the bottom right, then press and hold the power button for 3 seconds.</p>
-          <p class="mt-1 text-sm/6 text-stone-500" id="x3-restart-note" style="display:none">Disconnect and reconnect the USB cable.</p>
+          <p class="mt-1 text-sm/6 text-stone-500" id="restart-note-standard">Press the small <strong class="text-stone-600">Reset</strong> button near the bottom right, then press and hold the power button for 3 seconds.</p>
+          <p class="mt-1 text-sm/6 text-stone-500 hidden" id="restart-note-crosspoint-x3">For CrossPoint or nightly firmware on X3, disconnect the USB cable and reconnect it instead.</p>
         </div>
       </div>
     </div>
@@ -366,7 +366,7 @@
     function updateDevice() {
       styleCards('.model-btn', deviceModel, 'model');
       document.getElementById('x4-restart-note').style.display = deviceModel === 'x4' ? '' : 'none';
-      document.getElementById('x3-restart-note').style.display = deviceModel === 'x3' ? '' : 'none';
+      document.getElementById('restart-note-crosspoint-x3').classList.toggle('hidden', deviceModel !== 'x3');
       document.getElementById('step-firmware').classList.toggle('hidden', !deviceModel);
       // Update step indicator
       document.getElementById('step-num-1').className = deviceModel
@@ -635,7 +635,9 @@
         } else {
           let firmware;
           let title;
-          const skipReset = (action === 'crosspoint' && deviceModel === 'x3');
+          // X3 with CrossPoint/nightly firmware needs USB disconnect instead of hard reset
+          const isCrosspointFirmware = action === 'crosspoint' || action === 'nightly';
+          const skipReset = (isCrosspointFirmware && deviceModel === 'x3');
 
           if (action === 'crosspoint') {
             title = 'Flashing CrossPoint Firmware...';
