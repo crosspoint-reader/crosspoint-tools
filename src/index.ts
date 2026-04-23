@@ -1,4 +1,4 @@
-import type { Env, BuildMetadata, CustomBuildMetadata, FontTree, FontFile } from './types';
+import type { Env, BuildMetadata, CustomBuildMetadata, FontTree, FontFile, BetaBuild } from './types';
 
 const ROYALTY_REPO_ID = 'SoFriendly/crosspoint-tools';
 
@@ -9,6 +9,21 @@ export default {
     // API routes
     if (url.pathname.startsWith('/api/')) {
       return handleApi(request, url, env, ctx);
+    }
+
+    // Proxy fonts.json for SD card font loading
+    if (url.pathname === '/fonts' || url.pathname === '/fonts.json') {
+      const res = await fetch(
+        'https://github.com/adriancaruana/crosspoint-reader/releases/download/sd-fonts/fonts.json',
+        { headers: { 'User-Agent': 'CrossPoint-Tools' } }
+      );
+      return new Response(res.body, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=3600',
+        },
+      });
     }
 
     // Gate insider builds behind Royalty.dev subscription
@@ -97,7 +112,20 @@ async function handleApi(
       case '/api/custom-build/status-update':
         return handleCustomBuildStatusUpdate(request, env, corsHeaders);
 
+      case '/api/beta':
+        if (request.method === 'GET') return handleBetaList(env, corsHeaders);
+        if (request.method === 'POST') return handleBetaCreate(request, env, corsHeaders);
+        return json({ error: 'Method not allowed' }, 405, corsHeaders);
+
       default:
+        // Dynamic routes: /api/beta/{id}/firmware
+        if (url.pathname.startsWith('/api/beta/') && url.pathname.endsWith('/firmware')) {
+          return handleBetaFirmware(url, env, corsHeaders);
+        }
+        // /api/beta/{id} DELETE
+        if (url.pathname.startsWith('/api/beta/') && request.method === 'DELETE') {
+          return handleBetaDelete(request, url, env, corsHeaders);
+        }
         // Dynamic routes: /api/custom-build/fonts/{buildId}/{filename}
         if (url.pathname.startsWith('/api/custom-build/fonts/')) {
           return handleCustomBuildFontDownload(request, url, env, corsHeaders);
@@ -1128,6 +1156,118 @@ async function handleCustomBuildStatusUpdate(
 
   await env.BUILD_META.put(`custom-build:${body.buildId}`, JSON.stringify(meta));
   return json({ ok: true }, 200, headers);
+}
+
+// --- Beta Testing ---
+
+const BETA_LIST_KEY = 'beta-builds';
+
+async function getBetaList(env: Env): Promise<BetaBuild[]> {
+  const raw = await env.BUILD_META.get(BETA_LIST_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
+async function saveBetaList(env: Env, list: BetaBuild[]): Promise<void> {
+  await env.BUILD_META.put(BETA_LIST_KEY, JSON.stringify(list));
+}
+
+async function handleBetaList(
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const list = await getBetaList(env);
+  return json({ builds: list }, 200, headers);
+}
+
+async function handleBetaCreate(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const auth = request.headers.get('Authorization');
+  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const formData = await request.formData();
+  const name = formData.get('name');
+  const notes = formData.get('notes');
+  const firmware = formData.get('firmware');
+
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return json({ error: 'Name is required' }, 400, headers);
+  }
+  if (!(firmware instanceof File)) {
+    return json({ error: 'Firmware .bin file is required' }, 400, headers);
+  }
+
+  const id = `beta-${Date.now().toString(36)}`;
+  const data = await firmware.arrayBuffer();
+
+  await env.FIRMWARE_BUCKET.put(`builds/beta/${id}/firmware.bin`, data);
+
+  const build: BetaBuild = {
+    id,
+    name: name.trim(),
+    notes: (typeof notes === 'string' ? notes.trim() : '') || '',
+    createdAt: new Date().toISOString(),
+    firmwareSize: data.byteLength,
+  };
+
+  const list = await getBetaList(env);
+  list.unshift(build);
+  await saveBetaList(env, list);
+
+  return json({ build }, 201, headers);
+}
+
+async function handleBetaDelete(
+  request: Request,
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const auth = request.headers.get('Authorization');
+  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const id = url.pathname.replace('/api/beta/', '');
+  const list = await getBetaList(env);
+  const filtered = list.filter(b => b.id !== id);
+
+  if (filtered.length === list.length) {
+    return json({ error: 'Beta build not found' }, 404, headers);
+  }
+
+  await env.FIRMWARE_BUCKET.delete(`builds/beta/${id}/firmware.bin`);
+  await saveBetaList(env, filtered);
+
+  return json({ ok: true }, 200, headers);
+}
+
+async function handleBetaFirmware(
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  // Path: /api/beta/{id}/firmware
+  const parts = url.pathname.replace('/api/beta/', '').replace('/firmware', '');
+  const id = parts;
+
+  const object = await env.FIRMWARE_BUCKET.get(`builds/beta/${id}/firmware.bin`);
+  if (!object) {
+    return json({ error: 'Firmware not found' }, 404, headers);
+  }
+
+  return new Response(object.body, {
+    headers: {
+      ...headers,
+      'Content-Type': 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${id}.bin"`,
+      'Content-Length': String(object.size),
+    },
+  });
 }
 
 // --- Helpers ---

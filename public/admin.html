@@ -73,6 +73,29 @@
         <div id="trigger-result" class="mt-2"></div>
       </div>
 
+      <!-- Beta Testing -->
+      <div class="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
+        <h2 class="text-sm font-semibold text-stone-900">Beta Testing</h2>
+        <p class="mt-1 text-xs text-stone-400">Upload a .bin to make it available as a firmware option on the main page.</p>
+
+        <div class="mt-3 space-y-2">
+          <input type="text" id="beta-name" placeholder="Build name (e.g. KOSync Fix)" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+          <textarea id="beta-notes" placeholder="Test notes (shown to users when they select this build)" rows="3" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"></textarea>
+          <div class="flex gap-2">
+            <label class="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
+              <span id="beta-file-label">Choose .bin file...</span>
+              <input type="file" accept=".bin" id="beta-file-input" class="hidden">
+            </label>
+            <button onclick="uploadBeta()" id="beta-upload-btn" class="shrink-0 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+              Upload
+            </button>
+          </div>
+        </div>
+
+        <div id="beta-list" class="mt-4 divide-y divide-stone-100"></div>
+        <p id="beta-empty" class="mt-3 text-xs text-stone-400">No beta builds</p>
+      </div>
+
       <!-- Log -->
       <div class="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
         <h2 class="text-sm font-semibold text-stone-900">Activity Log</h2>
@@ -123,6 +146,7 @@
         sessionStorage.setItem('crosspoint-admin-secret', secret);
 
         refreshStatus();
+        loadBetaList();
       } catch (err) {
         document.getElementById('auth-error').textContent = 'Connection error';
         document.getElementById('auth-error').classList.remove('hidden');
@@ -201,6 +225,117 @@
       btn.disabled = false;
     }
 
+    // --- Beta Testing ---
+
+    let betaFile = null;
+
+    document.getElementById('beta-file-input').addEventListener('change', (e) => {
+      betaFile = e.target.files[0];
+      document.getElementById('beta-file-label').textContent = betaFile ? betaFile.name : 'Choose .bin file...';
+      document.getElementById('beta-upload-btn').disabled = !betaFile || !document.getElementById('beta-name').value.trim();
+    });
+
+    document.getElementById('beta-name').addEventListener('input', () => {
+      document.getElementById('beta-upload-btn').disabled = !betaFile || !document.getElementById('beta-name').value.trim();
+    });
+
+    async function uploadBeta() {
+      const btn = document.getElementById('beta-upload-btn');
+      const name = document.getElementById('beta-name').value.trim();
+      const notes = document.getElementById('beta-notes').value.trim();
+      if (!betaFile || !name) return;
+
+      btn.disabled = true;
+      btn.textContent = 'Uploading...';
+
+      try {
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('notes', notes);
+        formData.append('firmware', betaFile);
+
+        const res = await fetch('/api/beta', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + secret },
+          body: formData,
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          log('Beta build created: ' + data.build.name);
+          document.getElementById('beta-name').value = '';
+          document.getElementById('beta-notes').value = '';
+          document.getElementById('beta-file-input').value = '';
+          document.getElementById('beta-file-label').textContent = 'Choose .bin file...';
+          betaFile = null;
+          loadBetaList();
+        } else {
+          log('Beta upload failed: ' + data.error);
+        }
+      } catch (err) {
+        log('Beta upload error: ' + err.message);
+      }
+
+      btn.textContent = 'Upload';
+      btn.disabled = false;
+    }
+
+    async function deleteBeta(id, name) {
+      if (!confirm('Delete beta build "' + name + '"?')) return;
+
+      try {
+        const res = await fetch('/api/beta/' + id, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + secret },
+        });
+        if (res.ok) {
+          log('Deleted beta build: ' + name);
+          loadBetaList();
+        }
+      } catch (err) {
+        log('Delete failed: ' + err.message);
+      }
+    }
+
+    async function loadBetaList() {
+      try {
+        const res = await fetch('/api/beta');
+        const data = await res.json();
+        const list = data.builds || [];
+        const listEl = document.getElementById('beta-list');
+        const emptyEl = document.getElementById('beta-empty');
+
+        if (list.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.classList.remove('hidden');
+          return;
+        }
+
+        emptyEl.classList.add('hidden');
+        listEl.innerHTML = list.map(b => {
+          const size = (b.firmwareSize / 1024 / 1024).toFixed(1);
+          const date = new Date(b.createdAt).toLocaleDateString();
+          return '<div class="flex items-center justify-between py-2.5">' +
+            '<div class="min-w-0 flex-1">' +
+              '<div class="text-sm font-medium text-stone-700">' + escapeHtml(b.name) + '</div>' +
+              '<div class="text-xs text-stone-400">' + size + ' MB &middot; ' + date +
+                (b.notes ? ' &middot; <span class="text-stone-500" title="' + escapeHtml(b.notes) + '">has notes</span>' : '') +
+              '</div>' +
+            '</div>' +
+            '<button onclick="deleteBeta(\'' + b.id + '\', \'' + escapeHtml(b.name).replace(/'/g, "\\'") + '\')" class="ml-2 shrink-0 rounded-md p-1 text-stone-400 hover:bg-red-50 hover:text-red-600" title="Delete">' +
+              '<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>' +
+            '</button>' +
+          '</div>';
+        }).join('');
+      } catch {}
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
     // Handle enter key on password input
     document.getElementById('secret-input').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') authenticate();
@@ -213,6 +348,7 @@
       document.getElementById('auth-form').classList.add('hidden');
       document.getElementById('dashboard').classList.remove('hidden');
       refreshStatus();
+      loadBetaList();
     }
   </script>
 </body>

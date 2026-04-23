@@ -57,6 +57,14 @@ export interface CustomBuildMetadata {
   fontSizes?: Record<string, number[]>;   // family -> [small, medium, large, xlarge] point sizes
 }
 
+export interface BetaBuild {
+  id: string;
+  name: string;
+  notes: string;
+  createdAt: string;
+  firmwareSize: number;
+}
+
 export interface GitHubPushEvent {
   ref: string;
   after: string;

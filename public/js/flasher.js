@@ -410,6 +410,19 @@ export async function fetchCustomFirmware() {
   return new Uint8Array(await res.arrayBuffer());
 }
 
+export async function fetchBetaBuilds() {
+  const res = await fetch('/api/beta');
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.builds || [];
+}
+
+export async function fetchBetaFirmware(id) {
+  const res = await fetch(`/api/beta/${id}/firmware`);
+  if (!res.ok) throw new Error(`Failed to download beta firmware: ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 export async function fetchReleaseMeta() {
   const res = await fetch('/api/release/latest');
   if (!res.ok) return null;
