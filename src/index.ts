@@ -608,6 +608,10 @@ async function handleInsiderAccess(request: Request, url: URL, env: Env): Promis
     return Response.redirect(newUrl.toString(), 301);
   }
 
+  // Paywall temporarily disabled - serve insider page to everyone
+  return env.ASSETS.fetch(request);
+
+  /*
   // Check for royalty_key in URL (new purchase or magic link callback)
   const key = url.searchParams.get('royalty_key');
   if (key) {
@@ -636,7 +640,7 @@ async function handleInsiderAccess(request: Request, url: URL, env: Env): Promis
       // Verified subscriber - serve the insider page
       return env.ASSETS.fetch(request);
     }
-    // Invalid cookie — clear it and show gate
+    // Invalid cookie - clear it and show gate
     const gateRequest = new Request(new URL('/login.html', url.origin).toString(), request);
     const gateResponse = await env.ASSETS.fetch(gateRequest);
     const response = new Response(gateResponse.body, gateResponse);
@@ -647,9 +651,10 @@ async function handleInsiderAccess(request: Request, url: URL, env: Env): Promis
     return response;
   }
 
-  // No access — serve the login/gate page
+  // No access - serve the login/gate page
   const gateRequest = new Request(new URL('/login.html', url.origin).toString(), request);
   return env.ASSETS.fetch(gateRequest);
+  */
 }
 
 // --- Auth API ---
@@ -700,6 +705,25 @@ function handleLogout(request: Request): Response {
 
 // --- Subscriber Auth Helper ---
 
+function getUserId(request: Request): string | null {
+  const cookies = request.headers.get('Cookie') || '';
+  const match = cookies.match(/cp_uid=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+function generateUserId(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(12)))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function setUserIdCookie(response: Response, uid: string): void {
+  response.headers.append(
+    'Set-Cookie',
+    `cp_uid=${uid}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${365 * 24 * 60 * 60}`
+  );
+}
+
+/*
 async function getSubscriberEmail(request: Request): Promise<string | null> {
   const cookies = request.headers.get('Cookie') || '';
   const match = cookies.match(/royalty_access=([^;]+)/);
@@ -707,6 +731,7 @@ async function getSubscriberEmail(request: Request): Promise<string | null> {
   const data = await verifyRoyaltyKey(match[1]);
   return data.valid ? (data.email || null) : null;
 }
+*/
 
 // --- Font List (dynamic from upstream repo) ---
 
@@ -818,10 +843,8 @@ async function handleCustomBuildUpload(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const email = await getSubscriberEmail(request);
-  if (!email) {
-    return json({ error: 'Subscription required' }, 401, headers);
-  }
+  let uid = getUserId(request);
+  if (!uid) uid = generateUserId();
 
   // Check global build lock
   const lock = await env.BUILD_META.get('custom-build-lock');
@@ -922,12 +945,12 @@ async function handleCustomBuildUpload(
 
   // Set lock, user mapping, and build metadata
   await env.BUILD_META.put('custom-build-lock', buildId, { expirationTtl: CUSTOM_BUILD_LOCK_TTL });
-  await env.BUILD_META.put(`custom-build:user:${email}`, buildId);
+  await env.BUILD_META.put(`custom-build:user:${uid}`, buildId);
 
   const meta: CustomBuildMetadata = {
     buildId,
     status: 'pending',
-    email,
+    email: uid,
     createdAt: new Date().toISOString(),
     replacedFonts,
     fontLabels: Object.keys(fontLabels).length > 0 ? fontLabels : undefined,
@@ -966,7 +989,9 @@ async function handleCustomBuildUpload(
     return json({ error: 'Failed to start build' }, 502, headers);
   }
 
-  return json({ buildId, autoFilled }, 202, headers);
+  const response = json({ buildId, autoFilled }, 202, headers);
+  setUserIdCookie(response, uid);
+  return response;
 }
 
 async function handleCustomBuildStatus(
@@ -974,12 +999,12 @@ async function handleCustomBuildStatus(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const email = await getSubscriberEmail(request);
-  if (!email) {
-    return json({ error: 'Subscription required' }, 401, headers);
+  const uid = getUserId(request);
+  if (!uid) {
+    return json({ build: null }, 200, headers);
   }
 
-  const buildId = await env.BUILD_META.get(`custom-build:user:${email}`);
+  const buildId = await env.BUILD_META.get(`custom-build:user:${uid}`);
   if (!buildId) {
     return json({ build: null }, 200, headers);
   }
@@ -998,12 +1023,12 @@ async function handleCustomBuildFirmware(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const email = await getSubscriberEmail(request);
-  if (!email) {
-    return json({ error: 'Subscription required' }, 401, headers);
+  const uid = getUserId(request);
+  if (!uid) {
+    return json({ error: 'No custom build found' }, 404, headers);
   }
 
-  const buildId = await env.BUILD_META.get(`custom-build:user:${email}`);
+  const buildId = await env.BUILD_META.get(`custom-build:user:${uid}`);
   if (!buildId) {
     return json({ error: 'No custom build found' }, 404, headers);
   }
@@ -1033,17 +1058,17 @@ async function handleCustomBuildClear(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const email = await getSubscriberEmail(request);
-  if (!email) {
-    return json({ error: 'Subscription required' }, 401, headers);
+  const uid = getUserId(request);
+  if (!uid) {
+    return json({ ok: true }, 200, headers);
   }
 
-  const buildId = await env.BUILD_META.get(`custom-build:user:${email}`);
+  const buildId = await env.BUILD_META.get(`custom-build:user:${uid}`);
   if (buildId) {
     const raw = await env.BUILD_META.get(`custom-build:${buildId}`);
     if (raw) {
       const meta: CustomBuildMetadata = JSON.parse(raw);
-      await env.BUILD_META.delete(`custom-build:user:${email}`);
+      await env.BUILD_META.delete(`custom-build:user:${uid}`);
       await env.BUILD_META.delete(`custom-build:${buildId}`);
       // Release lock if this build holds it
       const lock = await env.BUILD_META.get('custom-build-lock');
