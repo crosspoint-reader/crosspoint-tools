@@ -125,6 +125,10 @@ async function handleApi(
         if (url.pathname.startsWith('/api/beta/') && url.pathname.endsWith('/firmware')) {
           return handleBetaFirmware(url, env, corsHeaders);
         }
+        // /api/beta/{id} PATCH
+        if (url.pathname.startsWith('/api/beta/') && request.method === 'PATCH') {
+          return handleBetaUpdate(request, url, env, corsHeaders);
+        }
         // /api/beta/{id} DELETE
         if (url.pathname.startsWith('/api/beta/') && request.method === 'DELETE') {
           return handleBetaDelete(request, url, env, corsHeaders);
@@ -1340,6 +1344,41 @@ async function handleBetaCreate(
   await saveBetaList(env, list);
 
   return json({ build }, 201, headers);
+}
+
+async function handleBetaUpdate(
+  request: Request,
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const auth = request.headers.get('Authorization');
+  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const id = url.pathname.replace('/api/beta/', '');
+  const list = await getBetaList(env);
+  const build = list.find(b => b.id === id);
+
+  if (!build) {
+    return json({ error: 'Beta build not found' }, 404, headers);
+  }
+
+  const body = await request.json() as { name?: string; notes?: string };
+
+  if (body.name !== undefined) {
+    if (typeof body.name !== 'string' || !body.name.trim()) {
+      return json({ error: 'Name cannot be empty' }, 400, headers);
+    }
+    build.name = body.name.trim();
+  }
+  if (body.notes !== undefined) {
+    build.notes = typeof body.notes === 'string' ? body.notes.trim() : '';
+  }
+
+  await saveBetaList(env, list);
+  return json({ build }, 200, headers);
 }
 
 async function handleBetaDelete(

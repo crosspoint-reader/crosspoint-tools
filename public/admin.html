@@ -316,19 +316,77 @@
         listEl.innerHTML = list.map(b => {
           const size = (b.firmwareSize / 1024 / 1024).toFixed(1);
           const date = new Date(b.createdAt).toLocaleDateString();
-          return '<div class="flex items-center justify-between py-2.5">' +
-            '<div class="min-w-0 flex-1">' +
-              '<div class="text-sm font-medium text-stone-700">' + escapeHtml(b.name) + '</div>' +
-              '<div class="text-xs text-stone-400">' + size + ' MB &middot; ' + date +
-                (b.notes ? ' &middot; <span class="text-stone-500" title="' + escapeHtml(b.notes) + '">has notes</span>' : '') +
+          const eid = escapeHtml(b.id);
+          const ename = escapeHtml(b.name);
+          const enotes = escapeHtml(b.notes || '');
+          return '<div class="py-2.5" id="beta-item-' + eid + '">' +
+            '<div class="flex items-center justify-between">' +
+              '<div class="min-w-0 flex-1">' +
+                '<div class="text-sm font-medium text-stone-700">' + ename + '</div>' +
+                '<div class="text-xs text-stone-400">' + size + ' MB &middot; ' + date +
+                  (b.notes ? ' &middot; <span class="text-stone-500" title="' + enotes + '">has notes</span>' : '') +
+                '</div>' +
+              '</div>' +
+              '<div class="ml-2 flex shrink-0 gap-0.5">' +
+                '<button onclick="editBeta(\'' + eid + '\', \'' + ename.replace(/'/g, "\\'") + '\', \'' + enotes.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\')" class="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600" title="Edit">' +
+                  '<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg>' +
+                '</button>' +
+                '<button onclick="deleteBeta(\'' + eid + '\', \'' + ename.replace(/'/g, "\\'") + '\')" class="rounded-md p-1 text-stone-400 hover:bg-red-50 hover:text-red-600" title="Delete">' +
+                  '<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>' +
+                '</button>' +
               '</div>' +
             '</div>' +
-            '<button onclick="deleteBeta(\'' + b.id + '\', \'' + escapeHtml(b.name).replace(/'/g, "\\'") + '\')" class="ml-2 shrink-0 rounded-md p-1 text-stone-400 hover:bg-red-50 hover:text-red-600" title="Delete">' +
-              '<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>' +
-            '</button>' +
+            '<div id="beta-edit-' + eid + '" class="hidden mt-2 space-y-2">' +
+              '<input type="text" id="beta-edit-name-' + eid + '" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">' +
+              '<textarea id="beta-edit-notes-' + eid + '" rows="2" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"></textarea>' +
+              '<div class="flex gap-2">' +
+                '<button onclick="saveBetaEdit(\'' + eid + '\')" class="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600">Save</button>' +
+                '<button onclick="cancelBetaEdit(\'' + eid + '\')" class="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700">Cancel</button>' +
+              '</div>' +
+            '</div>' +
           '</div>';
         }).join('');
       } catch {}
+    }
+
+    function editBeta(id, name, notes) {
+      const editEl = document.getElementById('beta-edit-' + id);
+      editEl.classList.toggle('hidden');
+      if (!editEl.classList.contains('hidden')) {
+        document.getElementById('beta-edit-name-' + id).value = name;
+        document.getElementById('beta-edit-notes-' + id).value = notes;
+      }
+    }
+
+    function cancelBetaEdit(id) {
+      document.getElementById('beta-edit-' + id).classList.add('hidden');
+    }
+
+    async function saveBetaEdit(id) {
+      const name = document.getElementById('beta-edit-name-' + id).value.trim();
+      const notes = document.getElementById('beta-edit-notes-' + id).value.trim();
+      if (!name) return;
+
+      try {
+        const res = await fetch('/api/beta/' + id, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': 'Bearer ' + secret,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name, notes }),
+        });
+
+        if (res.ok) {
+          log('Updated beta build: ' + name);
+          loadBetaList();
+        } else {
+          const data = await res.json();
+          log('Update failed: ' + data.error);
+        }
+      } catch (err) {
+        log('Update error: ' + err.message);
+      }
     }
 
     function escapeHtml(str) {
