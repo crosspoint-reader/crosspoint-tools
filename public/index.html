@@ -301,8 +301,8 @@
         <!-- Restart Instructions -->
         <div class="hidden rounded-xl bg-stone-50 p-5" id="restart-card">
           <div class="text-sm font-semibold text-stone-700">After flashing</div>
-          <p class="mt-1 text-sm/6 text-stone-500" id="restart-note-standard">Press the small <strong class="text-stone-600">Reset</strong> button near the bottom right, then press and hold the power button for 3 seconds.</p>
-          <p class="mt-1 text-sm/6 text-stone-500 hidden" id="restart-note-crosspoint-x3">For CrossPoint or nightly firmware on X3, disconnect the USB cable and reconnect it instead.</p>
+          <p class="mt-1 text-sm/6 text-stone-500">Press the small <strong class="text-stone-600">Reset</strong> button near the bottom right, then press and hold the power button for 3 seconds.</p>
+          <p class="mt-1 text-sm/6 text-stone-400 hidden" id="restart-note-crosspoint-x3"><strong class="text-stone-500">X3 tip:</strong> If your device is already running CrossPoint, you can disconnect and reconnect the USB cable instead.</p>
         </div>
       </div>
     </div>
@@ -635,9 +635,8 @@
         } else {
           let firmware;
           let title;
-          // X3 with CrossPoint/nightly firmware needs USB disconnect instead of hard reset
-          const isCrosspointFirmware = action === 'crosspoint' || action === 'nightly';
-          const skipReset = (isCrosspointFirmware && deviceModel === 'x3');
+          // Always do a hard reset — USB disconnect only works if already on CrossPoint
+          const skipReset = false;
 
           if (action === 'crosspoint') {
             title = 'Flashing CrossPoint Firmware...';
