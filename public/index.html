@@ -18,7 +18,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://rsms.me/inter/inter.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:wght@400;500;700&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -28,6 +28,7 @@
             sans: ['InterVariable', 'Inter', 'sans-serif'],
             serif: ['Lora', 'serif'],
             mono: ['"Geist Mono"', 'monospace'],
+            eink: ['"Noto Serif"', 'serif'],
           },
           colors: {
             brand: {
@@ -51,12 +52,437 @@
     @layer utilities {
       .animate-spin-slow { animation: spin 1.2s linear infinite; }
     }
+
+    /* ============================================================
+       E-INK DEVICE MOCKUP — renders firmware UI (Lyra theme)
+       Base canvas: 480×800. Scale with --eink-scale CSS variable.
+       ============================================================ */
+
+    .eink {
+      --eink-scale: 1;
+      --eink-paper: #f5f4ef;
+      --eink-ink: #1a1a1a;
+      --eink-dim: #8a8782;
+      --eink-sel: #d9d6ce;
+      --eink-rule: #0f0f0f;
+    }
+
+    .eink-device {
+      width: calc(496px * var(--eink-scale));
+      height: calc(820px * var(--eink-scale));
+      background: var(--eink-paper);
+      border-radius: calc(10px * var(--eink-scale));
+      padding: calc(10px * var(--eink-scale));
+      padding-bottom: calc(12px * var(--eink-scale));
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.06),
+        0 20px 40px -16px rgba(0,0,0,0.15),
+        0 50px 80px -30px rgba(0,0,0,0.18);
+      position: relative;
+    }
+
+    /* The actual 480×800 e-ink display */
+    .eink-screen {
+      width: calc(480px * var(--eink-scale));
+      height: calc(800px * var(--eink-scale));
+      background: var(--eink-paper);
+      color: var(--eink-ink);
+      position: relative;
+      overflow: hidden;
+      font-family: 'Noto Sans', sans-serif;
+      font-feature-settings: 'kern' 1, 'liga' 1;
+      box-shadow: inset 0 0 0 calc(1px * var(--eink-scale)) rgba(0,0,0,0.08);
+    }
+    .eink-screen * { box-sizing: border-box; }
+
+    /* Bare screen (no device bezel) — used for cutouts */
+    .eink-bare {
+      width: calc(480px * var(--eink-scale));
+      height: calc(800px * var(--eink-scale));
+      background: var(--eink-paper);
+      color: var(--eink-ink);
+      position: relative;
+      overflow: hidden;
+      font-family: 'Noto Sans', sans-serif;
+      border-radius: calc(4px * var(--eink-scale));
+      outline: 1px solid rgba(0,0,0,0.08);
+      outline-offset: -1px;
+    }
+
+    /* Scale multipliers via utility classes */
+    .eink-s-35 { --eink-scale: 0.35; }
+    .eink-s-40 { --eink-scale: 0.40; }
+    .eink-s-45 { --eink-scale: 0.45; }
+    .eink-s-50 { --eink-scale: 0.50; }
+    .eink-s-55 { --eink-scale: 0.55; }
+    .eink-s-60 { --eink-scale: 0.60; }
+    .eink-s-65 { --eink-scale: 0.65; }
+    .eink-s-70 { --eink-scale: 0.70; }
+
+    /* Subtle paper speckle for authenticity */
+    .eink-screen::before,
+    .eink-bare::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        radial-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+        radial-gradient(rgba(0,0,0,0.02) 1px, transparent 1px);
+      background-size: calc(3px * var(--eink-scale)) calc(3px * var(--eink-scale)),
+                       calc(7px * var(--eink-scale)) calc(7px * var(--eink-scale));
+      pointer-events: none;
+      opacity: 0.6;
+      mix-blend-mode: multiply;
+    }
+
+    /* ----- Lyra theme primitives — pixel-exact port from src/components/themes/lyra/LyraTheme.cpp -----
+       All values come from LyraMetrics::values and the drawing routines. Canvas is 480×800. */
+
+    /* Header: 84px for non-home screens; home override reduces to 56px (homeTopPadding).
+       Battery is drawn top-right (y=10 from screen top). Title (if set) renders near
+       bottom-left of header, with a 3px rule line at the very bottom. */
+    .eink-header {
+      height: calc(84px * var(--eink-scale));               /* headerHeight */
+      position: relative;
+      z-index: 1;
+    }
+    .eink-header::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      bottom: calc(3px * var(--eink-scale));
+      height: calc(3px * var(--eink-scale));
+      background: var(--eink-ink);
+    }
+    .is-home .eink-header { height: calc(56px * var(--eink-scale)); }
+    .is-home .eink-header::after,
+    .is-home .eink-header-title,
+    .is-home .eink-header-sub { display: none; }
+
+    .eink-header-title {
+      position: absolute;
+      left: calc(20px * var(--eink-scale));                  /* contentSidePadding */
+      top: calc(48px * var(--eink-scale));                   /* rect.y=5 + batteryBarHeight=40 + 3 */
+      font-family: 'Noto Sans', sans-serif;
+      font-size: calc(16px * var(--eink-scale));             /* UI_12 bold */
+      font-weight: 700;
+      line-height: 1;
+    }
+    .eink-header-sub {
+      position: absolute;
+      right: calc(20px * var(--eink-scale));
+      top: calc(55px * var(--eink-scale));                   /* rect.y=5 + 50 */
+      font-family: 'Noto Sans', sans-serif;
+      font-size: calc(13px * var(--eink-scale));             /* SMALL_FONT */
+      line-height: 1;
+    }
+    .eink-header-rule {
+      position: absolute;
+      left: 0; right: 0;
+      bottom: calc(3px * var(--eink-scale));
+      height: calc(3px * var(--eink-scale));
+      background: var(--eink-ink);
+    }
+
+    /* Battery: 16×12 outline per LyraMetrics. Positioned top-right of header. */
+    .eink-battery {
+      position: absolute;
+      top: calc(10px * var(--eink-scale));                   /* rect.y=5 + 5 */
+      right: calc(12px * var(--eink-scale));
+      display: flex;
+      align-items: center;
+      gap: calc(4px * var(--eink-scale));
+      font-size: calc(13px * var(--eink-scale));
+      font-family: 'Noto Sans', sans-serif;
+      font-variant-numeric: tabular-nums;
+    }
+    /* Battery icon rendered via SVG symbol (firmware-accurate 17×12 native). */
+    .eink-battery svg {
+      width: calc(17px * var(--eink-scale));
+      height: calc(12px * var(--eink-scale));
+      flex-shrink: 0;
+    }
+
+    /* Home recent-book cover tile — flows right after header (home header = 56px) */
+    .eink-home-cover {
+      margin: 0 calc(20px * var(--eink-scale));            /* contentSidePadding */
+      height: calc(242px * var(--eink-scale));             /* homeCoverTileHeight */
+      padding: calc(8px * var(--eink-scale));              /* hPaddingInSelection */
+      display: flex;
+      align-items: stretch;
+      border-radius: calc(6px * var(--eink-scale));
+      position: relative;
+      z-index: 1;
+    }
+    .eink-home-cover.selected { background: var(--eink-sel); }
+    .eink-home-cover .cover {
+      width: calc(135px * var(--eink-scale));              /* homeCoverHeight * 0.6 */
+      height: calc(226px * var(--eink-scale));             /* homeCoverHeight */
+      border: calc(1px * var(--eink-scale)) solid var(--eink-ink);
+      background: #ede9df;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: calc(14px * var(--eink-scale));
+      text-align: center;
+      flex-shrink: 0;
+    }
+    /* Cover with actual image — e-ink grayscale look, whites tinted to paper color */
+    .eink-home-cover .cover.cover-image {
+      padding: 0;
+      background-size: cover;
+      background-position: center;
+      background-color: var(--eink-paper);
+      background-blend-mode: multiply;
+      filter: grayscale(1) contrast(1.05);
+      image-rendering: crisp-edges;
+    }
+    .eink-cover-title {
+      font-family: 'Noto Serif', serif;
+      font-size: calc(13px * var(--eink-scale));
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .eink-cover-rule {
+      width: calc(20px * var(--eink-scale));
+      height: calc(1px * var(--eink-scale));
+      background: var(--eink-ink);
+      margin: calc(8px * var(--eink-scale)) 0;
+    }
+    .eink-cover-by {
+      font-size: calc(10px * var(--eink-scale));
+      font-family: 'Noto Serif', serif;
+      font-style: italic;
+    }
+    .eink-home-cover .meta {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 calc(16px * var(--eink-scale));           /* verticalSpacing */
+      min-width: 0;
+    }
+    .eink-home-cover .meta-title {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: calc(20px * var(--eink-scale));
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .eink-home-cover .meta-author {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: calc(18px * var(--eink-scale));
+      margin-top: calc(12px * var(--eink-scale));
+      color: var(--eink-ink);
+    }
+
+    /* Main menu — 16px gap below cover tile (verticalSpacing) */
+    .eink-menu {
+      margin: calc(16px * var(--eink-scale)) calc(20px * var(--eink-scale)) 0;
+      position: relative;
+      z-index: 1;
+    }
+    .eink-menu-row {
+      height: calc(64px * var(--eink-scale));              /* menuRowHeight */
+      margin-bottom: calc(8px * var(--eink-scale));         /* menuSpacing */
+      display: flex;
+      align-items: center;
+      padding: 0 calc(16px * var(--eink-scale));           /* textX offset from tile */
+      border-radius: calc(6px * var(--eink-scale));         /* cornerRadius */
+      font-family: 'Noto Sans', sans-serif;
+      font-size: calc(16px * var(--eink-scale));            /* UI_12 */
+      font-weight: 400;
+      gap: calc(10px * var(--eink-scale));                  /* hPaddingInSelection + 2 */
+    }
+    .eink-menu-row.selected { background: var(--eink-sel); }
+    .eink-menu-row svg {
+      width: calc(32px * var(--eink-scale));                /* mainMenuIconSize */
+      height: calc(32px * var(--eink-scale));
+      flex-shrink: 0;
+    }
+
+    /* Button hints — rendered exactly per drawButtonHints:
+       x positions [58, 146, 254, 342], width 80, height 40 (empty = 15) */
+    .eink-hints {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: calc(480px * var(--eink-scale));
+      height: calc(40px * var(--eink-scale));               /* buttonHintsHeight */
+    }
+    .eink-hint {
+      position: absolute;
+      bottom: calc(-12px * var(--eink-scale));              /* push bottom of pill off-screen */
+      width: calc(80px * var(--eink-scale));
+      height: calc(40px * var(--eink-scale));
+      background: var(--eink-paper);
+      /* Firmware draws top + left + right only (no bottom stroke) — pill blends into screen edge */
+      border-top: calc(1px * var(--eink-scale)) solid var(--eink-ink);
+      border-left: calc(1px * var(--eink-scale)) solid var(--eink-ink);
+      border-right: calc(1px * var(--eink-scale)) solid var(--eink-ink);
+      border-radius: calc(6px * var(--eink-scale)) calc(6px * var(--eink-scale)) 0 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: calc(7px * var(--eink-scale));           /* textYOffset from drawButtonHints */
+      font-family: 'Noto Sans', sans-serif;
+      font-size: calc(12px * var(--eink-scale));            /* SMALL_FONT */
+      color: var(--eink-ink);
+    }
+    .eink-hint:nth-child(1) { left: calc(58px * var(--eink-scale)); }
+    .eink-hint:nth-child(2) { left: calc(146px * var(--eink-scale)); }
+    .eink-hint:nth-child(3) { left: calc(254px * var(--eink-scale)); }
+    .eink-hint:nth-child(4) { left: calc(342px * var(--eink-scale)); }
+    .eink-hint-empty { height: calc(15px * var(--eink-scale)); }
+
+    /* List rows (file browser, settings) */
+    .eink-list {
+      padding: calc(8px * var(--eink-scale)) calc(20px * var(--eink-scale));
+      position: relative;
+      z-index: 1;
+    }
+    .eink-list-row {
+      display: flex;
+      align-items: center;
+      gap: calc(14px * var(--eink-scale));
+      height: calc(40px * var(--eink-scale));               /* listRowHeight */
+      padding: 0 calc(12px * var(--eink-scale));
+      border-radius: calc(6px * var(--eink-scale));
+      font-family: 'Noto Sans', sans-serif;
+      font-size: calc(14px * var(--eink-scale));            /* UI_10 */
+    }
+    .eink-list-row.selected { background: var(--eink-sel); }
+    .eink-list-row svg {
+      width: calc(24px * var(--eink-scale));
+      height: calc(24px * var(--eink-scale));
+      flex-shrink: 0;
+    }
+    .eink-list-row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .eink-list-row-value { color: var(--eink-ink); font-size: calc(14px * var(--eink-scale)); }
+    /* Selected row's value rendered as black pill with inverted text (firmware highlightValue) */
+    .eink-list-row.selected .eink-list-row-value {
+      background: var(--eink-ink);
+      color: var(--eink-paper);
+      padding: calc(3px * var(--eink-scale)) calc(10px * var(--eink-scale));
+      border-radius: calc(6px * var(--eink-scale));
+    }
+
+    /* Tab bar — drawTabBar (tab-bar-focused state):
+       whole bar has dithered light-gray bg, selected tab is a black pill with inverted text. */
+    .eink-tabs {
+      display: flex;
+      gap: calc(8px * var(--eink-scale));                   /* tabSpacing */
+      padding: calc(4px * var(--eink-scale)) calc(20px * var(--eink-scale));
+      height: calc(34px * var(--eink-scale));               /* shortened from firmware 40 */
+      align-items: stretch;
+      position: relative;
+      background: var(--eink-sel);                          /* full-bar focused highlight */
+      border-bottom: calc(1px * var(--eink-scale)) solid var(--eink-ink);
+      z-index: 1;
+    }
+    .eink-tab {
+      position: relative;
+      padding: 0 calc(10px * var(--eink-scale));            /* hPaddingInSelection */
+      display: flex;
+      align-items: center;
+      font-family: 'Noto Sans', sans-serif;
+      font-size: calc(15px * var(--eink-scale));            /* slightly bigger */
+      font-weight: 600;                                      /* slightly bolder */
+    }
+    .eink-tab.selected {
+      background: var(--eink-ink);
+      color: var(--eink-paper);
+      border-radius: calc(6px * var(--eink-scale));
+    }
+
+    /* Reader page */
+    .eink-reader-body {
+      padding: calc(40px * var(--eink-scale)) calc(40px * var(--eink-scale)) calc(80px * var(--eink-scale));
+      font-family: 'Noto Serif', serif;
+      font-size: calc(20px * var(--eink-scale));
+      line-height: 1.55;
+      text-align: justify;
+      hyphens: auto;
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      overflow: hidden;
+    }
+    .eink-reader-body h3 {
+      font-size: calc(28px * var(--eink-scale));
+      font-weight: 700;
+      text-align: center;
+      margin: calc(12px * var(--eink-scale)) 0 calc(28px * var(--eink-scale));
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .eink-reader-body h3 + p::first-letter {
+      font-size: calc(52px * var(--eink-scale));
+      font-weight: 700;
+      float: left;
+      line-height: 0.9;
+      padding: calc(4px * var(--eink-scale)) calc(6px * var(--eink-scale)) 0 0;
+    }
+    .eink-reader-body p { margin: 0 0 calc(14px * var(--eink-scale)); }
+    .eink-reader-status {
+      position: absolute;
+      bottom: calc(14px * var(--eink-scale));
+      left: calc(40px * var(--eink-scale));
+      right: calc(40px * var(--eink-scale));
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'Noto Sans', sans-serif;
+      font-size: calc(13px * var(--eink-scale));
+      color: var(--eink-dim);
+      z-index: 2;
+    }
+    .eink-reader-progress-track {
+      position: absolute;
+      left: calc(40px * var(--eink-scale));
+      right: calc(40px * var(--eink-scale));
+      bottom: calc(34px * var(--eink-scale));
+      height: calc(2px * var(--eink-scale));
+      background: rgba(0,0,0,0.15);
+    }
+    .eink-reader-progress-track > div {
+      height: 100%;
+      background: var(--eink-ink);
+    }
+
+
+    /* Theme compare — 3 mini devices side-by-side */
+    .eink-theme-classic { --eink-sel: transparent; }
+    .eink-theme-classic .eink-menu-row.selected { outline: calc(2px * var(--eink-scale)) solid var(--eink-ink); outline-offset: calc(-2px * var(--eink-scale)); border-radius: 0; }
+    .eink-theme-classic .eink-menu-row { border-radius: 0; }
+
+    /* Dithered "gray" fill using a CSS gradient — fallback for areas meant to look dithered */
+    .eink-dither {
+      background-image:
+        repeating-linear-gradient(45deg, var(--eink-ink) 0 1px, transparent 1px 3px);
+    }
   </style>
   <script src="https://cdn.usefathom.com/script.js" data-site="OHQZUNQD" defer></script>
 </head>
 <body class="min-h-dvh bg-stone-50 font-sans">
+  <!-- Firmware icon sprite — bitmaps extracted directly from /src/components/icons/ -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="icon-folder" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="4" y="3" width="9" height="1"/><rect x="2" y="4" width="12" height="1"/><rect x="2" y="5" width="2" height="1"/><rect x="11" y="5" width="3" height="1"/><rect x="2" y="6" width="2" height="1"/><rect x="12" y="6" width="3" height="1"/><rect x="2" y="7" width="2" height="1"/><rect x="13" y="7" width="16" height="1"/><rect x="2" y="8" width="2" height="1"/><rect x="14" y="8" width="16" height="1"/><rect x="2" y="9" width="2" height="1"/><rect x="27" y="9" width="3" height="1"/><rect x="2" y="10" width="2" height="1"/><rect x="28" y="10" width="2" height="1"/><rect x="2" y="11" width="2" height="1"/><rect x="28" y="11" width="2" height="1"/><rect x="2" y="12" width="2" height="1"/><rect x="28" y="12" width="2" height="1"/><rect x="2" y="13" width="2" height="1"/><rect x="28" y="13" width="2" height="1"/><rect x="2" y="14" width="2" height="1"/><rect x="28" y="14" width="2" height="1"/><rect x="2" y="15" width="2" height="1"/><rect x="28" y="15" width="2" height="1"/><rect x="2" y="16" width="2" height="1"/><rect x="28" y="16" width="2" height="1"/><rect x="2" y="17" width="2" height="1"/><rect x="28" y="17" width="2" height="1"/><rect x="2" y="18" width="2" height="1"/><rect x="28" y="18" width="2" height="1"/><rect x="2" y="19" width="2" height="1"/><rect x="28" y="19" width="2" height="1"/><rect x="2" y="20" width="2" height="1"/><rect x="28" y="20" width="2" height="1"/><rect x="2" y="21" width="2" height="1"/><rect x="28" y="21" width="2" height="1"/><rect x="2" y="22" width="2" height="1"/><rect x="28" y="22" width="2" height="1"/><rect x="2" y="23" width="2" height="1"/><rect x="28" y="23" width="2" height="1"/><rect x="2" y="24" width="2" height="1"/><rect x="28" y="24" width="2" height="1"/><rect x="2" y="25" width="4" height="1"/><rect x="27" y="25" width="3" height="1"/><rect x="3" y="26" width="27" height="1"/><rect x="4" y="27" width="23" height="1"/></g></symbol>
+      <symbol id="icon-recent" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="6" y="2" width="21" height="1"/><rect x="5" y="3" width="22" height="1"/><rect x="5" y="4" width="2" height="1"/><rect x="12" y="4" width="2" height="1"/><rect x="20" y="4" width="2" height="1"/><rect x="26" y="4" width="2" height="1"/><rect x="4" y="5" width="3" height="1"/><rect x="12" y="5" width="2" height="1"/><rect x="20" y="5" width="2" height="1"/><rect x="26" y="5" width="2" height="1"/><rect x="4" y="6" width="2" height="1"/><rect x="12" y="6" width="2" height="1"/><rect x="20" y="6" width="2" height="1"/><rect x="26" y="6" width="2" height="1"/><rect x="4" y="7" width="2" height="1"/><rect x="12" y="7" width="2" height="1"/><rect x="20" y="7" width="2" height="1"/><rect x="26" y="7" width="2" height="1"/><rect x="4" y="8" width="2" height="1"/><rect x="12" y="8" width="2" height="1"/><rect x="17" y="8" width="1" height="1"/><rect x="20" y="8" width="2" height="1"/><rect x="26" y="8" width="2" height="1"/><rect x="4" y="9" width="2" height="1"/><rect x="12" y="9" width="2" height="1"/><rect x="15" y="9" width="4" height="1"/><rect x="20" y="9" width="2" height="1"/><rect x="26" y="9" width="2" height="1"/><rect x="4" y="10" width="2" height="1"/><rect x="12" y="10" width="10" height="1"/><rect x="26" y="10" width="2" height="1"/><rect x="4" y="11" width="2" height="1"/><rect x="12" y="11" width="5" height="1"/><rect x="18" y="11" width="4" height="1"/><rect x="26" y="11" width="2" height="1"/><rect x="4" y="12" width="2" height="1"/><rect x="12" y="12" width="4" height="1"/><rect x="19" y="12" width="3" height="1"/><rect x="26" y="12" width="2" height="1"/><rect x="4" y="13" width="2" height="1"/><rect x="12" y="13" width="3" height="1"/><rect x="20" y="13" width="2" height="1"/><rect x="26" y="13" width="2" height="1"/><rect x="4" y="14" width="2" height="1"/><rect x="26" y="14" width="2" height="1"/><rect x="4" y="15" width="2" height="1"/><rect x="26" y="15" width="2" height="1"/><rect x="4" y="16" width="2" height="1"/><rect x="26" y="16" width="2" height="1"/><rect x="4" y="17" width="2" height="1"/><rect x="26" y="17" width="2" height="1"/><rect x="4" y="18" width="2" height="1"/><rect x="26" y="18" width="2" height="1"/><rect x="4" y="19" width="2" height="1"/><rect x="26" y="19" width="2" height="1"/><rect x="4" y="20" width="2" height="1"/><rect x="26" y="20" width="2" height="1"/><rect x="4" y="21" width="2" height="1"/><rect x="25" y="21" width="3" height="1"/><rect x="4" y="22" width="24" height="1"/><rect x="4" y="23" width="24" height="1"/><rect x="4" y="24" width="3" height="1"/><rect x="26" y="24" width="2" height="1"/><rect x="4" y="25" width="3" height="1"/><rect x="26" y="25" width="2" height="1"/><rect x="4" y="26" width="2" height="1"/><rect x="26" y="26" width="2" height="1"/><rect x="5" y="27" width="2" height="1"/><rect x="26" y="27" width="2" height="1"/><rect x="5" y="28" width="23" height="1"/><rect x="6" y="29" width="21" height="1"/></g></symbol>
+      <symbol id="icon-transfer" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="4" y="3" width="3" height="1"/><rect x="3" y="4" width="6" height="1"/><rect x="3" y="5" width="8" height="1"/><rect x="4" y="6" width="2" height="1"/><rect x="7" y="6" width="6" height="1"/><rect x="4" y="7" width="2" height="1"/><rect x="9" y="7" width="6" height="1"/><rect x="4" y="8" width="2" height="1"/><rect x="11" y="8" width="6" height="1"/><rect x="5" y="9" width="2" height="1"/><rect x="13" y="9" width="6" height="1"/><rect x="5" y="10" width="2" height="1"/><rect x="16" y="10" width="6" height="1"/><rect x="5" y="11" width="3" height="1"/><rect x="18" y="11" width="6" height="1"/><rect x="6" y="12" width="2" height="1"/><rect x="20" y="12" width="6" height="1"/><rect x="6" y="13" width="2" height="1"/><rect x="22" y="13" width="6" height="1"/><rect x="7" y="14" width="2" height="1"/><rect x="24" y="14" width="5" height="1"/><rect x="7" y="15" width="23" height="1"/><rect x="7" y="16" width="23" height="1"/><rect x="6" y="17" width="3" height="1"/><rect x="25" y="17" width="5" height="1"/><rect x="6" y="18" width="3" height="1"/><rect x="22" y="18" width="5" height="1"/><rect x="6" y="19" width="2" height="1"/><rect x="20" y="19" width="5" height="1"/><rect x="5" y="20" width="3" height="1"/><rect x="18" y="20" width="5" height="1"/><rect x="5" y="21" width="2" height="1"/><rect x="16" y="21" width="5" height="1"/><rect x="4" y="22" width="3" height="1"/><rect x="14" y="22" width="5" height="1"/><rect x="4" y="23" width="3" height="1"/><rect x="12" y="23" width="5" height="1"/><rect x="4" y="24" width="2" height="1"/><rect x="10" y="24" width="5" height="1"/><rect x="3" y="25" width="3" height="1"/><rect x="8" y="25" width="5" height="1"/><rect x="3" y="26" width="7" height="1"/><rect x="3" y="27" width="5" height="1"/><rect x="4" y="28" width="2" height="1"/></g></symbol>
+      <symbol id="icon-settings2" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="8" y="4" width="3" height="1"/><rect x="6" y="5" width="7" height="1"/><rect x="5" y="6" width="3" height="1"/><rect x="10" y="6" width="3" height="1"/><rect x="5" y="7" width="2" height="1"/><rect x="12" y="7" width="2" height="1"/><rect x="4" y="8" width="2" height="1"/><rect x="12" y="8" width="14" height="1"/><rect x="4" y="9" width="2" height="1"/><rect x="12" y="9" width="14" height="1"/><rect x="4" y="10" width="3" height="1"/><rect x="12" y="10" width="2" height="1"/><rect x="5" y="11" width="2" height="1"/><rect x="11" y="11" width="3" height="1"/><rect x="5" y="12" width="8" height="1"/><rect x="7" y="13" width="5" height="1"/><rect x="20" y="18" width="5" height="1"/><rect x="19" y="19" width="8" height="1"/><rect x="18" y="20" width="3" height="1"/><rect x="25" y="20" width="2" height="1"/><rect x="18" y="21" width="2" height="1"/><rect x="25" y="21" width="3" height="1"/><rect x="6" y="22" width="14" height="1"/><rect x="26" y="22" width="2" height="1"/><rect x="6" y="23" width="14" height="1"/><rect x="26" y="23" width="2" height="1"/><rect x="18" y="24" width="2" height="1"/><rect x="25" y="24" width="2" height="1"/><rect x="19" y="25" width="3" height="1"/><rect x="24" y="25" width="3" height="1"/><rect x="19" y="26" width="7" height="1"/><rect x="21" y="27" width="3" height="1"/></g></symbol>
+      <symbol id="icon-cog" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="15" y="2" width="2" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="15" y="3" width="2" height="1"/><rect x="22" y="3" width="1" height="1"/><rect x="8" y="4" width="3" height="1"/><rect x="14" y="4" width="4" height="1"/><rect x="21" y="4" width="3" height="1"/><rect x="9" y="5" width="14" height="1"/><rect x="9" y="6" width="5" height="1"/><rect x="18" y="6" width="5" height="1"/><rect x="8" y="7" width="4" height="1"/><rect x="20" y="7" width="4" height="1"/><rect x="4" y="8" width="1" height="1"/><rect x="7" y="8" width="6" height="1"/><rect x="22" y="8" width="3" height="1"/><rect x="27" y="8" width="1" height="1"/><rect x="3" y="9" width="6" height="1"/><rect x="11" y="9" width="2" height="1"/><rect x="23" y="9" width="6" height="1"/><rect x="4" y="10" width="4" height="1"/><rect x="12" y="10" width="2" height="1"/><rect x="24" y="10" width="4" height="1"/><rect x="5" y="11" width="3" height="1"/><rect x="12" y="11" width="3" height="1"/><rect x="24" y="11" width="3" height="1"/><rect x="5" y="12" width="2" height="1"/><rect x="13" y="12" width="4" height="1"/><rect x="25" y="12" width="2" height="1"/><rect x="5" y="13" width="2" height="1"/><rect x="13" y="13" width="6" height="1"/><rect x="25" y="13" width="2" height="1"/><rect x="4" y="14" width="2" height="1"/><rect x="13" y="14" width="3" height="1"/><rect x="17" y="14" width="2" height="1"/><rect x="26" y="14" width="2" height="1"/><rect x="2" y="15" width="4" height="1"/><rect x="12" y="15" width="2" height="1"/><rect x="17" y="15" width="13" height="1"/><rect x="2" y="16" width="4" height="1"/><rect x="12" y="16" width="2" height="1"/><rect x="17" y="16" width="13" height="1"/><rect x="4" y="17" width="2" height="1"/><rect x="13" y="17" width="3" height="1"/><rect x="17" y="17" width="2" height="1"/><rect x="26" y="17" width="2" height="1"/><rect x="5" y="18" width="2" height="1"/><rect x="13" y="18" width="6" height="1"/><rect x="25" y="18" width="2" height="1"/><rect x="5" y="19" width="2" height="1"/><rect x="13" y="19" width="4" height="1"/><rect x="25" y="19" width="2" height="1"/><rect x="5" y="20" width="3" height="1"/><rect x="12" y="20" width="3" height="1"/><rect x="24" y="20" width="3" height="1"/><rect x="4" y="21" width="4" height="1"/><rect x="12" y="21" width="2" height="1"/><rect x="24" y="21" width="4" height="1"/><rect x="3" y="22" width="6" height="1"/><rect x="11" y="22" width="2" height="1"/><rect x="23" y="22" width="6" height="1"/><rect x="4" y="23" width="1" height="1"/><rect x="7" y="23" width="6" height="1"/><rect x="22" y="23" width="3" height="1"/><rect x="27" y="23" width="1" height="1"/><rect x="8" y="24" width="4" height="1"/><rect x="20" y="24" width="4" height="1"/><rect x="9" y="25" width="5" height="1"/><rect x="18" y="25" width="5" height="1"/><rect x="9" y="26" width="14" height="1"/><rect x="8" y="27" width="3" height="1"/><rect x="14" y="27" width="4" height="1"/><rect x="21" y="27" width="3" height="1"/><rect x="9" y="28" width="1" height="1"/><rect x="15" y="28" width="2" height="1"/><rect x="22" y="28" width="1" height="1"/><rect x="15" y="29" width="2" height="1"/></g></symbol>
+      <symbol id="icon-library" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="4" y="3" width="11" height="1"/><rect x="17" y="3" width="3" height="1"/><rect x="3" y="4" width="18" height="1"/><rect x="3" y="5" width="2" height="1"/><rect x="8" y="5" width="2" height="1"/><rect x="14" y="5" width="3" height="1"/><rect x="19" y="5" width="2" height="1"/><rect x="3" y="6" width="2" height="1"/><rect x="8" y="6" width="2" height="1"/><rect x="14" y="6" width="2" height="1"/><rect x="19" y="6" width="3" height="1"/><rect x="3" y="7" width="2" height="1"/><rect x="8" y="7" width="2" height="1"/><rect x="14" y="7" width="2" height="1"/><rect x="20" y="7" width="2" height="1"/><rect x="3" y="8" width="2" height="1"/><rect x="8" y="8" width="2" height="1"/><rect x="14" y="8" width="2" height="1"/><rect x="20" y="8" width="2" height="1"/><rect x="3" y="9" width="2" height="1"/><rect x="8" y="9" width="2" height="1"/><rect x="14" y="9" width="3" height="1"/><rect x="20" y="9" width="3" height="1"/><rect x="3" y="10" width="2" height="1"/><rect x="8" y="10" width="2" height="1"/><rect x="14" y="10" width="3" height="1"/><rect x="21" y="10" width="2" height="1"/><rect x="3" y="11" width="2" height="1"/><rect x="8" y="11" width="2" height="1"/><rect x="14" y="11" width="4" height="1"/><rect x="21" y="11" width="2" height="1"/><rect x="3" y="12" width="2" height="1"/><rect x="8" y="12" width="2" height="1"/><rect x="14" y="12" width="4" height="1"/><rect x="22" y="12" width="2" height="1"/><rect x="3" y="13" width="2" height="1"/><rect x="8" y="13" width="2" height="1"/><rect x="14" y="13" width="4" height="1"/><rect x="22" y="13" width="2" height="1"/><rect x="3" y="14" width="2" height="1"/><rect x="8" y="14" width="2" height="1"/><rect x="14" y="14" width="2" height="1"/><rect x="17" y="14" width="2" height="1"/><rect x="22" y="14" width="2" height="1"/><rect x="3" y="15" width="2" height="1"/><rect x="8" y="15" width="2" height="1"/><rect x="14" y="15" width="2" height="1"/><rect x="17" y="15" width="2" height="1"/><rect x="23" y="15" width="2" height="1"/><rect x="3" y="16" width="2" height="1"/><rect x="8" y="16" width="2" height="1"/><rect x="14" y="16" width="2" height="1"/><rect x="17" y="16" width="2" height="1"/><rect x="23" y="16" width="2" height="1"/><rect x="3" y="17" width="2" height="1"/><rect x="8" y="17" width="2" height="1"/><rect x="14" y="17" width="2" height="1"/><rect x="18" y="17" width="2" height="1"/><rect x="23" y="17" width="2" height="1"/><rect x="3" y="18" width="2" height="1"/><rect x="8" y="18" width="2" height="1"/><rect x="14" y="18" width="2" height="1"/><rect x="18" y="18" width="2" height="1"/><rect x="24" y="18" width="2" height="1"/><rect x="3" y="19" width="2" height="1"/><rect x="8" y="19" width="2" height="1"/><rect x="14" y="19" width="2" height="1"/><rect x="18" y="19" width="2" height="1"/><rect x="24" y="19" width="2" height="1"/><rect x="3" y="20" width="2" height="1"/><rect x="8" y="20" width="2" height="1"/><rect x="14" y="20" width="2" height="1"/><rect x="19" y="20" width="2" height="1"/><rect x="24" y="20" width="3" height="1"/><rect x="3" y="21" width="2" height="1"/><rect x="8" y="21" width="2" height="1"/><rect x="14" y="21" width="2" height="1"/><rect x="19" y="21" width="2" height="1"/><rect x="25" y="21" width="2" height="1"/><rect x="3" y="22" width="2" height="1"/><rect x="8" y="22" width="2" height="1"/><rect x="14" y="22" width="2" height="1"/><rect x="19" y="22" width="3" height="1"/><rect x="25" y="22" width="2" height="1"/><rect x="3" y="23" width="2" height="1"/><rect x="8" y="23" width="2" height="1"/><rect x="14" y="23" width="2" height="1"/><rect x="20" y="23" width="2" height="1"/><rect x="26" y="23" width="2" height="1"/><rect x="3" y="24" width="2" height="1"/><rect x="8" y="24" width="2" height="1"/><rect x="14" y="24" width="2" height="1"/><rect x="20" y="24" width="2" height="1"/><rect x="26" y="24" width="2" height="1"/><rect x="3" y="25" width="2" height="1"/><rect x="8" y="25" width="2" height="1"/><rect x="14" y="25" width="2" height="1"/><rect x="20" y="25" width="3" height="1"/><rect x="26" y="25" width="2" height="1"/><rect x="3" y="26" width="2" height="1"/><rect x="8" y="26" width="2" height="1"/><rect x="14" y="26" width="2" height="1"/><rect x="21" y="26" width="2" height="1"/><rect x="25" y="26" width="3" height="1"/><rect x="3" y="27" width="12" height="1"/><rect x="21" y="27" width="6" height="1"/><rect x="4" y="28" width="11" height="1"/><rect x="22" y="28" width="3" height="1"/></g></symbol>
+      <symbol id="icon-wifi" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="10" y="6" width="12" height="1"/><rect x="8" y="7" width="17" height="1"/><rect x="5" y="8" width="6" height="1"/><rect x="20" y="8" width="7" height="1"/><rect x="4" y="9" width="4" height="1"/><rect x="23" y="9" width="5" height="1"/><rect x="3" y="10" width="3" height="1"/><rect x="25" y="10" width="5" height="1"/><rect x="2" y="11" width="3" height="1"/><rect x="27" y="11" width="3" height="1"/><rect x="2" y="12" width="1" height="1"/><rect x="14" y="12" width="5" height="1"/><rect x="28" y="12" width="2" height="1"/><rect x="11" y="13" width="11" height="1"/><rect x="8" y="14" width="7" height="1"/><rect x="16" y="14" width="8" height="1"/><rect x="7" y="15" width="4" height="1"/><rect x="20" y="15" width="5" height="1"/><rect x="6" y="16" width="3" height="1"/><rect x="22" y="16" width="4" height="1"/><rect x="6" y="17" width="2" height="1"/><rect x="24" y="17" width="2" height="1"/><rect x="13" y="19" width="6" height="1"/><rect x="11" y="20" width="10" height="1"/><rect x="10" y="21" width="4" height="1"/><rect x="17" y="21" width="4" height="1"/><rect x="11" y="22" width="1" height="1"/><rect x="19" y="22" width="3" height="1"/><rect x="15" y="26" width="2" height="1"/></g></symbol>
+      <symbol id="icon-hotspot" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="5" y="6" width="3" height="1"/><rect x="24" y="6" width="3" height="1"/><rect x="4" y="7" width="3" height="1"/><rect x="25" y="7" width="3" height="1"/><rect x="4" y="8" width="3" height="1"/><rect x="26" y="8" width="2" height="1"/><rect x="3" y="9" width="3" height="1"/><rect x="10" y="9" width="1" height="1"/><rect x="26" y="9" width="3" height="1"/><rect x="3" y="10" width="2" height="1"/><rect x="9" y="10" width="2" height="1"/><rect x="21" y="10" width="2" height="1"/><rect x="27" y="10" width="2" height="1"/><rect x="2" y="11" width="3" height="1"/><rect x="8" y="11" width="3" height="1"/><rect x="21" y="11" width="3" height="1"/><rect x="27" y="11" width="3" height="1"/><rect x="2" y="12" width="2" height="1"/><rect x="8" y="12" width="2" height="1"/><rect x="15" y="12" width="2" height="1"/><rect x="22" y="12" width="2" height="1"/><rect x="28" y="12" width="2" height="1"/><rect x="2" y="13" width="2" height="1"/><rect x="7" y="13" width="3" height="1"/><rect x="13" y="13" width="6" height="1"/><rect x="22" y="13" width="3" height="1"/><rect x="28" y="13" width="2" height="1"/><rect x="2" y="14" width="2" height="1"/><rect x="7" y="14" width="2" height="1"/><rect x="13" y="14" width="2" height="1"/><rect x="17" y="14" width="2" height="1"/><rect x="23" y="14" width="2" height="1"/><rect x="28" y="14" width="2" height="1"/><rect x="2" y="15" width="2" height="1"/><rect x="7" y="15" width="2" height="1"/><rect x="12" y="15" width="2" height="1"/><rect x="18" y="15" width="2" height="1"/><rect x="23" y="15" width="2" height="1"/><rect x="28" y="15" width="2" height="1"/><rect x="2" y="16" width="2" height="1"/><rect x="7" y="16" width="2" height="1"/><rect x="12" y="16" width="2" height="1"/><rect x="18" y="16" width="2" height="1"/><rect x="23" y="16" width="2" height="1"/><rect x="28" y="16" width="2" height="1"/><rect x="2" y="17" width="2" height="1"/><rect x="7" y="17" width="2" height="1"/><rect x="13" y="17" width="2" height="1"/><rect x="17" y="17" width="2" height="1"/><rect x="23" y="17" width="2" height="1"/><rect x="28" y="17" width="2" height="1"/><rect x="2" y="18" width="2" height="1"/><rect x="7" y="18" width="3" height="1"/><rect x="13" y="18" width="6" height="1"/><rect x="22" y="18" width="3" height="1"/><rect x="28" y="18" width="2" height="1"/><rect x="2" y="19" width="2" height="1"/><rect x="8" y="19" width="2" height="1"/><rect x="15" y="19" width="2" height="1"/><rect x="22" y="19" width="2" height="1"/><rect x="28" y="19" width="2" height="1"/><rect x="2" y="20" width="3" height="1"/><rect x="8" y="20" width="3" height="1"/><rect x="21" y="20" width="3" height="1"/><rect x="27" y="20" width="3" height="1"/><rect x="3" y="21" width="2" height="1"/><rect x="9" y="21" width="2" height="1"/><rect x="21" y="21" width="2" height="1"/><rect x="27" y="21" width="2" height="1"/><rect x="3" y="22" width="3" height="1"/><rect x="21" y="22" width="1" height="1"/><rect x="26" y="22" width="3" height="1"/><rect x="4" y="23" width="2" height="1"/><rect x="25" y="23" width="3" height="1"/><rect x="4" y="24" width="3" height="1"/><rect x="25" y="24" width="3" height="1"/><rect x="5" y="25" width="3" height="1"/><rect x="24" y="25" width="3" height="1"/></g></symbol>
+      <!-- Battery: pixel-exact port of BaseTheme::drawBatteryOutline + Lyra bar fills. -->
+      <symbol id="icon-battery-3" viewBox="0 0 17 12"><g fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="0" width="13" height="1"/><rect x="1" y="11" width="13" height="1"/><rect x="0" y="1" width="1" height="10"/><rect x="14" y="1" width="1" height="10"/><rect x="15" y="3" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="16" y="4" width="1" height="4"/><rect x="2" y="2" width="3" height="8"/><rect x="6" y="2" width="3" height="8"/><rect x="10" y="2" width="3" height="8"/></g></symbol>
+      <symbol id="icon-battery-2" viewBox="0 0 17 12"><g fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="0" width="13" height="1"/><rect x="1" y="11" width="13" height="1"/><rect x="0" y="1" width="1" height="10"/><rect x="14" y="1" width="1" height="10"/><rect x="15" y="3" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="16" y="4" width="1" height="4"/><rect x="2" y="2" width="3" height="8"/><rect x="6" y="2" width="3" height="8"/></g></symbol>
+      <symbol id="icon-battery-1" viewBox="0 0 17 12"><g fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="0" width="13" height="1"/><rect x="1" y="11" width="13" height="1"/><rect x="0" y="1" width="1" height="10"/><rect x="14" y="1" width="1" height="10"/><rect x="15" y="3" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="16" y="4" width="1" height="4"/><rect x="2" y="2" width="3" height="8"/></g></symbol>
+    </defs>
+  </svg>
   <nav class="sticky top-0 z-50 border-b border-stone-200 bg-white/90 backdrop-blur-sm">
-    <div class="mx-auto flex max-w-3xl items-center justify-between px-6 py-3">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
       <a href="/" class="flex items-center gap-2 text-stone-900 no-underline" aria-label="Homepage">
         <img src="/logo.png" alt="" class="size-7 rounded-md">
         <span class="text-base/6 font-medium tracking-tight sm:text-sm/6">CrossPoint Reader</span>
@@ -77,72 +503,330 @@
   </div>
 
   <!-- Hero -->
-  <section class="overflow-hidden">
-    <div class="flex flex-col sm:flex-row sm:items-stretch">
-      <div class="flex items-center py-16 sm:basis-[55%] sm:py-24">
-        <div class="px-6 sm:pl-[max(3rem,calc((100vw-80rem)/2+3rem))] sm:pr-12">
-          <p class="text-sm font-semibold text-brand-500">Open-source E-Ink firmware</p>
-          <h1 class="mt-2 font-serif text-5xl font-medium tracking-tight text-stone-900 text-balance">The best way to read on your Xteink</h1>
-          <p class="mt-4 max-w-[48ch] text-lg text-stone-500 text-pretty">CrossPoint Reader is community-built firmware that replaces the stock software on Xteink X3 and X4 e-readers. More features, more control, fully open-source.</p>
-          <div class="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
-            <a href="#flash-tools" class="rounded-lg bg-brand-500 py-2.5 pr-4 pl-3 text-sm font-semibold text-white no-underline hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 inline-flex items-center gap-2">
-              <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
-              Flash firmware
-            </a>
-            <a href="https://github.com/crosspoint-reader/crosspoint-reader" target="_blank" rel="noopener" class="text-sm font-semibold text-stone-600 no-underline hover:text-stone-900 inline-flex items-center gap-1">
-              View on GitHub
-              <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
-            </a>
+  <section class="eink relative overflow-hidden">
+    <!-- Soft gradient + subtle paper texture background -->
+    <div aria-hidden="true" class="pointer-events-none absolute inset-0 bg-linear-to-br from-stone-50 via-white to-brand-50/50"></div>
+    <div aria-hidden="true" class="pointer-events-none absolute -top-32 -left-32 h-96 w-96 rounded-full bg-brand-200/30 blur-3xl"></div>
+    <div aria-hidden="true" class="pointer-events-none absolute top-40 -right-32 h-96 w-96 rounded-full bg-amber-100/40 blur-3xl"></div>
+
+    <div class="relative mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-6 py-16 lg:grid-cols-[1fr_auto] lg:gap-16 lg:py-24">
+      <div>
+        <p class="text-sm font-semibold tracking-wide text-brand-500">Open-source E-Ink firmware</p>
+        <h1 class="mt-3 font-serif text-5xl/[1.05] font-medium tracking-tight text-stone-900 text-balance sm:text-6xl/[1.05]">The best way to&nbsp;read on your Xteink.</h1>
+        <p class="mt-5 max-w-[52ch] text-lg/7 text-stone-500 text-pretty">Community-built firmware that replaces the stock software on Xteink X3 and X4 e-readers. More features, more control, fully open-source.</p>
+
+        <div class="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
+          <a href="#flash-tools" class="inline-flex items-center gap-2 rounded-lg bg-brand-500 py-2.5 pr-4 pl-3 text-sm font-semibold text-white no-underline shadow-sm ring-1 ring-brand-600 hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
+            <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+            Flash Firmware
+          </a>
+          <a href="https://github.com/crosspoint-reader/crosspoint-reader" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-sm font-semibold text-stone-600 no-underline hover:text-stone-900">
+            View on GitHub
+            <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
+          </a>
+        </div>
+
+      </div>
+
+      <!-- Device mockup: home screen, scaled 0.55 → ≈290×440 + bezel -->
+      <div class="relative mx-auto lg:mx-0">
+        <!-- floating reader-preview cutout behind the main device -->
+        <div class="pointer-events-none absolute -top-8 -left-16 hidden rotate-[-6deg] lg:block">
+          <div class="eink eink-s-35">
+            <div class="eink-bare shadow-[0_20px_40px_-12px_rgba(0,0,0,0.25)]">
+              <div class="eink-reader-body">
+                <h3>Chapter I</h3>
+                <p>It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.</p>
+                <p>However little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families, that he is considered as the rightful property of some one or other of their daughters.</p>
+                <p>&ldquo;My dear Mr. Bennet,&rdquo; said his lady to him one day, &ldquo;have you heard that Netherfield Park is let at last?&rdquo;</p>
+              </div>
+              <div class="eink-reader-progress-track"><div style="width:23%"></div></div>
+              <div class="eink-reader-status"><span>Pride and Prejudice</span><span>23%</span></div>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="hidden sm:block sm:basis-[45%]">
-        <img src="/hero-device.png" alt="Xteink e-reader running CrossPoint firmware" class="h-full w-full object-cover">
+
+        <!-- floating settings cutout (Display tab) -->
+        <div class="pointer-events-none absolute -right-14 bottom-0 hidden rotate-[5deg] lg:block">
+          <div class="eink eink-s-35">
+            <div class="eink-bare shadow-[0_20px_40px_-12px_rgba(0,0,0,0.25)]">
+              <div class="eink-header">
+                <div class="eink-header-title">Settings</div>
+                <div class="eink-header-sub">1.2.0</div>
+                <div class="eink-battery"><span>87%</span><svg><use href="#icon-battery-3"/></svg></div>
+              </div>
+              <div class="eink-tabs">
+                <div class="eink-tab selected">Display</div>
+                <div class="eink-tab">Reader</div>
+                <div class="eink-tab">Controls</div>
+                <div class="eink-tab">System</div>
+              </div>
+              <div class="eink-list">
+                <div class="eink-list-row"><span class="eink-list-row-label">Sleep Screen</span><span class="eink-list-row-value">Cover</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Sleep Screen Cover Mode</span><span class="eink-list-row-value">Fit</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Sleep Screen Cover Filter</span><span class="eink-list-row-value">None</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Hide Battery %</span><span class="eink-list-row-value">Never</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Refresh Frequency</span><span class="eink-list-row-value">10 pages</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">UI Theme</span><span class="eink-list-row-value">Lyra</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Sunlight Fading Fix</span><span class="eink-list-row-value">OFF</span></div>
+              </div>
+              <div class="eink-hints">
+                <div class="eink-hint">Back</div>
+                <div class="eink-hint">Reader</div>
+                <div class="eink-hint">Up</div>
+                <div class="eink-hint">Down</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- main device: home screen (Lyra theme, pixel-accurate port) -->
+        <div class="eink eink-s-55 sm:eink-s-60 relative">
+          <div class="eink-device">
+            <div class="eink-screen is-home">
+              <!-- Header: home draws this with title=null, only battery visible -->
+              <div class="eink-header">
+                <span></span>
+                <div class="eink-battery">
+                  <span>87%</span>
+                  <svg><use href="#icon-battery-3"/></svg>
+                </div>
+              </div>
+
+              <!-- Recent book cover tile (selected state, selectorIndex=0) -->
+              <div class="eink-home-cover selected">
+                <div class="cover cover-image" style="background-image:url(/wayofkings.png)"></div>
+                <div class="meta">
+                  <div class="meta-title">The Way of Kings</div>
+                  <div class="meta-author">Brandon Sanderson</div>
+                </div>
+              </div>
+
+              <!-- Main menu -->
+              <div class="eink-menu">
+                <div class="eink-menu-row">
+                  <svg><use href="#icon-folder"/></svg>
+                  Browse Files
+                </div>
+                <div class="eink-menu-row">
+                  <svg><use href="#icon-recent"/></svg>
+                  Recent Books
+                </div>
+                <div class="eink-menu-row">
+                  <svg><use href="#icon-transfer"/></svg>
+                  File Transfer
+                </div>
+                <div class="eink-menu-row">
+                  <svg><use href="#icon-settings2"/></svg>
+                  Settings
+                </div>
+              </div>
+
+              <!-- Button hints: ["", SELECT, ↑, ↓] per HomeActivity -->
+              <div class="eink-hints">
+                <div class="eink-hint eink-hint-empty"></div>
+                <div class="eink-hint">Select</div>
+                <div class="eink-hint">Up</div>
+                <div class="eink-hint">Down</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- Features -->
-  <section class="border-t border-stone-200 bg-white py-16 sm:py-20">
-    <div class="mx-auto max-w-3xl px-6">
-      <p class="text-sm font-semibold text-brand-500">Features</p>
-      <h2 class="mt-2 max-w-[30ch] font-serif text-3xl font-medium tracking-tight text-stone-900 text-balance">Everything the stock firmware should have been</h2>
-      <p class="mt-3 max-w-[56ch] text-base/7 text-stone-500 text-pretty">Built by readers, for readers. CrossPoint adds the features and polish that make your Xteink worth using every day.</p>
+  <section class="eink border-t border-stone-200 bg-white py-20 sm:py-28">
+    <div class="mx-auto max-w-6xl px-6">
+      <!-- Feature 1: Reading experience (reader page-flip cutout) -->
+      <div class="grid items-center gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
+        <div>
+          <p class="text-xs font-semibold tracking-wider text-brand-500 uppercase">Rendering</p>
+          <h3 class="mt-3 max-w-[22ch] font-serif text-3xl font-medium tracking-tight text-stone-900 text-balance sm:text-4xl">EPUB 2 and 3 rendering.</h3>
+          <p class="mt-4 max-w-[52ch] text-base/7 text-stone-500 text-pretty">Parses EPUB 2 and 3 files, applies embedded CSS, and lays out chapters in the configured font, size, and margins. Chapter data is cached to SD on first open; subsequent opens are near-instant.</p>
+          <ul role="list" class="mt-6 space-y-3 text-sm/6 text-stone-600">
+            <li class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-brand-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>Justified text with optional hyphenation</li>
+            <li class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-brand-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>Footnote links and table of contents navigation</li>
+            <li class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-brand-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>Reading position persisted across reboots</li>
+          </ul>
+        </div>
 
-      <dl class="mt-10 grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2" role="list">
-        <div>
-          <dt class="text-sm font-semibold text-stone-900">EPUB 2 &amp; 3 support</dt>
-          <dd class="mt-1 text-sm/6 text-stone-500">Full EPUB rendering with embedded CSS, images, and proper chapter navigation.</dd>
+        <div class="relative mx-auto">
+          <!-- Reader cutout: static page of body text -->
+          <div class="eink eink-s-55 sm:eink-s-60">
+            <div class="eink-bare shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]">
+              <div class="eink-reader-body">
+                <p>It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.</p>
+                <p>However little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families, that he is considered as the rightful property of some one or other of their daughters.</p>
+                <p>&ldquo;My dear Mr. Bennet,&rdquo; said his lady to him one day, &ldquo;have you heard that Netherfield Park is let at last?&rdquo;</p>
+                <p>Mr. Bennet replied that he had not.</p>
+                <p>&ldquo;But it is,&rdquo; returned she; &ldquo;for Mrs. Long has just been here, and she told me all about it.&rdquo; Mr. Bennet made no answer.</p>
+                <p>&ldquo;Do not you want to know who has taken it?&rdquo; cried his wife impatiently.</p>
+                <p>&ldquo;Why, my dear, you must know, Mrs. Long</p>
+              </div>
+              <div class="eink-reader-progress-track"><div style="width:23%"></div></div>
+              <div class="eink-reader-status"><span>Pride and Prejudice</span><span>23%</span></div>
+            </div>
+          </div>
         </div>
-        <div>
-          <dt class="text-sm font-semibold text-stone-900">WiFi book uploads</dt>
-          <dd class="mt-1 text-sm/6 text-stone-500">Transfer books wirelessly from any device on your network. <a href="https://github.com/crosspoint-reader/calibre-plugins/releases/" target="_blank" rel="noopener" class="font-medium text-brand-500 underline underline-offset-2 hover:text-brand-600">Calibre plugin</a> support included.</dd>
+      </div>
+
+      <!-- Feature 2: Typography / settings (settings cutout, reversed) -->
+      <div class="mt-24 grid items-center gap-12 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
+        <div class="relative order-last mx-auto lg:order-first">
+          <div class="eink eink-s-55 sm:eink-s-60">
+            <div class="eink-bare shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]">
+              <!-- Header: title "Settings", subtitle = firmware version -->
+              <div class="eink-header">
+                <div class="eink-header-title">Settings</div>
+                <div class="eink-header-sub">1.2.0</div>
+                <div class="eink-battery"><span>87%</span><svg><use href="#icon-battery-3"/></svg></div>
+              </div>
+
+              <!-- Tab bar: 4 categories, Reader selected but not focused (row is focused) -->
+              <div class="eink-tabs">
+                <div class="eink-tab">Display</div>
+                <div class="eink-tab selected">Reader</div>
+                <div class="eink-tab">Controls</div>
+                <div class="eink-tab">System</div>
+              </div>
+
+              <!-- Reader category settings (firmware labels from english.yaml, order from SettingsList.h) -->
+              <div class="eink-list">
+                <div class="eink-list-row"><span class="eink-list-row-label">Reader Font Family</span><span class="eink-list-row-value">Noto Serif</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Download Fonts</span><span class="eink-list-row-value"></span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Reader Font Size</span><span class="eink-list-row-value">Medium</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Reader Line Spacing</span><span class="eink-list-row-value">Normal</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Reader Screen Margin</span><span class="eink-list-row-value">20</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Reader Paragraph Alignment</span><span class="eink-list-row-value">Justify</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Embedded Style</span><span class="eink-list-row-value">ON</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Hyphenation</span><span class="eink-list-row-value">ON</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Reading Orientation</span><span class="eink-list-row-value">Portrait</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Extra Paragraph Spacing</span><span class="eink-list-row-value">OFF</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Text Anti-Aliasing</span><span class="eink-list-row-value">ON</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Images</span><span class="eink-list-row-value">Display</span></div>
+                <div class="eink-list-row"><span class="eink-list-row-label">Customise Status Bar</span><span class="eink-list-row-value"></span></div>
+              </div>
+
+              <!-- Hints when tab bar is focused: Back | <next category> | Up | Down -->
+              <div class="eink-hints">
+                <div class="eink-hint">Back</div>
+                <div class="eink-hint">Controls</div>
+                <div class="eink-hint">Up</div>
+                <div class="eink-hint">Down</div>
+              </div>
+            </div>
+          </div>
         </div>
+
         <div>
-          <dt class="text-sm font-semibold text-stone-900">KOReader Sync</dt>
-          <dd class="mt-1 text-sm/6 text-stone-500">Sync your reading progress across devices with KOReader's open sync protocol.</dd>
+          <p class="text-xs font-semibold tracking-wider text-brand-500 uppercase">Typography</p>
+          <h3 class="mt-3 max-w-[22ch] font-serif text-3xl font-medium tracking-tight text-stone-900 text-balance sm:text-4xl">Configurable typography.</h3>
+          <p class="mt-4 max-w-[52ch] text-base/7 text-stone-500 text-pretty">Three built-in font families (Noto Serif, Noto Sans, Open Dyslexic) and user fonts loaded from the SD card. Settings for font size, line spacing, screen margin, paragraph alignment, hyphenation, embedded style, and anti-aliasing.</p>
+
+          <dl class="mt-6 grid grid-cols-2 gap-x-8 gap-y-5 text-sm" role="list">
+            <div>
+              <dt class="font-semibold text-stone-900">Font Sizes</dt>
+              <dd class="mt-1 text-stone-500">Small, Medium, Large, X-Large</dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-stone-900">Load Custom Fonts</dt>
+              <dd class="mt-1 text-stone-500">Add your own TTFs via the <a href="/fonts" class="font-medium text-brand-500 underline underline-offset-2 hover:text-brand-600">font builder</a></dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-stone-900">Alignment Options</dt>
+              <dd class="mt-1 text-stone-500">Justify, Left, Center, Right, or the Book's Style</dd>
+            </div>
+            <div>
+              <dt class="font-semibold text-stone-900">Set Screen Margin</dt>
+              <dd class="mt-1 text-stone-500">5–40 px, in 5-px increments</dd>
+            </div>
+          </dl>
         </div>
+      </div>
+
+      <!-- Feature 4: WiFi transfer -->
+      <div class="mt-24 grid items-center gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
         <div>
-          <dt class="text-sm font-semibold text-stone-900">Customizable typography</dt>
-          <dd class="mt-1 text-sm/6 text-stone-500">Choose from Noto Serif, Noto Sans, and Open Dyslexic. Adjust size, line spacing, margins, and alignment.</dd>
+          <p class="text-xs font-semibold tracking-wider text-brand-500 uppercase">Networking</p>
+          <h3 class="mt-3 max-w-[22ch] font-serif text-3xl font-medium tracking-tight text-stone-900 text-balance sm:text-4xl">WiFi transfer and sync.</h3>
+          <p class="mt-4 max-w-[52ch] text-base/7 text-stone-500 text-pretty">The device runs an HTTP upload server when connected to WiFi or acting as a hotspot. Drop EPUBs in from any browser or use our <a href="https://github.com/crosspoint-reader/calibre-plugins/releases/" target="_blank" rel="noopener" class="font-medium text-brand-500 underline underline-offset-2 hover:text-brand-600">Calibre Plugin</a>.</p>
+
+          <ul role="list" class="mt-6 space-y-3 text-sm/6 text-stone-600">
+            <li class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-brand-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>Joins an existing WiFi network or runs its own hotspot</li>
+            <li class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-brand-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>KOReader Sync for cross-device reading progress</li>
+            <li class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-brand-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>Multiple OPDS library servers configurable on-device</li>
+            <li class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-brand-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>Over-the-air firmware updates</li>
+          </ul>
         </div>
-        <div>
-          <dt class="text-sm font-semibold text-stone-900">Multiple themes</dt>
-          <dd class="mt-1 text-sm/6 text-stone-500">Switch between Classic, Lyra, and Lyra Extended UI themes. Portrait and landscape rotation supported.</dd>
+
+        <div class="relative mx-auto">
+          <div class="eink eink-s-55 sm:eink-s-60">
+            <div class="eink-bare shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]">
+              <div class="eink-header">
+                <div>
+                  <div class="eink-header-title">File Transfer</div>
+                  <div class="eink-header-sub">Server running</div>
+                </div>
+                <div class="eink-battery"><span>87%</span><svg><use href="#icon-battery-3"/></svg></div>
+              </div>
+
+              <!-- QR code + network info -->
+              <div style="padding:calc(28px * var(--eink-scale)) calc(20px * var(--eink-scale)) 0;display:flex;flex-direction:column;align-items:center;gap:calc(18px * var(--eink-scale))">
+                <!-- QR code: links to https://www.youtube.com/watch?v=dQw4w9WgXcQ -->
+                <div style="width:calc(240px * var(--eink-scale));height:calc(240px * var(--eink-scale));background:#fff;padding:calc(10px * var(--eink-scale));outline:calc(2px * var(--eink-scale)) solid #1a1a1a">
+                  <svg viewBox="0 0 33 33" shape-rendering="crispEdges" style="width:100%;height:100%;image-rendering:pixelated"><rect width="33" height="33" fill="#fff"/><g fill="#1a1a1a"><rect x="0" y="0" width="7" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="11" y="0" width="3" height="1"/><rect x="15" y="0" width="1" height="1"/><rect x="18" y="0" width="1" height="1"/><rect x="23" y="0" width="1" height="1"/><rect x="26" y="0" width="7" height="1"/><rect x="0" y="1" width="1" height="1"/><rect x="6" y="1" width="1" height="1"/><rect x="9" y="1" width="6" height="1"/><rect x="18" y="1" width="2" height="1"/><rect x="26" y="1" width="1" height="1"/><rect x="32" y="1" width="1" height="1"/><rect x="0" y="2" width="1" height="1"/><rect x="2" y="2" width="3" height="1"/><rect x="6" y="2" width="1" height="1"/><rect x="10" y="2" width="1" height="1"/><rect x="12" y="2" width="1" height="1"/><rect x="14" y="2" width="6" height="1"/><rect x="21" y="2" width="1" height="1"/><rect x="23" y="2" width="1" height="1"/><rect x="26" y="2" width="1" height="1"/><rect x="28" y="2" width="3" height="1"/><rect x="32" y="2" width="1" height="1"/><rect x="0" y="3" width="1" height="1"/><rect x="2" y="3" width="3" height="1"/><rect x="6" y="3" width="1" height="1"/><rect x="8" y="3" width="2" height="1"/><rect x="11" y="3" width="2" height="1"/><rect x="16" y="3" width="2" height="1"/><rect x="21" y="3" width="2" height="1"/><rect x="26" y="3" width="1" height="1"/><rect x="28" y="3" width="3" height="1"/><rect x="32" y="3" width="1" height="1"/><rect x="0" y="4" width="1" height="1"/><rect x="2" y="4" width="3" height="1"/><rect x="6" y="4" width="1" height="1"/><rect x="8" y="4" width="2" height="1"/><rect x="16" y="4" width="2" height="1"/><rect x="19" y="4" width="1" height="1"/><rect x="21" y="4" width="2" height="1"/><rect x="26" y="4" width="1" height="1"/><rect x="28" y="4" width="3" height="1"/><rect x="32" y="4" width="1" height="1"/><rect x="0" y="5" width="1" height="1"/><rect x="6" y="5" width="1" height="1"/><rect x="8" y="5" width="3" height="1"/><rect x="12" y="5" width="1" height="1"/><rect x="15" y="5" width="1" height="1"/><rect x="17" y="5" width="1" height="1"/><rect x="20" y="5" width="5" height="1"/><rect x="26" y="5" width="1" height="1"/><rect x="32" y="5" width="1" height="1"/><rect x="0" y="6" width="7" height="1"/><rect x="8" y="6" width="1" height="1"/><rect x="10" y="6" width="1" height="1"/><rect x="12" y="6" width="1" height="1"/><rect x="14" y="6" width="1" height="1"/><rect x="16" y="6" width="1" height="1"/><rect x="18" y="6" width="1" height="1"/><rect x="20" y="6" width="1" height="1"/><rect x="22" y="6" width="1" height="1"/><rect x="24" y="6" width="1" height="1"/><rect x="26" y="6" width="7" height="1"/><rect x="8" y="7" width="1" height="1"/><rect x="11" y="7" width="1" height="1"/><rect x="14" y="7" width="1" height="1"/><rect x="17" y="7" width="5" height="1"/><rect x="24" y="7" width="1" height="1"/><rect x="0" y="8" width="1" height="1"/><rect x="4" y="8" width="1" height="1"/><rect x="6" y="8" width="3" height="1"/><rect x="10" y="8" width="1" height="1"/><rect x="12" y="8" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="17" y="8" width="1" height="1"/><rect x="20" y="8" width="4" height="1"/><rect x="25" y="8" width="5" height="1"/><rect x="32" y="8" width="1" height="1"/><rect x="1" y="9" width="1" height="1"/><rect x="5" y="9" width="1" height="1"/><rect x="7" y="9" width="1" height="1"/><rect x="10" y="9" width="2" height="1"/><rect x="15" y="9" width="4" height="1"/><rect x="21" y="9" width="3" height="1"/><rect x="25" y="9" width="1" height="1"/><rect x="29" y="9" width="2" height="1"/><rect x="32" y="9" width="1" height="1"/><rect x="0" y="10" width="1" height="1"/><rect x="2" y="10" width="1" height="1"/><rect x="4" y="10" width="5" height="1"/><rect x="13" y="10" width="3" height="1"/><rect x="18" y="10" width="1" height="1"/><rect x="23" y="10" width="1" height="1"/><rect x="25" y="10" width="1" height="1"/><rect x="29" y="10" width="1" height="1"/><rect x="31" y="10" width="1" height="1"/><rect x="2" y="11" width="1" height="1"/><rect x="4" y="11" width="1" height="1"/><rect x="7" y="11" width="1" height="1"/><rect x="10" y="11" width="1" height="1"/><rect x="12" y="11" width="2" height="1"/><rect x="16" y="11" width="1" height="1"/><rect x="19" y="11" width="2" height="1"/><rect x="22" y="11" width="1" height="1"/><rect x="24" y="11" width="3" height="1"/><rect x="0" y="12" width="1" height="1"/><rect x="2" y="12" width="2" height="1"/><rect x="6" y="12" width="1" height="1"/><rect x="8" y="12" width="1" height="1"/><rect x="10" y="12" width="1" height="1"/><rect x="12" y="12" width="2" height="1"/><rect x="16" y="12" width="1" height="1"/><rect x="22" y="12" width="3" height="1"/><rect x="26" y="12" width="2" height="1"/><rect x="29" y="12" width="1" height="1"/><rect x="32" y="12" width="1" height="1"/><rect x="0" y="13" width="1" height="1"/><rect x="2" y="13" width="4" height="1"/><rect x="7" y="13" width="1" height="1"/><rect x="10" y="13" width="2" height="1"/><rect x="14" y="13" width="1" height="1"/><rect x="17" y="13" width="4" height="1"/><rect x="24" y="13" width="2" height="1"/><rect x="27" y="13" width="1" height="1"/><rect x="30" y="13" width="1" height="1"/><rect x="2" y="14" width="1" height="1"/><rect x="4" y="14" width="3" height="1"/><rect x="10" y="14" width="3" height="1"/><rect x="14" y="14" width="2" height="1"/><rect x="17" y="14" width="2" height="1"/><rect x="20" y="14" width="2" height="1"/><rect x="23" y="14" width="4" height="1"/><rect x="28" y="14" width="1" height="1"/><rect x="31" y="14" width="1" height="1"/><rect x="0" y="15" width="5" height="1"/><rect x="7" y="15" width="1" height="1"/><rect x="10" y="15" width="2" height="1"/><rect x="13" y="15" width="6" height="1"/><rect x="21" y="15" width="1" height="1"/><rect x="23" y="15" width="1" height="1"/><rect x="25" y="15" width="3" height="1"/><rect x="0" y="16" width="2" height="1"/><rect x="3" y="16" width="4" height="1"/><rect x="8" y="16" width="2" height="1"/><rect x="12" y="16" width="1" height="1"/><rect x="17" y="16" width="6" height="1"/><rect x="24" y="16" width="1" height="1"/><rect x="26" y="16" width="1" height="1"/><rect x="28" y="16" width="2" height="1"/><rect x="31" y="16" width="1" height="1"/><rect x="0" y="17" width="2" height="1"/><rect x="4" y="17" width="2" height="1"/><rect x="7" y="17" width="4" height="1"/><rect x="15" y="17" width="2" height="1"/><rect x="18" y="17" width="1" height="1"/><rect x="20" y="17" width="1" height="1"/><rect x="22" y="17" width="3" height="1"/><rect x="29" y="17" width="3" height="1"/><rect x="0" y="18" width="1" height="1"/><rect x="2" y="18" width="3" height="1"/><rect x="6" y="18" width="2" height="1"/><rect x="10" y="18" width="1" height="1"/><rect x="12" y="18" width="2" height="1"/><rect x="15" y="18" width="3" height="1"/><rect x="20" y="18" width="6" height="1"/><rect x="27" y="18" width="1" height="1"/><rect x="29" y="18" width="1" height="1"/><rect x="31" y="18" width="1" height="1"/><rect x="1" y="19" width="2" height="1"/><rect x="4" y="19" width="1" height="1"/><rect x="7" y="19" width="1" height="1"/><rect x="10" y="19" width="1" height="1"/><rect x="12" y="19" width="2" height="1"/><rect x="15" y="19" width="1" height="1"/><rect x="17" y="19" width="2" height="1"/><rect x="20" y="19" width="2" height="1"/><rect x="24" y="19" width="4" height="1"/><rect x="31" y="19" width="1" height="1"/><rect x="0" y="20" width="1" height="1"/><rect x="2" y="20" width="1" height="1"/><rect x="5" y="20" width="3" height="1"/><rect x="9" y="20" width="1" height="1"/><rect x="11" y="20" width="1" height="1"/><rect x="13" y="20" width="2" height="1"/><rect x="18" y="20" width="3" height="1"/><rect x="26" y="20" width="4" height="1"/><rect x="0" y="21" width="1" height="1"/><rect x="3" y="21" width="1" height="1"/><rect x="5" y="21" width="1" height="1"/><rect x="12" y="21" width="1" height="1"/><rect x="16" y="21" width="2" height="1"/><rect x="19" y="21" width="1" height="1"/><rect x="22" y="21" width="1" height="1"/><rect x="26" y="21" width="1" height="1"/><rect x="29" y="21" width="3" height="1"/><rect x="4" y="22" width="4" height="1"/><rect x="11" y="22" width="2" height="1"/><rect x="14" y="22" width="1" height="1"/><rect x="16" y="22" width="1" height="1"/><rect x="18" y="22" width="2" height="1"/><rect x="21" y="22" width="1" height="1"/><rect x="23" y="22" width="3" height="1"/><rect x="30" y="22" width="2" height="1"/><rect x="3" y="23" width="3" height="1"/><rect x="7" y="23" width="2" height="1"/><rect x="10" y="23" width="1" height="1"/><rect x="13" y="23" width="1" height="1"/><rect x="17" y="23" width="6" height="1"/><rect x="25" y="23" width="2" height="1"/><rect x="28" y="23" width="2" height="1"/><rect x="31" y="23" width="2" height="1"/><rect x="0" y="24" width="3" height="1"/><rect x="4" y="24" width="1" height="1"/><rect x="6" y="24" width="2" height="1"/><rect x="10" y="24" width="2" height="1"/><rect x="13" y="24" width="5" height="1"/><rect x="20" y="24" width="3" height="1"/><rect x="24" y="24" width="6" height="1"/><rect x="31" y="24" width="1" height="1"/><rect x="8" y="25" width="1" height="1"/><rect x="10" y="25" width="2" height="1"/><rect x="13" y="25" width="5" height="1"/><rect x="21" y="25" width="4" height="1"/><rect x="28" y="25" width="1" height="1"/><rect x="30" y="25" width="1" height="1"/><rect x="0" y="26" width="7" height="1"/><rect x="8" y="26" width="3" height="1"/><rect x="14" y="26" width="2" height="1"/><rect x="18" y="26" width="1" height="1"/><rect x="24" y="26" width="1" height="1"/><rect x="26" y="26" width="1" height="1"/><rect x="28" y="26" width="2" height="1"/><rect x="0" y="27" width="1" height="1"/><rect x="6" y="27" width="1" height="1"/><rect x="11" y="27" width="1" height="1"/><rect x="14" y="27" width="3" height="1"/><rect x="19" y="27" width="1" height="1"/><rect x="22" y="27" width="1" height="1"/><rect x="24" y="27" width="1" height="1"/><rect x="28" y="27" width="1" height="1"/><rect x="32" y="27" width="1" height="1"/><rect x="0" y="28" width="1" height="1"/><rect x="2" y="28" width="3" height="1"/><rect x="6" y="28" width="1" height="1"/><rect x="8" y="28" width="1" height="1"/><rect x="11" y="28" width="4" height="1"/><rect x="16" y="28" width="1" height="1"/><rect x="19" y="28" width="1" height="1"/><rect x="22" y="28" width="1" height="1"/><rect x="24" y="28" width="6" height="1"/><rect x="32" y="28" width="1" height="1"/><rect x="0" y="29" width="1" height="1"/><rect x="2" y="29" width="3" height="1"/><rect x="6" y="29" width="1" height="1"/><rect x="9" y="29" width="2" height="1"/><rect x="12" y="29" width="2" height="1"/><rect x="18" y="29" width="3" height="1"/><rect x="23" y="29" width="1" height="1"/><rect x="26" y="29" width="6" height="1"/><rect x="0" y="30" width="1" height="1"/><rect x="2" y="30" width="3" height="1"/><rect x="6" y="30" width="1" height="1"/><rect x="9" y="30" width="1" height="1"/><rect x="12" y="30" width="1" height="1"/><rect x="14" y="30" width="2" height="1"/><rect x="18" y="30" width="1" height="1"/><rect x="20" y="30" width="2" height="1"/><rect x="25" y="30" width="5" height="1"/><rect x="0" y="31" width="1" height="1"/><rect x="6" y="31" width="1" height="1"/><rect x="11" y="31" width="3" height="1"/><rect x="15" y="31" width="4" height="1"/><rect x="21" y="31" width="1" height="1"/><rect x="23" y="31" width="2" height="1"/><rect x="26" y="31" width="1" height="1"/><rect x="0" y="32" width="7" height="1"/><rect x="8" y="32" width="1" height="1"/><rect x="10" y="32" width="1" height="1"/><rect x="17" y="32" width="1" height="1"/><rect x="19" y="32" width="8" height="1"/><rect x="29" y="32" width="1" height="1"/><rect x="32" y="32" width="1" height="1"/></g></svg>
+                </div>
+                <div style="text-align:center;font-family:'Noto Sans',sans-serif">
+                  <div style="font-size:calc(22px * var(--eink-scale));font-weight:700">http://crosspoint.local</div>
+                  <div style="font-size:calc(16px * var(--eink-scale));color:#8a8782;margin-top:calc(4px * var(--eink-scale))">Connected to home-wifi · 192.168.1.42</div>
+                </div>
+
+                <!-- Progress -->
+                <div style="width:100%;margin-top:calc(12px * var(--eink-scale))">
+                  <div style="display:flex;justify-content:space-between;font-family:'Noto Sans',sans-serif;font-size:calc(15px * var(--eink-scale));margin-bottom:calc(8px * var(--eink-scale))">
+                    <span>Uploading <em style="font-style:italic">moby-dick.epub</em></span>
+                    <span style="font-variant-numeric:tabular-nums">68%</span>
+                  </div>
+                  <div style="height:calc(6px * var(--eink-scale));background:rgba(0,0,0,0.12);border-radius:999px;overflow:hidden">
+                    <div style="height:100%;width:68%;background:#1a1a1a"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="eink-hints">
+                <div class="eink-hint eink-hint-empty"></div>
+                <div class="eink-hint">STOP</div>
+                <div class="eink-hint eink-hint-empty"></div>
+                <div class="eink-hint">BACK</div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div>
-          <dt class="text-sm font-semibold text-stone-900">Multi-language text</dt>
-          <dd class="mt-1 text-sm/6 text-stone-500">Latin and Cyrillic script support covering English, Spanish, French, German, Russian, Ukrainian, and more.</dd>
-        </div>
-        <div>
-          <dt class="text-sm font-semibold text-stone-900">Reading persistence</dt>
-          <dd class="mt-1 text-sm/6 text-stone-500">Automatically saves your position. Pick up right where you left off, every time.</dd>
-        </div>
-        <div>
-          <dt class="text-sm font-semibold text-stone-900">OTA updates</dt>
-          <dd class="mt-1 text-sm/6 text-stone-500">Update firmware over WiFi or flash directly from this page. No special tools required.</dd>
-        </div>
-      </dl>
+      </div>
+
+      <!-- Secondary features grid -->
+      <div class="mt-24 border-t border-stone-200 pt-16">
+        <dl class="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-4" role="list">
+          <div>
+            <dt class="text-sm font-semibold text-stone-900">Localisation</dt>
+            <dd class="mt-1.5 text-sm/6 text-stone-500">UI translations for English, Spanish, French, German, Italian, Portuguese, Russian, Ukrainian, Polish,and more.</dd>
+          </div>
+          <div>
+            <dt class="text-sm font-semibold text-stone-900">UI Themes</dt>
+            <dd class="mt-1.5 text-sm/6 text-stone-500">Three custom themes to choose from. Classic, Lyra, Lyra 3 Covers. Four screen orientations.</dd>
+          </div>
+          <div>
+            <dt class="text-sm font-semibold text-stone-900">Calibre Plugin</dt>
+            <dd class="mt-1.5 text-sm/6 text-stone-500">Send books from Calibre to the device over WiFi via the CrossPoint device plugin.</dd>
+          </div>
+          <div>
+            <dt class="text-sm font-semibold text-stone-900">Sleep Screens</dt>
+            <dd class="mt-1.5 text-sm/6 text-stone-500">Choose a fixed image, the current book cover, or a random image from the SD card.</dd>
+          </div>
+        </dl>
+      </div>
     </div>
   </section>
 
@@ -150,8 +834,8 @@
   <section class="border-t border-stone-200 py-16 sm:py-20" id="flash-tools">
     <div class="mx-auto max-w-3xl px-6">
       <p class="text-sm font-semibold text-brand-500">Web flasher</p>
-      <h2 class="mt-2 max-w-[30ch] font-serif text-3xl font-medium tracking-tight text-stone-900 text-balance">Flash from your browser</h2>
-      <p class="mt-3 max-w-[56ch] text-base/7 text-stone-500 text-pretty">Connect your Xteink via USB and flash firmware directly. No downloads, no installs, just Chrome or Edge on desktop. Originally built by <a href="https://github.com/daveallie" target="_blank" rel="noopener" class="font-medium text-brand-500 underline underline-offset-2 hover:text-brand-600">daveallie</a>.</p>
+      <h2 class="mt-2 max-w-[30ch] font-serif text-3xl font-medium tracking-tight text-stone-900 text-balance">Flash from your browser.</h2>
+      <p class="mt-3 max-w-[56ch] text-base/7 text-stone-500 text-pretty">Writes firmware over USB using the WebSerial API. Works in Chrome and Edge on desktop. Originally built by <a href="https://github.com/daveallie" target="_blank" rel="noopener" class="font-medium text-brand-500 underline underline-offset-2 hover:text-brand-600">daveallie</a>.</p>
 
       <!-- Browser check -->
       <div id="browser-warning" class="mt-8 hidden rounded-lg border border-red-200 bg-red-50/60 px-4 py-3 text-sm/6 text-red-800">
@@ -326,8 +1010,8 @@
   <section class="border-t border-stone-200 bg-white py-16 sm:py-20">
     <div class="mx-auto max-w-3xl px-6 text-center">
       <p class="text-sm font-semibold text-brand-500">Insider Builds</p>
-      <h2 class="mx-auto mt-2 max-w-[24ch] font-serif text-3xl font-medium tracking-tight text-stone-900 text-balance">Want the latest features first?</h2>
-      <p class="mx-auto mt-3 max-w-[48ch] text-base/7 text-stone-500 text-pretty">Insider Builds are compiled nightly from the latest commits. Build custom firmware with your own fonts swapped in.</p>
+      <h2 class="mx-auto mt-2 max-w-[24ch] font-serif text-3xl font-medium tracking-tight text-stone-900 text-balance">Nightly builds and custom fonts.</h2>
+      <p class="mx-auto mt-3 max-w-[48ch] text-base/7 text-stone-500 text-pretty">Nightly builds are compiled from the latest master commits. Custom font builds let you swap in custom TTFs and produces a firmware image ready to flash.</p>
       <div class="mt-8">
         <a href="/insider" class="inline-flex items-center gap-2 rounded-lg bg-brand-500 py-2.5 pr-4 pl-3 text-sm font-semibold text-white no-underline hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500">
           <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z"/></svg>
@@ -715,4 +1399,4 @@
     });
   </script>
 </body>
-</html>
+</html
