@@ -41,11 +41,10 @@
   //   GITHUB_WEBHOOK_SECRET - for verifying webhook payloads
   //   GITHUB_TOKEN - optional, for private repo access
 
-  // Workers AI binding — commented for local dev; the AI binding always runs remote
-  // and blocks `wrangler dev` if the CF session is expired. Uncomment before deploying.
-  // "ai": {
-  //   "binding": "AI"
-  // },
+  // Workers AI binding
+  "ai": {
+    "binding": "AI"
+  },
 
   "vars": {
     "REPO_URL": "https://github.com/crosspoint-reader/crosspoint-reader.git"
