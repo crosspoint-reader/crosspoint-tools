@@ -1335,7 +1335,7 @@
           // X3 bootloader validates the new app on first boot before committing the OTA pointer.
           // A hard_reset interrupts that validation and rolls back, causing the "flash twice" bug.
           // Skip reset for CrossPoint on X3 so the user's manual replug runs the validation cleanly.
-          const skipReset = action === 'crosspoint' && deviceModel === 'x3';
+          const skipReset = (action === 'crosspoint' || action.startsWith('beta-')) && deviceModel === 'x3';
 
           if (action === 'crosspoint') {
             title = 'Flashing CrossPoint Firmware...';
