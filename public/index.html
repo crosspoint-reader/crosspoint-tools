@@ -77,20 +77,27 @@
   </div>
 
   <!-- Hero -->
-  <section class="py-16 sm:py-24">
-    <div class="mx-auto max-w-3xl px-6">
-      <p class="text-sm font-semibold text-brand-500">Open-source E-Ink firmware</p>
-      <h1 class="mt-2 max-w-[20ch] font-serif text-5xl font-medium tracking-tight text-stone-900 text-balance">A better reading experience for your Xteink</h1>
-      <p class="mt-4 max-w-[48ch] text-lg text-stone-500 text-pretty">CrossPoint Reader is community-built firmware that replaces the stock software on Xteink X3 and X4 e-readers. More features, more control, fully open-source.</p>
-      <div class="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
-        <a href="#flash-tools" class="rounded-lg bg-brand-500 py-2.5 pr-4 pl-3 text-sm font-semibold text-white no-underline hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 inline-flex items-center gap-2">
-          <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
-          Flash firmware
-        </a>
-        <a href="https://github.com/crosspoint-reader/crosspoint-reader" target="_blank" rel="noopener" class="text-sm font-semibold text-stone-600 no-underline hover:text-stone-900 inline-flex items-center gap-1">
-          View on GitHub
-          <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
-        </a>
+  <section class="overflow-hidden">
+    <div class="flex flex-col sm:flex-row sm:items-stretch">
+      <div class="flex items-center py-16 sm:basis-[55%] sm:py-24">
+        <div class="px-6 sm:pl-[max(3rem,calc((100vw-80rem)/2+3rem))] sm:pr-12">
+          <p class="text-sm font-semibold text-brand-500">Open-source E-Ink firmware</p>
+          <h1 class="mt-2 font-serif text-5xl font-medium tracking-tight text-stone-900 text-balance">The best way to read on your Xteink</h1>
+          <p class="mt-4 max-w-[48ch] text-lg text-stone-500 text-pretty">CrossPoint Reader is community-built firmware that replaces the stock software on Xteink X3 and X4 e-readers. More features, more control, fully open-source.</p>
+          <div class="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
+            <a href="#flash-tools" class="rounded-lg bg-brand-500 py-2.5 pr-4 pl-3 text-sm font-semibold text-white no-underline hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 inline-flex items-center gap-2">
+              <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+              Flash firmware
+            </a>
+            <a href="https://github.com/crosspoint-reader/crosspoint-reader" target="_blank" rel="noopener" class="text-sm font-semibold text-stone-600 no-underline hover:text-stone-900 inline-flex items-center gap-1">
+              View on GitHub
+              <svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="hidden sm:block sm:basis-[45%]">
+        <img src="/hero-device.png" alt="Xteink e-reader running CrossPoint firmware" class="h-full w-full object-cover">
       </div>
     </div>
   </section>
