@@ -30,7 +30,7 @@ function crc32(data) {
   for (let i = 0; i < data.length; i++) {
     crc = CRC32_TABLE[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
   }
-  return crc >>> 0;
+  return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 
 // --- Byte Utilities ---
