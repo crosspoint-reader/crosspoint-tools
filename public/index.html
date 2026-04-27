@@ -49,10 +49,6 @@
     }
   </script>
   <style type="text/tailwindcss">
-    @layer utilities {
-      .animate-spin-slow { animation: spin 1.2s linear infinite; }
-    }
-
     /* ============================================================
        E-INK DEVICE MOCKUP — renders firmware UI (Lyra theme)
        Base canvas: 480×800. Scale with --eink-scale CSS variable.
@@ -1338,7 +1334,7 @@
         const st = states[i] || 'pending';
         const colors = { pending: 'text-stone-400', running: 'text-stone-900', done: 'text-brand-500', error: 'text-red-600' };
         const icons = { pending: '\u25CB', running: '\u25E0', done: '\u2713', error: '\u2717' };
-        const spin = st === 'running' ? 'animate-spin-slow' : '';
+        const spin = st === 'running' ? 'animate-spin' : '';
         const showBar = st === 'running' && (name.includes('Flash') || name.includes('Read flash') || name.includes('Write flash'));
         const bar = showBar ? '<div class="flex-1 h-1 rounded-full bg-stone-200 overflow-hidden"><div class="bg-brand-500 h-full rounded-full transition-all duration-200" id="flash-progress" style="width:0%"></div></div>' : '';
         return `<li class="flex items-center gap-3 py-3 text-sm/5 ${colors[st]}"><span class="size-5 flex items-center justify-center shrink-0 ${spin}" aria-hidden="true">${icons[st]}</span><span class="${showBar ? '' : 'flex-1'}">${name}</span>${bar}</li>`;
