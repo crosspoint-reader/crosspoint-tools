@@ -48,9 +48,49 @@
     [0x2000, 0x206F],
   ];
 
+  /** Symbols commonly seen in scifi/popsci/literary fiction (math, arrows,
+   *  music notes, geometric shapes). Not a standard Unicode block grouping —
+   *  designed to fill the gaps between latin-ext and the symbol blocks. */
+  var SYMBOLS_INTERVALS = [
+    [0x2070, 0x209F], // Superscripts and subscripts
+    [0x20A0, 0x20CF], // Currency
+    [0x2150, 0x218F], // Number forms (½, ¼, Roman numerals)
+    [0x2190, 0x21FF], // Arrows
+    [0x2200, 0x22FF], // Mathematical operators
+    [0x2500, 0x257F], // Box drawing
+    [0x25A0, 0x25FF], // Geometric shapes
+    [0x2600, 0x26FF], // Miscellaneous symbols (♪ ♫ ♬ ♭ ♮ ♯ ★ ☆)
+    [0x2700, 0x27BF], // Dingbats (✓ ✗ ❦)
+  ];
+
+  /** Composite preset for English-language literary fiction including
+   *  scifi/popsci. Covers Project Hail Mary, The Martian, etc. — Greek for
+   *  physics terms, math symbols, and miscellaneous symbols for music notes
+   *  and other glyphs commonly used in modern fiction. */
+  var READING_INTERVALS = [
+    [0x0020, 0x024F], // Latin + Latin Extended-A/B
+    [0x0300, 0x036F], // Combining diacritics
+    [0x0370, 0x03FF], // Greek
+    [0x0400, 0x04FF], // Cyrillic
+    [0x1E00, 0x1EFF], // Latin Extended Additional
+    [0x2000, 0x206F], // General punctuation
+    [0x2070, 0x209F], // Superscripts and subscripts
+    [0x20A0, 0x20CF], // Currency
+    [0x2150, 0x218F], // Number forms
+    [0x2190, 0x21FF], // Arrows
+    [0x2200, 0x22FF], // Mathematical operators
+    [0x2500, 0x257F], // Box drawing
+    [0x25A0, 0x25FF], // Geometric shapes
+    [0x2600, 0x26FF], // Miscellaneous symbols (music notes, stars)
+    [0x2700, 0x27BF], // Dingbats
+    [0xFB00, 0xFB06], // Latin ligatures (ﬁ ﬂ)
+  ];
+
   var INTERVAL_PRESETS = {
     builtin: BUILTIN_INTERVALS,
     'latin-ext': LATIN_EXT_INTERVALS,
+    symbols: SYMBOLS_INTERVALS,
+    reading: READING_INTERVALS,
   };
 
   var STANDARD_LIGATURE_MAP = {

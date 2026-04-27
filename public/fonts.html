@@ -127,17 +127,20 @@
               Unicode Coverage
               <span class="group relative">
                 <span class="flex size-4 cursor-help items-center justify-center rounded-full bg-stone-200 text-[10px] font-bold text-stone-500">?</span>
-                <span class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-64 -translate-x-1/2 rounded-lg bg-stone-800 px-3 py-2.5 text-xs font-normal leading-relaxed text-stone-100 shadow-lg group-hover:block">
+                <span class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-[28rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg bg-stone-800 px-3 py-2.5 text-xs font-normal leading-relaxed text-stone-100 shadow-lg group-hover:block">
                   Controls which characters are included in the font files. More coverage = larger files.
                   <br><br>
-                  <strong class="text-white">Built-in</strong> — Matches the default CrossPoint fonts. Covers English, most European languages, Cyrillic (Russian, Ukrainian, etc.), Greek, and common ligatures. Best for most users.
+                  <strong class="text-white">Built-in</strong> — Matches the default CrossPoint fonts. Covers English, most European languages, Cyrillic (Russian, Ukrainian, etc.), combining diacritics, math operators, arrows, and common ligatures. Best for most users.
                   <br><br>
-                  <strong class="text-white">Latin Extended</strong> — Broader Latin coverage including Vietnamese, African languages, and additional diacritics. Smaller than Built-in (no Cyrillic/Greek). Use if you only need Latin scripts but need wide accent support.
+                  <strong class="text-white">Latin Extended</strong> — Broader Latin coverage including Vietnamese, African languages, and additional diacritics. Smaller than Built-in (no Cyrillic). Use if you only need Latin scripts but need wide accent support.
+                  <br><br>
+                  <strong class="text-white">Reading (recommended for fiction)</strong> — Comprehensive coverage for English-language literary fiction including scifi/popsci. Adds Greek (physics terms like λ, φ), super/subscripts, currency, arrows, math operators, and miscellaneous symbols including music notes (♪ ♫ ♬), stars (★), and dingbats (✓). Required for books like Project Hail Mary, The Martian, and most contemporary fiction with technical content.
                 </span>
               </span>
             </label>
             <select id="intervalPreset" class="mt-1.5 block rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 shadow-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none">
-              <option value="builtin" selected>Built-in (Latin, Cyrillic, Greek, ligatures)</option>
+              <option value="reading" selected>Reading — fiction with symbols (recommended)</option>
+              <option value="builtin">Built-in — matches default fonts</option>
               <option value="latin-ext">Latin Extended</option>
             </select>
           </div>
