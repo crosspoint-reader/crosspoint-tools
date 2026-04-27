@@ -180,13 +180,13 @@ export class CrossPointFlasher {
   }
 
   async connect() {
-    await loadEsptool();
     if (!('serial' in navigator && navigator.serial)) {
       throw new Error('WebSerial is not supported. Please use Chrome or Edge.');
     }
     const port = await navigator.serial.requestPort({
       filters: [{ usbVendorId: 12346, usbProductId: 4097 }],
     });
+    await loadEsptool();
     const transport = new Transport(port, false);
     this.espLoader = new ESPLoader({
       transport, baudrate: 115200, romBaudrate: 115200, enableTracing: false,
