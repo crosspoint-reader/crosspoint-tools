@@ -286,13 +286,8 @@
   <script type="module">
     import { CrossPointFlasher, fetchEarlyAccessFirmware, fetchBuildMeta, fetchFontList, fetchCustomBuildStatus, uploadCustomFonts, fetchCustomFirmware, downloadBlob } from '/js/flasher.js';
 
-    const hasWebSerial = 'serial' in navigator;
-    if (!hasWebSerial) {
+    if (!('serial' in navigator)) {
       document.getElementById('browser-warning').classList.remove('hidden');
-      document.getElementById('flash-ea-btn').disabled = true;
-      document.getElementById('flash-ea-btn').title = 'WebSerial requires Chrome or Edge on desktop';
-      document.getElementById('cf-flash-btn').disabled = true;
-      document.getElementById('cf-flash-btn').title = 'WebSerial requires Chrome or Edge on desktop';
     }
 
     function formatDate(isoStr) {
@@ -470,6 +465,7 @@
       try {
         serialPort = await CrossPointFlasher.requestPort();
       } catch (err) {
+        if (err.name !== 'NotFoundError') alert(err.message);
         return;
       }
 

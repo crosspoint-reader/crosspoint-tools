@@ -1118,13 +1118,8 @@
     let fullFlashFile = null;
 
     // --- Browser check ---
-    const hasWebSerial = 'serial' in navigator;
-    if (!hasWebSerial) {
+    if (!('serial' in navigator)) {
       document.getElementById('browser-warning').classList.remove('hidden');
-      document.querySelectorAll('.flash-btn').forEach(btn => {
-        btn.disabled = true;
-        btn.title = 'WebSerial requires Chrome or Edge on desktop';
-      });
     }
 
     // --- Card styling helper ---
@@ -1369,7 +1364,7 @@
       try {
         serialPort = await CrossPointFlasher.requestPort();
       } catch (err) {
-        // User cancelled the chooser, or no compatible device.
+        if (err.name !== 'NotFoundError') alert(err.message);
         return;
       }
 
