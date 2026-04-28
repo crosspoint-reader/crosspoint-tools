@@ -435,6 +435,7 @@
     // --- Flash Logic ---
     function getSteps(skipReset) {
       return [
+        'Download firmware',
         'Connect to device',
         'Validate partition table',
         'Read OTA data',
@@ -484,15 +485,17 @@
       renderSteps(steps, states);
 
       try {
-        progressStatus.innerHTML = '<p class="text-sm text-stone-400">Downloading nightly firmware...</p>';
+        states[0] = 'running';
+        renderSteps(steps, states);
         const firmware = await fetchEarlyAccessFirmware();
-        progressStatus.innerHTML = '';
+        states[0] = 'done';
+        renderSteps(steps, states);
 
         const flasher = new CrossPointFlasher(deviceModel, serialPort);
         await flasher.flashFirmware(firmware, {
           skipReset,
           onStepChange: (idx, name, status) => {
-            states[idx] = status;
+            states[idx + 1] = status;
             renderSteps(steps, states);
           },
           onProgress: (step, current, total) => {
@@ -509,7 +512,7 @@
       } catch (err) {
         const failIdx = states.findIndex(s => s === 'running');
         if (failIdx >= 0) states[failIdx] = 'error';
-        renderSteps(states);
+        renderSteps(steps, states);
         progressStatus.innerHTML = `<div class="rounded-lg bg-red-50 px-4 py-3 text-sm/6 text-red-800">${escapeHtml(err.message)}</div>`;
       }
 
@@ -800,6 +803,7 @@
       try {
         serialPort = await CrossPointFlasher.requestPort();
       } catch (err) {
+        if (err.name !== 'NotFoundError') alert(err.message);
         return;
       }
 
@@ -831,14 +835,16 @@
       renderCfSteps(states);
 
       try {
-        progressStatus.innerHTML = '<p class="text-sm text-stone-400">Downloading custom firmware...</p>';
+        states[0] = 'running';
+        renderCfSteps(states);
         const firmware = await fetchCustomFirmware();
-        progressStatus.innerHTML = '';
+        states[0] = 'done';
+        renderCfSteps(states);
 
         const flasher = new CrossPointFlasher(deviceModel, serialPort);
         await flasher.flashFirmware(firmware, {
           skipReset: cfSkipReset,
-          onStepChange: (idx, name, status) => { states[idx] = status; renderCfSteps(states); },
+          onStepChange: (idx, name, status) => { states[idx + 1] = status; renderCfSteps(states); },
           onProgress: (step, current, total) => {
             if (step === 'Flash firmware') {
               const bar = document.getElementById('cf-flash-progress');
