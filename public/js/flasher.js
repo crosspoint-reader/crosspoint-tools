@@ -137,6 +137,17 @@ function buildNewOtadata(existingData, backupPartition, nextSequence) {
   return newData;
 }
 
+function assertOtadataSwitch(ota, expectedPartition, expectedSequence) {
+  const expectedSlot = expectedPartition === 'app1' ? ota.slot1 : ota.slot0;
+  if (!expectedSlot.crcValid || expectedSlot.sequence !== expectedSequence || ota.currentBoot !== expectedPartition) {
+    throw new Error(
+      `OTA boot selector did not verify after write. Expected ${expectedPartition} seq ${expectedSequence}, ` +
+      `got ${ota.currentBoot} (app0 seq ${ota.slot0.sequence} crc ${ota.slot0.crcValid ? 'ok' : 'bad'}, ` +
+      `app1 seq ${ota.slot1.sequence} crc ${ota.slot1.crcValid ? 'ok' : 'bad'}).`
+    );
+  }
+}
+
 // --- Partition Table Parsing ---
 
 const PARTITION_TYPES = {
@@ -280,6 +291,8 @@ export class CrossPointFlasher {
       eraseAll: false, compress: true,
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Update boot partition', written, total); },
     });
+    const verifyOtadata = parseOtadata(await this.espLoader.readFlash(0xE000, 0x2000));
+    assertOtadataSwitch(verifyOtadata, ota.backupPartition, ota.nextSequence);
     step(4, 'done');
 
     step(5, 'running');

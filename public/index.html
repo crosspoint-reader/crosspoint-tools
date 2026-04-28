@@ -1372,10 +1372,9 @@
       const progressTitle = document.getElementById('progress-title');
       const progressStatus = document.getElementById('progress-status');
 
-      // X3 bootloader validates the new app on first boot before committing the OTA pointer.
-      // A hard_reset interrupts that validation and rolls back, causing the "flash twice" bug.
-      // Skip reset for CrossPoint/beta/custom on X3 so the user's manual replug runs the validation cleanly.
-      const skipReset = deviceModel === 'x3' && (action === 'crosspoint' || action === 'custom' || action.startsWith('beta-'));
+      // CrossPoint-style OTA updates validate the new app on first boot before committing the OTA pointer.
+      // Avoid serial hard reset here; a clean unplug/replug matches the known-good flasher behavior.
+      const skipReset = action === 'crosspoint' || action === 'custom' || action.startsWith('beta-');
 
       setRunning(true);
       progressCard.classList.remove('hidden');
@@ -1490,4 +1489,4 @@
     });
   </script>
 </body>
-</html
+</html>
