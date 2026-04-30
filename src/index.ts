@@ -346,6 +346,31 @@ async function handleManualTrigger(
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
+  // Look up the commit the workflow will actually build, so the caller can
+  // show it in the UI. The workflow itself queries crosspoint-reader@master,
+  // so we mirror that here.
+  let commit = '';
+  let commitShort = '';
+  try {
+    const commitRes = await fetch(
+      'https://api.github.com/repos/crosspoint-reader/crosspoint-reader/commits/master',
+      {
+        headers: {
+          'User-Agent': 'crosspoint-tools',
+          Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      }
+    );
+    if (commitRes.ok) {
+      const data = await commitRes.json() as { sha?: string };
+      commit = data.sha || '';
+      commitShort = commit.substring(0, 7);
+    }
+  } catch (err) {
+    console.error('Failed to fetch latest commit:', err);
+  }
+
   // Dispatch the GitHub Actions workflow
   const ghRes = await fetch(
     'https://api.github.com/repos/SoFriendly/crosspoint-tools/actions/workflows/build-firmware.yml/dispatches',
@@ -366,7 +391,7 @@ async function handleManualTrigger(
     return json({ error: `Failed to trigger build: ${ghRes.status}` }, 502, headers);
   }
 
-  return json({ message: 'Build dispatched to GitHub Actions' }, 202, headers);
+  return json({ message: 'Build dispatched to GitHub Actions', commit: commitShort }, 202, headers);
 }
 
 // --- Build Status Update (called by GitHub Actions) ---
