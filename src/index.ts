@@ -1445,6 +1445,7 @@ interface CatalogRelease {
   firmware_url: string;
   firmware_sha256: string;
   size: number;
+  supported_devices: ('x3' | 'x4')[];
 }
 
 const ORIGIN = 'https://crosspointreader.com';
@@ -1518,6 +1519,7 @@ async function fetchStableForCatalog(env: Env): Promise<CatalogRelease | null> {
       firmware_url: `${ORIGIN}/api/release/firmware`,
       firmware_sha256: sha,
       size: asset.size,
+      supported_devices: ['x4'],
     };
   } catch (err) {
     console.error('Stable catalog fetch failed:', err);
@@ -1547,6 +1549,7 @@ async function fetchInsiderForCatalog(env: Env): Promise<CatalogRelease | null> 
     firmware_url: `${ORIGIN}/api/build/firmware`,
     firmware_sha256: result.sha,
     size: meta.firmwareSize || result.size,
+    supported_devices: ['x3', 'x4'],
   };
 }
 
@@ -1572,6 +1575,7 @@ async function fetchBetasForCatalog(env: Env): Promise<CatalogRelease[]> {
       firmware_url: `${ORIGIN}/api/beta/${b.id}/firmware`,
       firmware_sha256: sha,
       size,
+      supported_devices: ['x3', 'x4'],
     });
   }
   return out;

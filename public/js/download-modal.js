@@ -100,9 +100,8 @@ function renderFirmwareList() {
     return;
   }
 
-  // Stable releases are X4-only builds; X3 has no compatible stable, so hide it.
   const releases = (state.catalog.releases || []).filter(r =>
-    state.model === 'x3' ? r.channel !== 'stable' : true
+    !r.supported_devices || r.supported_devices.includes(state.model)
   );
   if (releases.length === 0) {
     list.innerHTML = '<p class="text-sm text-stone-400">No firmware available right now.</p>';
