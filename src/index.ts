@@ -865,7 +865,7 @@ async function fetchFontTree(env: Env): Promise<FontTree> {
   if (!res.ok) {
     // Return cached even if stale, or empty
     if (cached) return JSON.parse(cached);
-    return { families: {}, fetchedAt: new Date().toISOString() };
+    return { families: {}, defaultSizes: {}, fetchedAt: new Date().toISOString() };
   }
 
   const dirs = await res.json() as Array<{ name: string; type: string }>;
@@ -957,7 +957,7 @@ async function handleCustomBuildUpload(
   const fontLabels: Record<string, string> = {};
   const fontSizes: Record<string, number[]> = {};
 
-  for (const [key, value] of formData.entries()) {
+  for (const [key, value] of formData.entries() as IterableIterator<[string, string | File]>) {
     // Font labels come as "label:FamilyName" -> "Custom Name"
     if (typeof value === 'string' && key.startsWith('label:')) {
       const family = key.slice(6);
@@ -977,7 +977,7 @@ async function handleCustomBuildUpload(
       fontSizes[family] = sizes;
       continue;
     }
-    if (!(value instanceof File)) continue;
+    if (typeof value === 'string') continue;
     // Key is the font path, e.g. "NotoSerif/NotoSerif-Regular.ttf"
     if (!key.includes('/') || !/\.(ttf|otf)$/i.test(key)) {
       return json({ error: `Invalid font path: ${key}` }, 400, headers);
@@ -1316,12 +1316,12 @@ async function handleBetaCreate(
   const formData = await request.formData();
   const name = formData.get('name');
   const notes = formData.get('notes');
-  const firmware = formData.get('firmware');
+  const firmware = formData.get('firmware') as string | File | null;
 
   if (!name || typeof name !== 'string' || !name.trim()) {
     return json({ error: 'Name is required' }, 400, headers);
   }
-  if (!(firmware instanceof File)) {
+  if (!firmware || typeof firmware === 'string') {
     return json({ error: 'Firmware .bin file is required' }, 400, headers);
   }
 
@@ -1441,7 +1441,6 @@ interface CatalogRelease {
   name: string;
   version: string;
   released_at: string;
-  notes: string;
   firmware_url: string;
   firmware_sha256: string;
   size: number;
@@ -1515,7 +1514,6 @@ async function fetchStableForCatalog(env: Env): Promise<CatalogRelease | null> {
       name: release.name || release.tag_name,
       version: release.tag_name,
       released_at: release.published_at,
-      notes: release.body || '',
       firmware_url: `${ORIGIN}/api/release/firmware`,
       firmware_sha256: sha,
       size: asset.size,
@@ -1537,15 +1535,12 @@ async function fetchInsiderForCatalog(env: Env): Promise<CatalogRelease | null> 
   const result = await getOrComputeR2Sha(env, cacheKey, 'builds/latest/firmware.bin');
   if (!result) return null;
 
-  const notes = meta.summary || meta.commitMessage || '';
-
   return {
     id: `insider-${meta.commitShort}`,
     channel: 'insider',
     name: `master-${meta.commitShort}`,
     version: meta.version || `master-${meta.commitShort}`,
     released_at: meta.buildDate,
-    notes,
     firmware_url: `${ORIGIN}/api/build/firmware`,
     firmware_sha256: result.sha,
     size: meta.firmwareSize || result.size,
@@ -1571,7 +1566,6 @@ async function fetchBetasForCatalog(env: Env): Promise<CatalogRelease[]> {
       name: b.name,
       version: b.version || b.name,
       released_at: b.createdAt,
-      notes: b.notes,
       firmware_url: `${ORIGIN}/api/beta/${b.id}/firmware`,
       firmware_sha256: sha,
       size,
