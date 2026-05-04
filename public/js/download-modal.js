@@ -15,7 +15,7 @@ const MODAL_HTML = `
 
     <div class="space-y-6 px-6 py-5">
       <div class="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
-        <p>If your device is locked, our <a href="/#unlock-tool" class="font-medium underline underline-offset-2 hover:text-amber-950">experimental Unlock Tool</a> (macOS only for now, Windows and Linux coming soon) lets you install CrossPoint over OTA instead of USB.</p>
+        <p>If your device is locked, our <a href="/#unlock-tool" class="font-medium underline underline-offset-2 hover:text-amber-950">experimental Unlock Tool</a> (macOS and Windows, Linux coming soon) lets you install CrossPoint over OTA instead of USB.</p>
       </div>
 
       <!-- Device -->
