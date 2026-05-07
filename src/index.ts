@@ -575,19 +575,23 @@ const STOCK_CHECK_URLS: Record<string, Record<string, string>> = {
   },
 };
 
-async function fetchStockFirmwareInfo(model: string, lang: string) {
+type StockFetchResult =
+  | { ok: true; data: { version: string; download_url: string } }
+  | { ok: false; reason: 'unknown_model' | 'upstream_unreachable' };
+
+async function fetchStockFirmwareInfo(model: string, lang: string): Promise<StockFetchResult> {
   const checkUrl = STOCK_CHECK_URLS[model]?.[lang];
-  if (!checkUrl) return null;
+  if (!checkUrl) return { ok: false, reason: 'unknown_model' };
 
   try {
-    const res = await fetch(checkUrl, { signal: AbortSignal.timeout(5000) });
+    const res = await fetch(checkUrl, { signal: AbortSignal.timeout(15000) });
     if (res.ok) {
       const body = await res.json() as { data?: { version: string; download_url: string } };
-      if (body.data?.download_url) return body.data;
+      if (body.data?.download_url) return { ok: true, data: body.data };
     }
   } catch { /* fall through */ }
 
-  return null;
+  return { ok: false, reason: 'upstream_unreachable' };
 }
 
 async function handleStockFirmwareInfo(
@@ -597,12 +601,15 @@ async function handleStockFirmwareInfo(
   const model = url.searchParams.get('model') || 'x4';
   const lang = url.searchParams.get('lang') || 'en';
 
-  const info = await fetchStockFirmwareInfo(model, lang);
-  if (!info) {
-    return json({ error: 'Invalid model or language' }, 400, headers);
+  const result = await fetchStockFirmwareInfo(model, lang);
+  if (!result.ok) {
+    if (result.reason === 'unknown_model') {
+      return json({ error: 'Invalid model or language' }, 400, headers);
+    }
+    return json({ error: 'Upstream firmware API unreachable' }, 502, headers);
   }
 
-  return json({ version: info.version, downloadUrl: info.download_url, model, lang }, 200, headers);
+  return json({ version: result.data.version, downloadUrl: result.data.download_url, model, lang }, 200, headers);
 }
 
 async function handleStockFirmwareCache(
@@ -666,12 +673,15 @@ async function handleStockFirmware(
   }
 
   // Fetch version info then download directly
-  const info = await fetchStockFirmwareInfo(model, lang);
-  if (!info) {
-    return json({ error: 'Invalid model or language' }, 400, headers);
+  const result = await fetchStockFirmwareInfo(model, lang);
+  if (!result.ok) {
+    if (result.reason === 'unknown_model') {
+      return json({ error: 'Invalid model or language' }, 400, headers);
+    }
+    return json({ error: 'Upstream firmware API unreachable' }, 502, headers);
   }
 
-  const fwRes = await fetch(info.download_url);
+  const fwRes = await fetch(result.data.download_url);
   if (!fwRes.ok) {
     return json({ error: 'Failed to download stock firmware' }, 502, headers);
   }
@@ -681,7 +691,7 @@ async function handleStockFirmware(
       ...headers,
       'Content-Type': 'application/octet-stream',
       'Content-Disposition': `attachment; filename="${model}-${lang}-firmware.bin"`,
-      'X-Firmware-Version': info.version,
+      'X-Firmware-Version': result.data.version,
     },
   });
 }
