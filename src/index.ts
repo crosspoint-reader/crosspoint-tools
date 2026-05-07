@@ -1,4 +1,4 @@
-import type { Env, BuildMetadata, CustomBuildMetadata, FontTree, FontFile, BetaBuild } from './types';
+import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, FontTree, FontFile, BetaBuild } from './types';
 
 const ROYALTY_REPO_ID = 'SoFriendly/crosspoint-tools';
 
@@ -118,6 +118,21 @@ async function handleApi(
       case '/api/custom-build/status-update':
         return handleCustomBuildStatusUpdate(request, env, corsHeaders);
 
+      case '/api/font-build/upload':
+        return handleFontBuildUpload(request, env, corsHeaders);
+
+      case '/api/font-build/status':
+        return handleFontBuildStatus(request, env, corsHeaders);
+
+      case '/api/font-build/clear':
+        return handleFontBuildClear(request, env, corsHeaders);
+
+      case '/api/font-build/upload-result':
+        return handleFontBuildUploadResult(request, env, corsHeaders);
+
+      case '/api/font-build/status-update':
+        return handleFontBuildStatusUpdate(request, env, corsHeaders);
+
       case '/api/beta':
         if (request.method === 'GET') return handleBetaList(env, corsHeaders);
         if (request.method === 'POST') return handleBetaCreate(request, env, corsHeaders);
@@ -139,6 +154,14 @@ async function handleApi(
         // Dynamic routes: /api/custom-build/fonts/{buildId}/{filename}
         if (url.pathname.startsWith('/api/custom-build/fonts/')) {
           return handleCustomBuildFontDownload(request, url, env, corsHeaders);
+        }
+        // /api/font-build/files/{buildId}/{style}.ttf  — workflow downloads inputs
+        if (url.pathname.startsWith('/api/font-build/files/')) {
+          return handleFontBuildFileDownload(request, url, env, corsHeaders);
+        }
+        // /api/font-build/result/{filename}            — user downloads outputs
+        if (url.pathname.startsWith('/api/font-build/result/')) {
+          return handleFontBuildResultDownload(request, url, env, corsHeaders);
         }
         return json({ error: 'Not found' }, 404, corsHeaders);
     }
@@ -1290,6 +1313,310 @@ async function handleCustomBuildStatusUpdate(
 
   await env.BUILD_META.put(`custom-build:${body.buildId}`, JSON.stringify(meta));
   return json({ ok: true }, 200, headers);
+}
+
+// --- Font Build (.cpfont generation via firmware-repo script) ---
+//
+// Single source of truth: `lib/EpdFont/scripts/fontconvert_sdcard.py` in the
+// crosspoint-reader repo. The web tool uploads TTFs, dispatches a GitHub
+// Actions workflow that checks out crosspoint-reader and runs that script
+// unmodified, then downloads the resulting .cpfont files. No JS reimplementation.
+
+const FONT_BUILD_LOCK_TTL = 10 * 60;
+const FONT_BUILD_STYLES = ['regular', 'bold', 'italic', 'bolditalic'] as const;
+type FontBuildStyle = typeof FONT_BUILD_STYLES[number];
+
+async function handleFontBuildUpload(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+
+  let uid = getUserId(request);
+  if (!uid) uid = generateUserId();
+
+  const lock = await env.BUILD_META.get('font-build-lock');
+  if (lock) {
+    return json({ error: 'A font build is already in progress. Try again shortly.' }, 409, headers);
+  }
+
+  const formData = await request.formData();
+
+  const family = (formData.get('family') as string | null)?.trim();
+  if (!family || !/^[A-Za-z0-9 _-]{1,40}$/.test(family)) {
+    return json({ error: 'Invalid or missing family name' }, 400, headers);
+  }
+
+  const sizesRaw = (formData.get('sizes') as string | null)?.trim() || '';
+  const sizes = sizesRaw.split(',').map(s => parseInt(s.trim(), 10));
+  if (sizes.length === 0 || sizes.some(s => isNaN(s) || s < 6 || s > 48)) {
+    return json({ error: 'Invalid sizes (must be 6–48 pt)' }, 400, headers);
+  }
+
+  const intervals = ((formData.get('intervals') as string | null)?.trim() || 'builtin');
+  if (!/^[a-zA-Z0-9_,-]{1,200}$/.test(intervals)) {
+    return json({ error: 'Invalid intervals' }, 400, headers);
+  }
+
+  const uploadedStyles: FontBuildStyle[] = [];
+  const validatedFiles = new Map<FontBuildStyle, ArrayBuffer>();
+  for (const style of FONT_BUILD_STYLES) {
+    const entry = formData.get(style) as string | File | null;
+    if (!entry || typeof entry === 'string') continue;
+    const file = entry;
+    if (file.size > 5 * 1024 * 1024) {
+      return json({ error: `${style}.ttf exceeds 5 MB` }, 400, headers);
+    }
+    const data = await file.arrayBuffer();
+    if (!isValidFontFile(data)) {
+      return json({ error: `Invalid font file for ${style}` }, 400, headers);
+    }
+    validatedFiles.set(style, data);
+    uploadedStyles.push(style);
+  }
+
+  if (uploadedStyles.length === 0) {
+    return json({ error: 'Upload at least one TTF (regular at minimum)' }, 400, headers);
+  }
+  if (!uploadedStyles.includes('regular')) {
+    return json({ error: 'A regular style is required' }, 400, headers);
+  }
+
+  const buildId = generateBuildId();
+
+  for (const [style, data] of validatedFiles) {
+    await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/in/${style}.ttf`, data);
+  }
+
+  await env.BUILD_META.put('font-build-lock', buildId, { expirationTtl: FONT_BUILD_LOCK_TTL });
+  await env.BUILD_META.put(`font-build:user:${uid}`, buildId);
+
+  const meta: FontBuildMetadata = {
+    buildId,
+    status: 'pending',
+    uid,
+    family,
+    sizes,
+    intervals,
+    styles: uploadedStyles,
+    createdAt: new Date().toISOString(),
+  };
+  await env.BUILD_META.put(`font-build:${buildId}`, JSON.stringify(meta));
+
+  const ghRes = await fetch(
+    'https://api.github.com/repos/SoFriendly/crosspoint-tools/actions/workflows/build-fonts.yml/dispatches',
+    {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'crosspoint-tools',
+        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+      body: JSON.stringify({
+        ref: 'master',
+        inputs: {
+          buildId,
+          family,
+          sizes: sizes.join(','),
+          intervals,
+        },
+      }),
+    }
+  );
+
+  if (!ghRes.ok) {
+    await env.BUILD_META.delete('font-build-lock');
+    await env.BUILD_META.delete(`font-build:${buildId}`);
+    const body = await ghRes.text();
+    console.error(`Font build dispatch failed: ${ghRes.status} ${body}`);
+    return json({ error: 'Failed to start build' }, 502, headers);
+  }
+
+  const response = json({ buildId, styles: uploadedStyles }, 202, headers);
+  setUserIdCookie(response, uid);
+  return response;
+}
+
+async function handleFontBuildStatus(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const uid = getUserId(request);
+  if (!uid) return json({ build: null }, 200, headers);
+
+  const buildId = await env.BUILD_META.get(`font-build:user:${uid}`);
+  if (!buildId) return json({ build: null }, 200, headers);
+
+  const raw = await env.BUILD_META.get(`font-build:${buildId}`);
+  if (!raw) return json({ build: null }, 200, headers);
+
+  return json({ build: JSON.parse(raw) as FontBuildMetadata }, 200, headers);
+}
+
+async function handleFontBuildClear(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+  const uid = getUserId(request);
+  if (!uid) return json({ ok: true }, 200, headers);
+
+  const buildId = await env.BUILD_META.get(`font-build:user:${uid}`);
+  if (buildId) {
+    await env.BUILD_META.delete(`font-build:user:${uid}`);
+    await env.BUILD_META.delete(`font-build:${buildId}`);
+    const lock = await env.BUILD_META.get('font-build-lock');
+    if (lock === buildId) await env.BUILD_META.delete('font-build-lock');
+  }
+  return json({ ok: true }, 200, headers);
+}
+
+// Workflow downloads input TTFs from here.
+async function handleFontBuildFileDownload(
+  request: Request,
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const auth = request.headers.get('Authorization');
+  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  // Path: /api/font-build/files/{buildId}/{style}.ttf
+  const parts = url.pathname.replace('/api/font-build/files/', '').split('/');
+  if (parts.length !== 2) return json({ error: 'Invalid path' }, 400, headers);
+  const [buildId, filename] = parts;
+  const style = filename.replace(/\.ttf$/i, '') as FontBuildStyle;
+  if (!FONT_BUILD_STYLES.includes(style)) {
+    return json({ error: 'Invalid style' }, 400, headers);
+  }
+
+  const object = await env.FIRMWARE_BUCKET.get(`font-builds/${buildId}/in/${style}.ttf`);
+  if (!object) return json({ error: 'Not found' }, 404, headers);
+
+  return new Response(object.body, {
+    headers: {
+      ...headers,
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(object.size),
+    },
+  });
+}
+
+// Workflow uploads each .cpfont here. Stored under font-builds/{buildId}/out/.
+async function handleFontBuildUploadResult(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'PUT') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+  const auth = request.headers.get('Authorization');
+  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const buildId = request.headers.get('X-Build-Id');
+  const filename = request.headers.get('X-Filename');
+  if (!buildId || !filename) {
+    return json({ error: 'Missing X-Build-Id or X-Filename' }, 400, headers);
+  }
+  if (!/^[A-Za-z0-9 _.-]+\.cpfont$/.test(filename)) {
+    return json({ error: 'Invalid filename' }, 400, headers);
+  }
+
+  const data = await request.arrayBuffer();
+  await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/out/${filename}`, data);
+
+  // Track filename in metadata so the client can list outputs.
+  const raw = await env.BUILD_META.get(`font-build:${buildId}`);
+  if (raw) {
+    const meta = JSON.parse(raw) as FontBuildMetadata;
+    meta.outputs = Array.from(new Set([...(meta.outputs || []), filename]));
+    await env.BUILD_META.put(`font-build:${buildId}`, JSON.stringify(meta));
+  }
+
+  return json({ ok: true, size: data.byteLength }, 200, headers);
+}
+
+async function handleFontBuildStatusUpdate(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+  const auth = request.headers.get('Authorization');
+  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const body = await request.json() as {
+    buildId: string;
+    status: FontBuildMetadata['status'];
+    readerRef?: string;
+    log?: string;
+    error?: string;
+  };
+
+  const raw = await env.BUILD_META.get(`font-build:${body.buildId}`);
+  if (!raw) return json({ error: 'Build not found' }, 404, headers);
+
+  const meta = JSON.parse(raw) as FontBuildMetadata;
+  meta.status = body.status;
+  if (body.readerRef) meta.readerRef = body.readerRef;
+  if (body.log) meta.log = body.log;
+  if (body.error) meta.error = body.error;
+  if (body.status === 'success' || body.status === 'failed') {
+    meta.completedAt = new Date().toISOString();
+    await env.BUILD_META.delete('font-build-lock');
+  }
+
+  await env.BUILD_META.put(`font-build:${body.buildId}`, JSON.stringify(meta));
+  return json({ ok: true }, 200, headers);
+}
+
+// User downloads a built .cpfont. Path: /api/font-build/result/{filename}
+// Looked up against the user's current build (via cookie), so users can't
+// snoop each other's outputs by guessing buildIds.
+async function handleFontBuildResultDownload(
+  request: Request,
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const uid = getUserId(request);
+  if (!uid) return json({ error: 'Not found' }, 404, headers);
+
+  const buildId = await env.BUILD_META.get(`font-build:user:${uid}`);
+  if (!buildId) return json({ error: 'Not found' }, 404, headers);
+
+  const filename = url.pathname.replace('/api/font-build/result/', '');
+  if (!/^[A-Za-z0-9 _.-]+\.cpfont$/.test(filename)) {
+    return json({ error: 'Invalid filename' }, 400, headers);
+  }
+
+  const object = await env.FIRMWARE_BUCKET.get(`font-builds/${buildId}/out/${filename}`);
+  if (!object) return json({ error: 'Not found' }, 404, headers);
+
+  return new Response(object.body, {
+    headers: {
+      ...headers,
+      'Content-Type': 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': String(object.size),
+    },
+  });
 }
 
 // --- Beta Testing ---

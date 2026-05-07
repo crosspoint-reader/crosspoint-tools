@@ -1,0 +1,140 @@
+name: Build .cpfont
+
+on:
+  workflow_dispatch:
+    inputs:
+      buildId:
+        description: 'Font build ID'
+        required: true
+      family:
+        description: 'Font family name (used for output filenames)'
+        required: true
+      sizes:
+        description: 'Comma-separated point sizes, e.g. "12,14,16,18"'
+        required: true
+      intervals:
+        description: 'Codepoint interval presets'
+        required: false
+        default: 'builtin'
+      readerRef:
+        description: 'crosspoint-reader ref to pull fontconvert_sdcard.py from'
+        required: false
+        # TEMPORARY: pinned to feature branch until SD-fonts work merges to master.
+        # Flip back to 'master' (or a release tag) once merged.
+        default: 'feature/sd-fonts-v1'
+
+concurrency:
+  group: font-build-${{ inputs.buildId }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark build as started
+        run: |
+          curl -sf -X POST "https://crosspointreader.com/api/font-build/status-update" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"buildId":"${{ inputs.buildId }}","status":"building"}'
+
+      - name: Checkout crosspoint-reader (script source of truth)
+        uses: actions/checkout@v6
+        with:
+          repository: crosspoint-reader/crosspoint-reader
+          ref: ${{ inputs.readerRef }}
+          path: reader
+          submodules: false
+
+      - name: Download uploaded TTFs
+        id: download
+        run: |
+          mkdir -p /tmp/ttfs
+          ARGS=()
+          for style in regular bold italic bolditalic; do
+            target="/tmp/ttfs/$style.ttf"
+            if curl -sf \
+                -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+                -o "$target" \
+                "https://crosspointreader.com/api/font-build/files/${{ inputs.buildId }}/$style.ttf"; then
+              echo "Downloaded $style ($(stat -c%s "$target") bytes)"
+              ARGS+=("--$style" "$target")
+            else
+              rm -f "$target"
+            fi
+          done
+          if [ ${#ARGS[@]} -eq 0 ]; then
+            echo "No TTFs available for build ${{ inputs.buildId }}" >&2
+            exit 1
+          fi
+          # Persist style flags for the next step
+          printf '%s\n' "${ARGS[@]}" > /tmp/style_args.txt
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install font conversion dependencies
+        run: pip install --no-cache-dir freetype-py fonttools brotli
+
+      - name: Run fontconvert_sdcard.py
+        run: |
+          mkdir -p out
+          mapfile -t STYLE_ARGS < /tmp/style_args.txt
+          python reader/lib/EpdFont/scripts/fontconvert_sdcard.py \
+            "${STYLE_ARGS[@]}" \
+            --name "${{ inputs.family }}" \
+            --intervals "${{ inputs.intervals }}" \
+            --sizes "${{ inputs.sizes }}" \
+            --output-dir out 2>&1 | tee /tmp/build.log
+
+      - name: Upload .cpfont results
+        run: |
+          shopt -s nullglob
+          count=0
+          for f in out/*.cpfont; do
+            name=$(basename "$f")
+            size=$(stat -c%s "$f")
+            echo "Uploading $name ($size bytes)"
+            curl -sf -X PUT \
+              -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+              -H "X-Build-Id: ${{ inputs.buildId }}" \
+              -H "X-Filename: $name" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$f" \
+              "https://crosspointreader.com/api/font-build/upload-result"
+            count=$((count + 1))
+          done
+          if [ "$count" -eq 0 ]; then
+            echo "No .cpfont files produced" >&2
+            exit 1
+          fi
+          echo "Uploaded $count file(s)"
+
+      - name: Mark build success
+        run: |
+          # Attach the build log tail so users can see glyph/kern stats.
+          LOG_TAIL=$(tail -c 4000 /tmp/build.log | jq -Rs .)
+          curl -sf -X POST "https://crosspointreader.com/api/font-build/status-update" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"buildId\": \"${{ inputs.buildId }}\",
+              \"status\": \"success\",
+              \"readerRef\": \"${{ inputs.readerRef }}\",
+              \"log\": $LOG_TAIL
+            }"
+
+      - name: Mark build failed
+        if: failure()
+        run: |
+          LOG_TAIL=$(tail -c 4000 /tmp/build.log 2>/dev/null | jq -Rs . || echo '""')
+          curl -sf -X POST "https://crosspointreader.com/api/font-build/status-update" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"buildId\": \"${{ inputs.buildId }}\",
+              \"status\": \"failed\",
+              \"error\": \"Build failed. See GitHub Actions logs.\",
+              \"log\": $LOG_TAIL
+            }" || true

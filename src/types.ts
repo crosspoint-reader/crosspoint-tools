@@ -57,6 +57,22 @@ export interface CustomBuildMetadata {
   fontSizes?: Record<string, number[]>;   // family -> [small, medium, large, xlarge] point sizes
 }
 
+export interface FontBuildMetadata {
+  buildId: string;
+  status: 'pending' | 'building' | 'success' | 'failed';
+  uid: string;
+  family: string;
+  sizes: number[];
+  intervals: string;
+  styles: string[];                       // styles uploaded, e.g. ["regular","bold"]
+  outputs?: string[];                     // .cpfont filenames produced
+  readerRef?: string;                     // ref of crosspoint-reader the script ran from
+  log?: string;                           // tail of stderr (glyph/kern stats)
+  error?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
 export interface BetaBuild {
   id: string;
   name: string;
