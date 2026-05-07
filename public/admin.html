@@ -77,12 +77,18 @@
       <!-- Beta Testing -->
       <div class="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
         <h2 class="text-sm font-semibold text-stone-900">Beta Testing</h2>
-        <p class="mt-1 text-xs text-stone-400">Upload a .bin to make it available as a firmware option on the main page.</p>
+        <p class="mt-1 text-xs text-stone-400">Upload a .bin or point at a GitHub release to expose it as a firmware option on the main page.</p>
 
         <div class="mt-3 space-y-2">
           <input type="text" id="beta-name" placeholder="Build name (e.g. KOSync Fix)" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
           <textarea id="beta-notes" placeholder="Test notes (shown to users when they select this build)" rows="3" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"></textarea>
-          <div class="flex gap-2">
+
+          <div class="flex gap-1 rounded-lg bg-stone-100 p-1 text-xs font-medium">
+            <button type="button" id="beta-mode-upload" onclick="setBetaMode('upload')" class="flex-1 rounded-md px-3 py-1.5 text-stone-600">Upload .bin</button>
+            <button type="button" id="beta-mode-release" onclick="setBetaMode('release')" class="flex-1 rounded-md px-3 py-1.5 text-stone-600">GitHub Release</button>
+          </div>
+
+          <div id="beta-mode-upload-panel" class="flex gap-2">
             <label class="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
               <span id="beta-file-label">Choose .bin file...</span>
               <input type="file" accept=".bin" id="beta-file-input" class="hidden">
@@ -90,6 +96,17 @@
             <button onclick="uploadBeta()" id="beta-upload-btn" class="shrink-0 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
               Upload
             </button>
+          </div>
+
+          <div id="beta-mode-release-panel" class="hidden space-y-2">
+            <input type="text" id="beta-release-tag" placeholder="Release tag (e.g. sd-fonts-v1.0)" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+            <div class="flex gap-2">
+              <input type="text" id="beta-release-repo" placeholder="crosspoint-reader/crosspoint-reader" class="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+              <button onclick="uploadBeta()" id="beta-release-btn" class="shrink-0 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Pull from release
+              </button>
+            </div>
+            <p class="text-xs text-stone-400">Pulls <code class="rounded bg-stone-100 px-1 py-0.5 font-mono">firmware.bin</code> from that tag. Repo defaults to <code class="rounded bg-stone-100 px-1 py-0.5 font-mono">crosspoint-reader/crosspoint-reader</code>.</p>
           </div>
         </div>
 
@@ -229,31 +246,71 @@
     // --- Beta Testing ---
 
     let betaFile = null;
+    let betaMode = 'upload';
+
+    function setBetaMode(mode) {
+      betaMode = mode;
+      const isUpload = mode === 'upload';
+      document.getElementById('beta-mode-upload').classList.toggle('bg-white', isUpload);
+      document.getElementById('beta-mode-upload').classList.toggle('shadow-sm', isUpload);
+      document.getElementById('beta-mode-upload').classList.toggle('text-stone-900', isUpload);
+      document.getElementById('beta-mode-release').classList.toggle('bg-white', !isUpload);
+      document.getElementById('beta-mode-release').classList.toggle('shadow-sm', !isUpload);
+      document.getElementById('beta-mode-release').classList.toggle('text-stone-900', !isUpload);
+      document.getElementById('beta-mode-upload-panel').classList.toggle('hidden', !isUpload);
+      document.getElementById('beta-mode-release-panel').classList.toggle('hidden', isUpload);
+      refreshBetaButtons();
+    }
+
+    function refreshBetaButtons() {
+      const hasName = !!document.getElementById('beta-name').value.trim();
+      document.getElementById('beta-upload-btn').disabled = !betaFile || !hasName;
+      const tag = document.getElementById('beta-release-tag').value.trim();
+      document.getElementById('beta-release-btn').disabled = !tag || !hasName;
+    }
 
     document.getElementById('beta-file-input').addEventListener('change', (e) => {
       betaFile = e.target.files[0];
       document.getElementById('beta-file-label').textContent = betaFile ? betaFile.name : 'Choose .bin file...';
-      document.getElementById('beta-upload-btn').disabled = !betaFile || !document.getElementById('beta-name').value.trim();
+      refreshBetaButtons();
     });
 
-    document.getElementById('beta-name').addEventListener('input', () => {
-      document.getElementById('beta-upload-btn').disabled = !betaFile || !document.getElementById('beta-name').value.trim();
-    });
+    document.getElementById('beta-name').addEventListener('input', refreshBetaButtons);
+    document.getElementById('beta-release-tag').addEventListener('input', refreshBetaButtons);
+
+    // Initialize active tab styling.
+    setBetaMode('upload');
 
     async function uploadBeta() {
-      const btn = document.getElementById('beta-upload-btn');
       const name = document.getElementById('beta-name').value.trim();
       const notes = document.getElementById('beta-notes').value.trim();
-      if (!betaFile || !name) return;
+      if (!name) return;
+
+      const isRelease = betaMode === 'release';
+      const btn = document.getElementById(isRelease ? 'beta-release-btn' : 'beta-upload-btn');
+      const tag = document.getElementById('beta-release-tag').value.trim();
+      const repo = document.getElementById('beta-release-repo').value.trim();
+
+      if (isRelease) {
+        if (!tag) return;
+      } else if (!betaFile) {
+        return;
+      }
 
       btn.disabled = true;
-      btn.textContent = 'Uploading...';
+      const origLabel = btn.textContent;
+      btn.textContent = isRelease ? 'Pulling...' : 'Uploading...';
 
       try {
         const formData = new FormData();
         formData.append('name', name);
         formData.append('notes', notes);
-        formData.append('firmware', betaFile);
+        if (isRelease) {
+          formData.append('releaseTag', tag);
+          if (repo) formData.append('releaseRepo', repo);
+        } else {
+          formData.append('firmware', betaFile);
+        }
 
         const res = await fetch('/api/beta', {
           method: 'POST',
@@ -263,22 +320,27 @@
         const data = await res.json();
 
         if (res.ok) {
-          log('Beta build created: ' + data.build.name);
+          log('Beta build created: ' + data.build.name +
+              (data.build.source && data.build.source.type === 'github-release'
+                ? ' (release ' + data.build.source.tag + ')'
+                : ''));
           document.getElementById('beta-name').value = '';
           document.getElementById('beta-notes').value = '';
           document.getElementById('beta-file-input').value = '';
           document.getElementById('beta-file-label').textContent = 'Choose .bin file...';
+          document.getElementById('beta-release-tag').value = '';
           betaFile = null;
+          refreshBetaButtons();
           loadBetaList();
         } else {
-          log('Beta upload failed: ' + data.error);
+          log('Beta create failed: ' + data.error);
         }
       } catch (err) {
-        log('Beta upload error: ' + err.message);
+        log('Beta create error: ' + err.message);
       }
 
-      btn.textContent = 'Upload';
-      btn.disabled = false;
+      btn.textContent = origLabel;
+      refreshBetaButtons();
     }
 
     async function deleteBeta(id, name) {
@@ -319,16 +381,22 @@
           const eid = escapeHtml(b.id);
           const ename = escapeHtml(b.name);
           const enotes = escapeHtml(b.notes || '');
+          const src = b.source && b.source.type === 'github-release' ? b.source : null;
+          const sourceBadge = src
+            ? ' &middot; <span class="text-brand-600">release ' + escapeHtml(src.tag) + '</span>'
+            : '';
+          const existingTag = src ? escapeHtml(src.tag) : '';
+          const existingRepo = src ? escapeHtml(src.owner + '/' + src.repo) : '';
           return '<div class="py-2.5" id="beta-item-' + eid + '">' +
             '<div class="flex items-center justify-between">' +
               '<div class="min-w-0 flex-1">' +
                 '<div class="text-sm font-medium text-stone-700">' + ename + '</div>' +
-                '<div class="text-xs text-stone-400">' + size + ' MB &middot; ' + date +
+                '<div class="text-xs text-stone-400">' + size + ' MB &middot; ' + date + sourceBadge +
                   (b.notes ? ' &middot; <span class="text-stone-500" title="' + enotes + '">has notes</span>' : '') +
                 '</div>' +
               '</div>' +
               '<div class="ml-2 flex shrink-0 gap-0.5">' +
-                '<button onclick="editBeta(\'' + eid + '\', \'' + ename.replace(/'/g, "\\'") + '\', \'' + enotes.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\')" class="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600" title="Edit">' +
+                '<button onclick="editBeta(\'' + eid + '\', \'' + ename.replace(/'/g, "\\'") + '\', \'' + enotes.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\', \'' + existingTag + '\', \'' + existingRepo + '\')" class="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600" title="Edit">' +
                   '<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg>' +
                 '</button>' +
                 '<button onclick="deleteBeta(\'' + eid + '\', \'' + ename.replace(/'/g, "\\'") + '\')" class="rounded-md p-1 text-stone-400 hover:bg-red-50 hover:text-red-600" title="Delete">' +
@@ -339,6 +407,12 @@
             '<div id="beta-edit-' + eid + '" class="hidden mt-2 space-y-2">' +
               '<input type="text" id="beta-edit-name-' + eid + '" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">' +
               '<textarea id="beta-edit-notes-' + eid + '" rows="2" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"></textarea>' +
+              '<div class="rounded-md border border-stone-200 p-2 space-y-1.5">' +
+                '<div class="text-xs font-medium text-stone-500">Re-link to GitHub release (optional)</div>' +
+                '<input type="text" id="beta-edit-tag-' + eid + '" placeholder="Release tag" class="w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">' +
+                '<input type="text" id="beta-edit-repo-' + eid + '" placeholder="crosspoint-reader/crosspoint-reader" class="w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">' +
+                '<p class="text-xs text-stone-400">Setting a tag refetches firmware.bin and replaces the stored binary.</p>' +
+              '</div>' +
               '<div class="flex gap-2">' +
                 '<button onclick="saveBetaEdit(\'' + eid + '\')" class="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600">Save</button>' +
                 '<button onclick="cancelBetaEdit(\'' + eid + '\')" class="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700">Cancel</button>' +
@@ -349,12 +423,20 @@
       } catch {}
     }
 
-    function editBeta(id, name, notes) {
+    function editBeta(id, name, notes, currentTag, currentRepo) {
       const editEl = document.getElementById('beta-edit-' + id);
       editEl.classList.toggle('hidden');
       if (!editEl.classList.contains('hidden')) {
         document.getElementById('beta-edit-name-' + id).value = name;
         document.getElementById('beta-edit-notes-' + id).value = notes;
+        // Don't pre-fill the tag — leaving it blank means "keep current binary".
+        // Pre-filling would force a re-fetch on every save.
+        document.getElementById('beta-edit-tag-' + id).value = '';
+        document.getElementById('beta-edit-tag-' + id).placeholder = currentTag
+          ? 'Currently: ' + currentTag
+          : 'Release tag';
+        document.getElementById('beta-edit-repo-' + id).value = '';
+        document.getElementById('beta-edit-repo-' + id).placeholder = currentRepo || 'crosspoint-reader/crosspoint-reader';
       }
     }
 
@@ -365,7 +447,15 @@
     async function saveBetaEdit(id) {
       const name = document.getElementById('beta-edit-name-' + id).value.trim();
       const notes = document.getElementById('beta-edit-notes-' + id).value.trim();
+      const tag = document.getElementById('beta-edit-tag-' + id).value.trim();
+      const repo = document.getElementById('beta-edit-repo-' + id).value.trim();
       if (!name) return;
+
+      const body = { name, notes };
+      if (tag) {
+        body.releaseTag = tag;
+        if (repo) body.releaseRepo = repo;
+      }
 
       try {
         const res = await fetch('/api/beta/' + id, {
@@ -374,11 +464,11 @@
             'Authorization': 'Bearer ' + secret,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ name, notes }),
+          body: JSON.stringify(body),
         });
 
         if (res.ok) {
-          log('Updated beta build: ' + name);
+          log('Updated beta build: ' + name + (tag ? ' (linked to ' + tag + ')' : ''));
           loadBetaList();
         } else {
           const data = await res.json();

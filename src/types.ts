@@ -73,6 +73,10 @@ export interface FontBuildMetadata {
   completedAt?: string;
 }
 
+export type BetaSource =
+  | { type: 'upload' }
+  | { type: 'github-release'; owner: string; repo: string; tag: string; asset: string };
+
 export interface BetaBuild {
   id: string;
   name: string;
@@ -81,6 +85,8 @@ export interface BetaBuild {
   createdAt: string;
   firmwareSize: number;
   firmwareSha256?: string;
+  // Absent on legacy entries; treat undefined as { type: 'upload' }.
+  source?: BetaSource;
 }
 
 export interface GitHubPushEvent {

@@ -1,4 +1,4 @@
-import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, FontTree, FontFile, BetaBuild } from './types';
+import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource } from './types';
 
 const ROYALTY_REPO_ID = 'SoFriendly/crosspoint-tools';
 
@@ -1640,6 +1640,47 @@ async function handleBetaList(
   return json({ builds: list }, 200, headers);
 }
 
+// Resolve a tag on crosspoint-reader to a firmware.bin (or first *.bin) asset
+// and stream it back. Used by beta builds whose source is a GitHub release.
+async function fetchReleaseFirmware(
+  env: Env,
+  owner: string,
+  repo: string,
+  tag: string
+): Promise<{ data: ArrayBuffer; assetName: string } | { error: string; status: number }> {
+  const ghHeaders: Record<string, string> = {
+    'User-Agent': 'crosspoint-tools',
+    Accept: 'application/vnd.github+json',
+  };
+  if (env.GITHUB_TOKEN) ghHeaders.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
+
+  const relRes = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/releases/tags/${encodeURIComponent(tag)}`,
+    { headers: ghHeaders }
+  );
+  if (!relRes.ok) {
+    return { error: `Release "${tag}" not found in ${owner}/${repo}`, status: 404 };
+  }
+  const release = await relRes.json() as { assets?: Array<{ name: string; browser_download_url: string }> };
+  const assets = release.assets || [];
+  // Prefer firmware.bin, otherwise first .bin asset.
+  const asset = assets.find(a => a.name === 'firmware.bin') ||
+                assets.find(a => a.name.toLowerCase().endsWith('.bin'));
+  if (!asset) {
+    return { error: `No .bin asset on release "${tag}"`, status: 422 };
+  }
+
+  const binRes = await fetch(asset.browser_download_url, {
+    headers: { 'User-Agent': 'crosspoint-tools' },
+    redirect: 'follow',
+  });
+  if (!binRes.ok) {
+    return { error: `Failed to download asset (HTTP ${binRes.status})`, status: 502 };
+  }
+  const data = await binRes.arrayBuffer();
+  return { data, assetName: asset.name };
+}
+
 async function handleBetaCreate(
   request: Request,
   env: Env,
@@ -1654,18 +1695,47 @@ async function handleBetaCreate(
   const name = formData.get('name');
   const notes = formData.get('notes');
   const firmware = formData.get('firmware') as string | File | null;
+  const releaseTagRaw = formData.get('releaseTag');
+  const releaseTag = typeof releaseTagRaw === 'string' ? releaseTagRaw.trim() : '';
+  const releaseRepoRaw = formData.get('releaseRepo');
+  const releaseRepo = (typeof releaseRepoRaw === 'string' && releaseRepoRaw.trim())
+    ? releaseRepoRaw.trim()
+    : 'crosspoint-reader/crosspoint-reader';
 
   if (!name || typeof name !== 'string' || !name.trim()) {
     return json({ error: 'Name is required' }, 400, headers);
   }
-  if (!firmware || typeof firmware === 'string') {
-    return json({ error: 'Firmware .bin file is required' }, 400, headers);
-  }
 
   const id = `beta-${Date.now().toString(36)}`;
-  const data = await firmware.arrayBuffer();
-  const sha256 = await sha256Hex(data);
+  let data: ArrayBuffer;
+  let source: BetaSource;
+  let version: string | undefined;
 
+  const hasUpload = firmware && typeof firmware !== 'string';
+  if (hasUpload && releaseTag) {
+    return json({ error: 'Provide either a firmware file OR a release tag, not both' }, 400, headers);
+  }
+
+  if (hasUpload) {
+    data = await (firmware as File).arrayBuffer();
+    source = { type: 'upload' };
+  } else if (releaseTag) {
+    const [owner, repo] = releaseRepo.split('/');
+    if (!owner || !repo) {
+      return json({ error: 'Invalid releaseRepo (use "owner/repo")' }, 400, headers);
+    }
+    const fetched = await fetchReleaseFirmware(env, owner, repo, releaseTag);
+    if ('error' in fetched) {
+      return json({ error: fetched.error }, fetched.status, headers);
+    }
+    data = fetched.data;
+    source = { type: 'github-release', owner, repo, tag: releaseTag, asset: fetched.assetName };
+    version = releaseTag;
+  } else {
+    return json({ error: 'Provide either a firmware .bin file or a release tag' }, 400, headers);
+  }
+
+  const sha256 = await sha256Hex(data);
   await env.FIRMWARE_BUCKET.put(`builds/beta/${id}/firmware.bin`, data, {
     customMetadata: { sha256 },
   });
@@ -1674,9 +1744,11 @@ async function handleBetaCreate(
     id,
     name: name.trim(),
     notes: (typeof notes === 'string' ? notes.trim() : '') || '',
+    version,
     createdAt: new Date().toISOString(),
     firmwareSize: data.byteLength,
     firmwareSha256: sha256,
+    source,
   };
 
   const list = await getBetaList(env);
@@ -1705,7 +1777,12 @@ async function handleBetaUpdate(
     return json({ error: 'Beta build not found' }, 404, headers);
   }
 
-  const body = await request.json() as { name?: string; notes?: string };
+  const body = await request.json() as {
+    name?: string;
+    notes?: string;
+    releaseTag?: string;
+    releaseRepo?: string;
+  };
 
   if (body.name !== undefined) {
     if (typeof body.name !== 'string' || !body.name.trim()) {
@@ -1715,6 +1792,32 @@ async function handleBetaUpdate(
   }
   if (body.notes !== undefined) {
     build.notes = typeof body.notes === 'string' ? body.notes.trim() : '';
+  }
+
+  // Re-link to (or refresh from) a GitHub release. Replaces the R2 binary in place.
+  if (body.releaseTag !== undefined && body.releaseTag !== '') {
+    const repoSpec = (body.releaseRepo && body.releaseRepo.trim())
+      ? body.releaseRepo.trim()
+      : 'crosspoint-reader/crosspoint-reader';
+    const [owner, repo] = repoSpec.split('/');
+    if (!owner || !repo) {
+      return json({ error: 'Invalid releaseRepo (use "owner/repo")' }, 400, headers);
+    }
+    const fetched = await fetchReleaseFirmware(env, owner, repo, body.releaseTag);
+    if ('error' in fetched) {
+      return json({ error: fetched.error }, fetched.status, headers);
+    }
+    const sha = await sha256Hex(fetched.data);
+    await env.FIRMWARE_BUCKET.put(`builds/beta/${build.id}/firmware.bin`, fetched.data, {
+      customMetadata: { sha256: sha },
+    });
+    // Drop cached sha so the catalog recomputes against the new bytes.
+    await env.BUILD_META.delete(`sha256:beta:${build.id}`);
+
+    build.source = { type: 'github-release', owner, repo, tag: body.releaseTag, asset: fetched.assetName };
+    build.version = body.releaseTag;
+    build.firmwareSize = fetched.data.byteLength;
+    build.firmwareSha256 = sha;
   }
 
   await saveBetaList(env, list);
