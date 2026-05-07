@@ -91,11 +91,6 @@
     </div>
 
     <div id="main-content">
-      <div class="mb-4 rounded-lg border border-red-200 bg-red-50/60 px-4 py-3 text-sm/6 text-red-800">
-        <p>We have been made aware by the community that recent shipments of Xteink may have disabled the capability to flash custom firmware. <a href="https://www.reddit.com/r/xteinkereader/comments/1szk0pq/flashing_of_firmwares_disabled/" target="_blank" rel="noopener" class="font-medium underline underline-offset-2 hover:text-red-900">Read more</a>.</p>
-        <p class="mt-2">If your device is locked, our <a href="/#unlock-tool" class="font-medium underline underline-offset-2 hover:text-red-900">Unlock Tool</a> lets you install CrossPoint over OTA instead of USB.</p>
-      </div>
-
       <!-- Device Selector -->
       <div class="mb-4 rounded-xl bg-white p-5 ring-1 ring-stone-950/5" id="device-selector">
         <h3 class="text-sm font-semibold text-stone-900">Select your device</h3>
@@ -161,6 +156,9 @@
           </div>
 
           <div id="flash-section" class="mt-5 hidden">
+            <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
+              Make sure your device is not asleep and is sitting at the home screen before flashing. If the flasher fails to detect your device remove your sd card and try again.
+            </div>
             <button class="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50 disabled:cursor-not-allowed" id="flash-ea-btn" disabled>
               Flash Nightly Build
             </button>
