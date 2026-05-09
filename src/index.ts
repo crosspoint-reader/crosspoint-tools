@@ -1367,9 +1367,6 @@ async function handleFontBuildUpload(
     const entry = formData.get(style) as string | File | null;
     if (!entry || typeof entry === 'string') continue;
     const file = entry;
-    if (file.size > 5 * 1024 * 1024) {
-      return json({ error: `${style}.ttf exceeds 5 MB` }, 400, headers);
-    }
     const data = await file.arrayBuffer();
     if (!isValidFontFile(data)) {
       return json({ error: `Invalid font file for ${style}` }, 400, headers);
