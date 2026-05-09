@@ -1451,7 +1451,18 @@ async function handleFontBuildStatus(
   const raw = await env.BUILD_META.get(`font-build:${buildId}`);
   if (!raw) return json({ build: null }, 200, headers);
 
-  return json({ build: JSON.parse(raw) as FontBuildMetadata }, 200, headers);
+  const meta = JSON.parse(raw) as FontBuildMetadata;
+  // List outputs from R2 (strongly consistent) on every read rather than
+  // accumulating them in KV — concurrent upload-result handlers would otherwise
+  // race each other's read-modify-writes and lose filenames.
+  const list = await env.FIRMWARE_BUCKET.list({ prefix: `font-builds/${buildId}/out/` });
+  const prefix = `font-builds/${buildId}/out/`;
+  meta.outputs = list.objects
+    .map(o => o.key.startsWith(prefix) ? o.key.slice(prefix.length) : o.key)
+    .filter(name => name.endsWith('.cpfont'))
+    .sort();
+
+  return json({ build: meta }, 200, headers);
 }
 
 async function handleFontBuildClear(
@@ -1534,13 +1545,9 @@ async function handleFontBuildUploadResult(
   const data = await request.arrayBuffer();
   await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/out/${filename}`, data);
 
-  // Track filename in metadata so the client can list outputs.
-  const raw = await env.BUILD_META.get(`font-build:${buildId}`);
-  if (raw) {
-    const meta = JSON.parse(raw) as FontBuildMetadata;
-    meta.outputs = Array.from(new Set([...(meta.outputs || []), filename]));
-    await env.BUILD_META.put(`font-build:${buildId}`, JSON.stringify(meta));
-  }
+  // Outputs are listed from R2 in handleFontBuildStatus, not tracked in KV.
+  // Touching the meta key here would race other concurrent upload-results and
+  // status-update under KV's eventual consistency.
 
   return json({ ok: true, size: data.byteLength }, 200, headers);
 }
