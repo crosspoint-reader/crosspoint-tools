@@ -1199,7 +1199,7 @@
         const date = new Date(b.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
         panel.innerHTML = '<div class="text-sm font-semibold text-stone-900">' + escapeHtml(b.name) + '</div>' +
           '<div class="mt-1 font-mono text-xs text-stone-400 tabular-nums">' + size + ' MB &middot; ' + date + '</div>' +
-          (b.notes ? '<div class="mt-3 rounded-lg bg-amber-50/60 px-4 py-3 text-sm/6 text-stone-700 whitespace-pre-wrap">' + linkify(b.notes) + '</div>' : '') +
+          (b.notes ? '<div class="mt-3 rounded-lg bg-amber-50/60 px-4 py-3 text-sm/6 text-stone-700">' + renderMarkdown(b.notes) + '</div>' : '') +
           '<button class="flash-btn mt-4 inline-flex items-center justify-center rounded-lg bg-amber-600 py-2 pr-4 pl-3 text-sm font-semibold text-white hover:bg-amber-700" data-action="beta-' + b.id + '">' +
             '<svg class="mr-1.5 size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>' +
             'Flash ' + escapeHtml(b.name) +
@@ -1219,13 +1219,40 @@
       return div.innerHTML;
     }
 
-    function linkify(str, linkClass) {
-      const cls = linkClass || 'font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700';
-      return escapeHtml(str).replace(
-        /(https?:\/\/[^\s<]+[^\s<.,;:!?)'"\]])/g,
-        '<a href="$1" target="_blank" rel="noopener" class="' + cls + '">$1</a>'
-      );
+    function safeUrl(url) {
+      const trimmed = url.trim();
+      if (/^(https?:\/\/|\/|#|mailto:)/i.test(trimmed)) return trimmed;
+      return '#';
     }
+
+    // Minimal, safe markdown subset: escape first, then apply patterns over the
+    // escaped string. Supports: [text](url), **bold**, *italic*, `code`, bare
+    // URLs, and newline -> <br>.
+    function renderMarkdown(str, linkClass) {
+      const cls = linkClass || 'font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700';
+      let html = escapeHtml(str);
+      // [text](url) — text and url are already escaped; sanitize url scheme.
+      html = html.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, text, url) =>
+        '<a href="' + safeUrl(url) + '" target="_blank" rel="noopener" class="' + cls + '">' + text + '</a>'
+      );
+      // `code`
+      html = html.replace(/`([^`]+)`/g, '<code class="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.9em]">$1</code>');
+      // **bold**
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      // *italic* (avoid matching inside already-substituted tags by requiring word-ish boundaries)
+      html = html.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+      // Bare URLs that aren't already inside an href="..." attribute.
+      html = html.replace(
+        /(^|[\s(>])(https?:\/\/[^\s<]+[^\s<.,;:!?)'"\]])/g,
+        '$1<a href="$2" target="_blank" rel="noopener" class="' + cls + '">$2</a>'
+      );
+      // Newlines → <br>
+      html = html.replace(/\n/g, '<br>');
+      return html;
+    }
+
+    // Backwards-compatible alias.
+    const linkify = renderMarkdown;
 
     async function loadSiteBanner() {
       const el = document.getElementById('site-banner');
@@ -1238,7 +1265,7 @@
           el.classList.add('hidden');
           return;
         }
-        el.innerHTML = linkify(banner.text, 'underline underline-offset-2 text-white hover:text-brand-100');
+        el.innerHTML = renderMarkdown(banner.text, 'underline underline-offset-2 text-white hover:text-brand-100');
         el.classList.remove('hidden');
       } catch (err) {
         // Silent fail — banner is optional.

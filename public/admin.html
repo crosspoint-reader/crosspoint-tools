@@ -77,7 +77,7 @@
       <!-- Site Banner -->
       <div class="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
         <h2 class="text-sm font-semibold text-stone-900">Site Banner</h2>
-        <p class="mt-1 text-xs text-stone-400">The colored bar at the top of the homepage. URLs in the text become clickable links automatically.</p>
+        <p class="mt-1 text-xs text-stone-400">The colored bar at the top of the homepage. Supports markdown: <code class="font-mono">**bold**</code>, <code class="font-mono">*italic*</code>, <code class="font-mono">[text](url)</code>, <code class="font-mono">`code`</code>, and bare URLs.</p>
 
         <div class="mt-3 space-y-2">
           <textarea id="banner-text" placeholder="Banner text (e.g. New: CrossPoint beta released. Update via https://crosspoint.tools/#flash-tools)" rows="3" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"></textarea>
@@ -99,7 +99,7 @@
 
         <div class="mt-3 space-y-2">
           <input type="text" id="beta-name" placeholder="Build name (e.g. KOSync Fix)" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
-          <textarea id="beta-notes" placeholder="Test notes (shown to users when they select this build)" rows="3" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"></textarea>
+          <textarea id="beta-notes" placeholder="Test notes — supports markdown: **bold**, *italic*, [text](url), `code`" rows="3" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"></textarea>
 
           <div class="flex gap-1 rounded-lg bg-stone-100 p-1 text-xs font-medium">
             <button type="button" id="beta-mode-upload" onclick="setBetaMode('upload')" class="flex-1 rounded-md px-3 py-1.5 text-stone-600">Upload .bin</button>
