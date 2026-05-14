@@ -138,6 +138,11 @@ async function handleApi(
         if (request.method === 'POST') return handleBetaCreate(request, env, corsHeaders);
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
+      case '/api/banner':
+        if (request.method === 'GET') return handleBannerGet(env, corsHeaders);
+        if (request.method === 'PUT') return handleBannerUpdate(request, env, corsHeaders);
+        return json({ error: 'Method not allowed' }, 405, corsHeaders);
+
       default:
         // Dynamic routes: /api/beta/{id}/firmware
         if (url.pathname.startsWith('/api/beta/') && url.pathname.endsWith('/firmware')) {
@@ -1636,6 +1641,39 @@ async function handleFontBuildResultDownload(
       'Content-Length': String(object.size),
     },
   });
+}
+
+// --- Site Banner ---
+
+const BANNER_KEY = 'site-banner';
+const DEFAULT_BANNER = {
+  enabled: true,
+  text: 'New: CrossPoint beta released with support for remote font downloads & SD storage. Update via firmware flasher https://crosspoint.tools/#flash-tools',
+};
+
+async function handleBannerGet(env: Env, headers: Record<string, string>): Promise<Response> {
+  const raw = await env.BUILD_META.get(BANNER_KEY);
+  const banner = raw ? JSON.parse(raw) : DEFAULT_BANNER;
+  return json(banner, 200, headers);
+}
+
+async function handleBannerUpdate(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const auth = request.headers.get('Authorization');
+  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const body = await request.json() as { enabled?: boolean; text?: string };
+  const banner = {
+    enabled: typeof body.enabled === 'boolean' ? body.enabled : true,
+    text: typeof body.text === 'string' ? body.text.trim() : '',
+  };
+  await env.BUILD_META.put(BANNER_KEY, JSON.stringify(banner));
+  return json(banner, 200, headers);
 }
 
 // --- Beta Testing ---

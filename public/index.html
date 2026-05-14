@@ -545,9 +545,7 @@
     </div>
   </nav>
 
-  <div class="bg-brand-600 px-6 py-2.5 text-center text-sm font-medium text-white">
-    <strong>New:</strong> CrossPoint beta released with support for remote font downloads &amp; SD storage. Update via firmware flasher <a href="#flash-tools" class="underline underline-offset-2 text-white hover:text-brand-100">here</a>.
-  </div>
+  <div id="site-banner" class="hidden bg-brand-600 px-6 py-2.5 text-center text-sm font-medium text-white"></div>
 
   <!-- Hero -->
   <section class="eink relative overflow-hidden">
@@ -1221,12 +1219,32 @@
       return div.innerHTML;
     }
 
-    function linkify(str) {
+    function linkify(str, linkClass) {
+      const cls = linkClass || 'font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700';
       return escapeHtml(str).replace(
         /(https?:\/\/[^\s<]+[^\s<.,;:!?)'"\]])/g,
-        '<a href="$1" target="_blank" rel="noopener" class="font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700">$1</a>'
+        '<a href="$1" target="_blank" rel="noopener" class="' + cls + '">$1</a>'
       );
     }
+
+    async function loadSiteBanner() {
+      const el = document.getElementById('site-banner');
+      if (!el) return;
+      try {
+        const res = await fetch('/api/banner');
+        if (!res.ok) return;
+        const banner = await res.json();
+        if (!banner.enabled || !banner.text) {
+          el.classList.add('hidden');
+          return;
+        }
+        el.innerHTML = linkify(banner.text, 'underline underline-offset-2 text-white hover:text-brand-100');
+        el.classList.remove('hidden');
+      } catch (err) {
+        // Silent fail — banner is optional.
+      }
+    }
+    loadSiteBanner();
 
     function relativeTime(isoStr) {
       const diff = Date.now() - new Date(isoStr).getTime();

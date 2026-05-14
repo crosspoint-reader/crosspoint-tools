@@ -74,6 +74,24 @@
         <div id="trigger-result" class="mt-2"></div>
       </div>
 
+      <!-- Site Banner -->
+      <div class="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
+        <h2 class="text-sm font-semibold text-stone-900">Site Banner</h2>
+        <p class="mt-1 text-xs text-stone-400">The colored bar at the top of the homepage. URLs in the text become clickable links automatically.</p>
+
+        <div class="mt-3 space-y-2">
+          <textarea id="banner-text" placeholder="Banner text (e.g. New: CrossPoint beta released. Update via https://crosspoint.tools/#flash-tools)" rows="3" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"></textarea>
+          <label class="flex items-center gap-2 text-sm text-stone-700">
+            <input type="checkbox" id="banner-enabled" class="size-4 rounded border-stone-300 text-brand-500 focus:ring-brand-500/20">
+            Show banner on homepage
+          </label>
+          <button onclick="saveBanner()" id="banner-save-btn" class="w-full rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed">
+            Save banner
+          </button>
+          <p id="banner-result" class="text-xs"></p>
+        </div>
+      </div>
+
       <!-- Beta Testing -->
       <div class="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
         <h2 class="text-sm font-semibold text-stone-900">Beta Testing</h2>
@@ -165,6 +183,7 @@
 
         refreshStatus();
         loadBetaList();
+        loadBanner();
       } catch (err) {
         document.getElementById('auth-error').textContent = 'Connection error';
         document.getElementById('auth-error').classList.remove('hidden');
@@ -238,6 +257,54 @@
         }
       } catch (err) {
         result.innerHTML = `<div class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Connection error</div>`;
+      }
+
+      btn.disabled = false;
+    }
+
+    // --- Site Banner ---
+
+    async function loadBanner() {
+      try {
+        const res = await fetch('/api/banner');
+        if (!res.ok) return;
+        const banner = await res.json();
+        document.getElementById('banner-text').value = banner.text || '';
+        document.getElementById('banner-enabled').checked = !!banner.enabled;
+      } catch (err) {
+        log('Failed to load banner');
+      }
+    }
+
+    async function saveBanner() {
+      const btn = document.getElementById('banner-save-btn');
+      const result = document.getElementById('banner-result');
+      const text = document.getElementById('banner-text').value;
+      const enabled = document.getElementById('banner-enabled').checked;
+      btn.disabled = true;
+      result.textContent = '';
+
+      try {
+        const res = await fetch('/api/banner', {
+          method: 'PUT',
+          headers: {
+            'Authorization': 'Bearer ' + secret,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ enabled, text }),
+        });
+        if (res.ok) {
+          result.className = 'text-xs text-brand-600';
+          result.textContent = 'Saved';
+          log('Banner saved (' + (enabled ? 'shown' : 'hidden') + ')');
+        } else {
+          const data = await res.json().catch(() => ({}));
+          result.className = 'text-xs text-red-600';
+          result.textContent = data.error || 'Save failed';
+        }
+      } catch (err) {
+        result.className = 'text-xs text-red-600';
+        result.textContent = 'Connection error';
       }
 
       btn.disabled = false;
