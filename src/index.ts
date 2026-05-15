@@ -1343,9 +1343,9 @@ async function handleFontBuildUpload(
   let uid = getUserId(request);
   if (!uid) uid = generateUserId();
 
-  const lock = await env.BUILD_META.get('font-build-lock');
+  const lock = await env.BUILD_META.get(`font-build-lock:${uid}`);
   if (lock) {
-    return json({ error: 'A font build is already in progress. Try again shortly.' }, 409, headers);
+    return json({ error: 'Your previous font build is still running. Try again shortly.' }, 409, headers);
   }
 
   const formData = await request.formData();
@@ -1393,7 +1393,7 @@ async function handleFontBuildUpload(
     await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/in/${style}.ttf`, data);
   }
 
-  await env.BUILD_META.put('font-build-lock', buildId, { expirationTtl: FONT_BUILD_LOCK_TTL });
+  await env.BUILD_META.put(`font-build-lock:${uid}`, buildId, { expirationTtl: FONT_BUILD_LOCK_TTL });
   await env.BUILD_META.put(`font-build:user:${uid}`, buildId);
 
   const meta: FontBuildMetadata = {
@@ -1430,7 +1430,7 @@ async function handleFontBuildUpload(
   );
 
   if (!ghRes.ok) {
-    await env.BUILD_META.delete('font-build-lock');
+    await env.BUILD_META.delete(`font-build-lock:${uid}`);
     await env.BUILD_META.delete(`font-build:${buildId}`);
     const body = await ghRes.text();
     console.error(`Font build dispatch failed: ${ghRes.status} ${body}`);
@@ -1485,8 +1485,7 @@ async function handleFontBuildClear(
   if (buildId) {
     await env.BUILD_META.delete(`font-build:user:${uid}`);
     await env.BUILD_META.delete(`font-build:${buildId}`);
-    const lock = await env.BUILD_META.get('font-build-lock');
-    if (lock === buildId) await env.BUILD_META.delete('font-build-lock');
+    await env.BUILD_META.delete(`font-build-lock:${uid}`);
   }
   return json({ ok: true }, 200, headers);
 }
@@ -1590,7 +1589,7 @@ async function handleFontBuildStatusUpdate(
   if (body.error) meta.error = body.error;
   if (body.status === 'success' || body.status === 'failed') {
     meta.completedAt = new Date().toISOString();
-    await env.BUILD_META.delete('font-build-lock');
+    if (meta.uid) await env.BUILD_META.delete(`font-build-lock:${meta.uid}`);
   }
 
   await env.BUILD_META.put(`font-build:${body.buildId}`, JSON.stringify(meta));
