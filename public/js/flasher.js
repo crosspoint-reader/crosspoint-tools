@@ -363,12 +363,6 @@ export async function fetchEarlyAccessFirmware() {
 }
 
 export async function fetchReleaseFirmware(model = 'x4') {
-  // X3 uses the nightly build
-  if (model === 'x3') {
-    const res = await fetch('/api/build/firmware');
-    if (!res.ok) throw new Error(`Failed to download X3 firmware: ${res.status}`);
-    return new Uint8Array(await res.arrayBuffer());
-  }
   const res = await fetch('/api/release/firmware');
   if (!res.ok) throw new Error(`Failed to download release firmware: ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());

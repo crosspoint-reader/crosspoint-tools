@@ -916,6 +916,10 @@
               <div class="text-sm font-semibold text-stone-900">CrossPoint</div>
               <div class="mt-0.5 text-xs text-brand-500">Community</div>
             </button>
+            <button class="fw-btn group relative rounded-xl p-4 text-left ring-1 ring-stone-950/5" data-fw="nightly" id="fw-btn-nightly">
+              <div class="text-sm font-semibold text-stone-900">CrossPoint Nightly</div>
+              <div class="mt-0.5 text-xs text-brand-500">Insider</div>
+            </button>
             <button class="fw-btn group relative rounded-xl p-4 text-left ring-1 ring-stone-950/5" data-fw="stock-en">
               <div class="text-sm font-semibold text-stone-900">Stock English</div>
               <div class="mt-0.5 text-xs text-stone-400">Official</div>
@@ -954,7 +958,20 @@
                   <a id="release-notes-link" href="#" target="_blank" rel="noopener" class="hidden text-sm font-medium text-brand-500 underline underline-offset-2 hover:text-brand-600">Release Notes</a>
                 </div>
                 <p class="mt-2 text-xs text-stone-400">If you are coming from Stock or another firmware you may need to flash twice for CrossPoint to show up.</p>
-                <!-- X3 Changelog -->
+              </div>
+
+              <!-- Nightly panel -->
+              <div id="fw-panel-nightly" class="hidden">
+                <div class="text-sm font-semibold text-stone-900">CrossPoint Nightly</div>
+                <div class="mt-1 font-mono text-xs text-stone-400 tabular-nums" id="nightly-version">Loading...</div>
+                <div class="mt-4 flex items-center gap-3">
+                  <button class="flash-btn inline-flex items-center justify-center rounded-lg bg-brand-500 py-2 pr-4 pl-3 text-sm font-semibold text-white hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50 disabled:cursor-not-allowed" data-action="nightly" disabled>
+                    <svg class="mr-1.5 size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
+                    Flash Nightly
+                  </button>
+                </div>
+                <p class="mt-2 text-xs text-stone-400">Built from the latest master commit. If you are coming from Stock or another firmware you may need to flash twice.</p>
+                <!-- Nightly Changelog -->
                 <div id="x3-changelog" class="mt-5 hidden border-t border-stone-200 pt-5">
                   <div class="flex items-center justify-between">
                     <div class="text-sm font-semibold text-stone-700">What's in this build</div>
@@ -1104,7 +1121,7 @@
   </footer>
 
   <script type="module">
-    import { CrossPointFlasher, fetchReleaseFirmware, fetchReleaseMeta, fetchStockFirmware, fetchStockFirmwareInfo, fetchBuildMeta, fetchBetaBuilds, fetchBetaFirmware, downloadBlob } from '/js/flasher.js';
+    import { CrossPointFlasher, fetchReleaseFirmware, fetchReleaseMeta, fetchEarlyAccessFirmware, fetchStockFirmware, fetchStockFirmwareInfo, fetchBuildMeta, fetchBetaBuilds, fetchBetaFirmware, downloadBlob } from '/js/flasher.js';
 
     let deviceModel = null;
     let selectedFw = null;
@@ -1160,7 +1177,7 @@
       document.getElementById('step-num-2').className = selectedFw
         ? 'flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white'
         : 'flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-200 font-mono text-xs font-semibold text-stone-500';
-      const panels = ['crosspoint', 'stock-en', 'stock-ch', 'custom'];
+      const panels = ['crosspoint', 'nightly', 'stock-en', 'stock-ch', 'custom'];
       panels.forEach(p => {
         document.getElementById(`fw-panel-${p}`).classList.toggle('hidden', p !== selectedFw);
       });
@@ -1169,10 +1186,10 @@
         el.classList.toggle('hidden', el.id !== `fw-panel-${selectedFw}`);
       });
       document.getElementById('fw-panel-empty').classList.toggle('hidden', selectedFw !== null);
-      // Show X3 changelog when CrossPoint is selected on X3
-      const showX3Changelog = deviceModel === 'x3' && selectedFw === 'crosspoint';
-      document.getElementById('x3-changelog').classList.toggle('hidden', !showX3Changelog);
-      if (showX3Changelog && !x3ChangelogLoaded) loadX3Changelog();
+      // Show nightly changelog when Nightly is selected
+      const showNightlyChangelog = selectedFw === 'nightly';
+      document.getElementById('x3-changelog').classList.toggle('hidden', !showNightlyChangelog);
+      if (showNightlyChangelog && !x3ChangelogLoaded) loadX3Changelog();
     }
     updateFirmware();
 
@@ -1324,29 +1341,26 @@
     async function loadFirmwareVersions() {
       document.getElementById('crosspoint-version').textContent = 'Loading...';
       document.getElementById('fw-btn-crosspoint').textContent = 'CrossPoint';
-      if (deviceModel === 'x3') {
-        const buildMeta = await fetchBuildMeta();
-        if (buildMeta && buildMeta.status === 'success') {
-          document.getElementById('crosspoint-version').textContent = `${buildMeta.version} - ${new Date(buildMeta.buildDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`;
-          document.getElementById('fw-btn-crosspoint').textContent = `CrossPoint ${buildMeta.version}`;
-          document.querySelector('[data-action="crosspoint"]').disabled = false;
-        } else {
-          document.getElementById('crosspoint-version').textContent = 'No build available';
+      document.getElementById('nightly-version').textContent = 'Loading...';
+      const [meta, buildMeta] = await Promise.all([fetchReleaseMeta(), fetchBuildMeta()]);
+      if (meta) {
+        document.getElementById('crosspoint-version').textContent = `${meta.tag} - ${new Date(meta.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`;
+        document.getElementById('fw-btn-crosspoint').textContent = `CrossPoint ${meta.tag}`;
+        document.querySelector('[data-action="crosspoint"]').disabled = false;
+        if (meta.htmlUrl) {
+          const link = document.getElementById('release-notes-link');
+          link.href = meta.htmlUrl;
+          link.classList.remove('hidden');
         }
       } else {
-        const meta = await fetchReleaseMeta();
-        if (meta) {
-          document.getElementById('crosspoint-version').textContent = `${meta.tag} - ${new Date(meta.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`;
-          document.getElementById('fw-btn-crosspoint').textContent = `CrossPoint ${meta.tag}`;
-          document.querySelector('[data-action="crosspoint"]').disabled = false;
-          if (meta.htmlUrl) {
-            const link = document.getElementById('release-notes-link');
-            link.href = meta.htmlUrl;
-            link.classList.remove('hidden');
-          }
-        } else {
-          document.getElementById('crosspoint-version').textContent = 'Failed to load';
-        }
+        document.getElementById('crosspoint-version').textContent = 'Failed to load';
+      }
+
+      if (buildMeta && buildMeta.status === 'success') {
+        document.getElementById('nightly-version').textContent = `${buildMeta.version} - ${new Date(buildMeta.buildDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`;
+        document.querySelector('[data-action="nightly"]').disabled = false;
+      } else {
+        document.getElementById('nightly-version').textContent = 'No build available';
       }
 
       for (const lang of ['en', 'ch']) {
@@ -1417,7 +1431,7 @@
 
       // CrossPoint-style OTA updates validate the new app on first boot before committing the OTA pointer.
       // Avoid serial hard reset here; a clean unplug/replug matches the known-good flasher behavior.
-      const skipReset = action === 'crosspoint' || action === 'custom' || action.startsWith('beta-');
+      const skipReset = action === 'crosspoint' || action === 'nightly' || action === 'custom' || action.startsWith('beta-');
 
       setRunning(true);
       progressCard.classList.remove('hidden');
@@ -1472,6 +1486,11 @@
             progressTitle.textContent = title;
             progressStatus.innerHTML = '<p class="text-sm text-stone-400">Downloading firmware...</p>';
             firmware = await fetchReleaseFirmware(deviceModel);
+          } else if (action === 'nightly') {
+            title = 'Flashing CrossPoint Nightly...';
+            progressTitle.textContent = title;
+            progressStatus.innerHTML = '<p class="text-sm text-stone-400">Downloading nightly build...</p>';
+            firmware = await fetchEarlyAccessFirmware();
           } else if (action === 'stock-en') {
             title = 'Flashing English Firmware...';
             progressTitle.textContent = title;

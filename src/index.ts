@@ -2013,7 +2013,7 @@ async function fetchStableForCatalog(env: Env): Promise<CatalogRelease | null> {
       firmware_url: `${ORIGIN}/api/release/firmware`,
       firmware_sha256: sha,
       size: asset.size,
-      supported_devices: ['x4'],
+      supported_devices: ['x3', 'x4'],
     };
   } catch (err) {
     console.error('Stable catalog fetch failed:', err);
