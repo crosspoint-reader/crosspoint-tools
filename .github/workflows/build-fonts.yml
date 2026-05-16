@@ -19,9 +19,7 @@ on:
       readerRef:
         description: 'crosspoint-reader ref to pull fontconvert_sdcard.py from'
         required: false
-        # TEMPORARY: pinned to feature branch until SD-fonts work merges to master.
-        # Flip back to 'master' (or a release tag) once merged.
-        default: 'feature/sd-fonts-v1'
+        default: 'master'
 
 concurrency:
   group: font-build-${{ inputs.buildId }}
