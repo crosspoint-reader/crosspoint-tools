@@ -57,50 +57,80 @@ function generateCrc32Le(sequence) {
   return u32ToLeBytes(crc32(u32ToLeBytes(sequence), 0xFFFFFFFF));
 }
 
-// --- Partition Layouts ---
+// --- Firmware Image Validation ---
 
-export const X4_LAYOUT = {
-  app0Offset: 0x10000,
-  app1Offset: 0x650000,
-  appSize: 0x640000,
-};
+const ESP_IMAGE_MAGIC = 0xE9;
+const IMG_HEADER_SIZE = 24;
+const IMG_SEG_HEADER_SIZE = 8;
+const IMG_SHA_TRAILER = 32;
+const IMG_CHECKSUM_SEED = 0xEF;
+// header[23] bit 0 = hash_appended; default IDF builds set it.
+const IMG_HASH_APPENDED_OFFSET = 23;
 
-export const X3_LAYOUT = {
-  app0Offset: 0x10000,
-  app1Offset: 0x780000,
-  appSize: 0x770000,
-};
+// Walk the ESP image structure: 24-byte header, segCount segments each with an
+// 8-byte header + dataLen bytes, padding-to-16, 1-byte XOR checksum at
+// padEnd - 1, optional 32-byte SHA-256 over [0, totalSize - 32). Rejects HTML
+// error pages, truncated downloads, and wrong-shape binaries that would
+// otherwise pass the only previous check (a length range).
+//
+// Headroom-first arithmetic on every bound: `totalSize - pos < N`, never
+// `pos + N > totalSize`. Hostile dataLen = 0xFFFFFFFF wraps the addition form
+// into "valid" and admits a 4 GB read; the subtraction form catches it.
+export async function validateFirmwareImage(data) {
+  const totalSize = data.length;
+  if (totalSize < IMG_HEADER_SIZE) {
+    throw new Error('Firmware too small: header is truncated.');
+  }
+  if (data[0] !== ESP_IMAGE_MAGIC) {
+    throw new Error('Invalid firmware: ESP image magic byte (0xE9) missing. Are you sure this is a firmware .bin?');
+  }
+  const segCount = data[1];
+  const hashAppended = (data[IMG_HASH_APPENDED_OFFSET] & 0x01) !== 0;
 
-export const X4_PARTITION_TABLE = [
-  { type: 'data-nvs', offset: 0x9000, size: 0x5000 },
-  { type: 'data-ota', offset: 0xe000, size: 0x2000 },
-  { type: 'app-ota_0', offset: 0x10000, size: 0x640000 },
-  { type: 'app-ota_1', offset: 0x650000, size: 0x640000 },
-  { type: 'data-spiffs', offset: 0xc90000, size: 0x360000 },
-  { type: 'data-coredump', offset: 0xff0000, size: 0x10000 },
-];
+  let xorAccum = IMG_CHECKSUM_SEED;
+  let pos = IMG_HEADER_SIZE;
+  for (let i = 0; i < segCount; i++) {
+    if (totalSize - pos < IMG_SEG_HEADER_SIZE) {
+      throw new Error('Invalid firmware: segment header runs past end of file.');
+    }
+    const dataLen = leBytesToU32(data.subarray(pos + 4, pos + 8));
+    pos += IMG_SEG_HEADER_SIZE;
+    if (dataLen > totalSize - pos) {
+      throw new Error('Invalid firmware: segment data runs past end of file.');
+    }
+    const end = pos + dataLen;
+    for (let j = pos; j < end; j++) xorAccum ^= data[j];
+    pos = end;
+  }
 
-export const X3_PARTITION_TABLE = [
-  { type: 'data-nvs', offset: 0x9000, size: 0x5000 },
-  { type: 'data-ota', offset: 0xe000, size: 0x2000 },
-  { type: 'app-ota_0', offset: 0x10000, size: 0x770000 },
-  { type: 'app-ota_1', offset: 0x780000, size: 0x770000 },
-  { type: 'data-spiffs', offset: 0xef0000, size: 0x100000 },
-  { type: 'data-coredump', offset: 0xff0000, size: 0x10000 },
-];
-
-export function getLayout(model) {
-  return model === 'x3' ? X3_LAYOUT : X4_LAYOUT;
-}
-
-function getExpectedPartitionTables(model) {
-  // X3 can have either X3 or X4 partition layout
-  return model === 'x3'
-    ? [X3_PARTITION_TABLE, X4_PARTITION_TABLE]
-    : [X4_PARTITION_TABLE];
+  // (pos + 16) & ~15 lands in [1, 16] bytes past pos; the byte at padEnd - 1
+  // holds the XOR-of-segment-data checksum.
+  const padEnd = (pos + 16) & ~15;
+  const expectedTotal = padEnd + (hashAppended ? IMG_SHA_TRAILER : 0);
+  if (expectedTotal !== totalSize) {
+    throw new Error(`Invalid firmware: declared size ${expectedTotal} does not match file size ${totalSize}.`);
+  }
+  const storedChecksum = data[padEnd - 1];
+  if ((xorAccum & 0xFF) !== storedChecksum) {
+    throw new Error(`Invalid firmware: segment checksum mismatch (computed 0x${(xorAccum & 0xFF).toString(16)}, stored 0x${storedChecksum.toString(16)}).`);
+  }
+  if (hashAppended) {
+    const body = data.subarray(0, totalSize - IMG_SHA_TRAILER);
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', body));
+    const stored = data.subarray(totalSize - IMG_SHA_TRAILER);
+    if (!isEqualBytes(digest, stored)) {
+      throw new Error('Invalid firmware: SHA-256 trailer mismatch. File is corrupt or truncated.');
+    }
+  }
 }
 
 // --- OTA Partition ---
+
+// IDF otadata format: exactly two 4 KB flash sectors, each holding one
+// esp_ota_select_entry_t at byte 0. This is a protocol constant, not a
+// layout choice, so it's hardcoded rather than read from the PT.
+const OTA_SECTOR_BYTES = 0x1000;
+const OTADATA_BYTES = 2 * OTA_SECTOR_BYTES;
 
 const OTA_STATE = { NEW: 0, PENDING_VERIFY: 1, VALID: 2, INVALID: 3, ABORTED: 4, UNDEFINED: 0xFFFFFFFF };
 const INVALID_STATES = new Set([OTA_STATE.INVALID, OTA_STATE.ABORTED]);
@@ -114,36 +144,73 @@ function parseOtaPartitionSlot(data, offset) {
   return { sequence, state: stateVal, crcValid: isEqualBytes(crcBytes, expectedCrc) };
 }
 
+// IDF OTA model: active app slot = (active_seq - 1) % NUM_OTA_PARTITIONS.
+// The otadata sector that holds the active entry has no fixed relation to
+// the app slot it boots; the new entry goes into the OTHER sector. Pairing
+// sector index with app label drifts out of sync once otadata leaves
+// canonical state (interrupted OTA, a prior write that used the wrong
+// mapping) and silently writes firmware into the slot the bootloader is
+// about to skip.
 function parseOtadata(data) {
   const slot0 = parseOtaPartitionSlot(data, 0);
   const slot1 = parseOtaPartitionSlot(data, 0x1000);
-  const candidates = [];
-  if (!INVALID_STATES.has(slot0.state) && slot0.crcValid) candidates.push({ label: 'app0', ...slot0 });
-  if (!INVALID_STATES.has(slot1.state) && slot1.crcValid) candidates.push({ label: 'app1', ...slot1 });
-  candidates.sort((a, b) => b.sequence - a.sequence);
 
-  const currentBoot = candidates[0]?.label || 'app0';
-  const backupPartition = currentBoot === 'app0' ? 'app1' : 'app0';
-  const nextSequence = (candidates[0]?.sequence || 0) + 1;
-  return { slot0, slot1, currentBoot, backupPartition, nextSequence };
+  const eligible = [];
+  if (slot0.sequence !== 0xFFFFFFFF && slot0.crcValid && !INVALID_STATES.has(slot0.state)) {
+    eligible.push({ sector: 0, seq: slot0.sequence });
+  }
+  if (slot1.sequence !== 0xFFFFFFFF && slot1.crcValid && !INVALID_STATES.has(slot1.state)) {
+    eligible.push({ sector: 1, seq: slot1.sequence });
+  }
+  eligible.sort((a, b) => b.seq - a.seq);
+
+  let activeSector, activeSeq, activeApp;
+  if (eligible.length === 0) {
+    activeSector = -1;
+    activeSeq = 0;
+    activeApp = 0;
+  } else {
+    activeSector = eligible[0].sector;
+    activeSeq = eligible[0].seq;
+    activeApp = (activeSeq - 1) % 2;
+  }
+  const inactiveApp = 1 - activeApp;
+  // Smallest seq > activeSeq with (newSeq - 1) % 2 == inactiveApp. For an
+  // existing active entry this is always activeSeq + 1; for the no-eligible
+  // case (factory-fresh otadata, activeSeq = 0, activeApp = 0 by IDF
+  // default) it has to step to 2 so the bootloader picks inactiveApp = 1.
+  let newSeq = activeSeq + 1;
+  while (((newSeq - 1) % 2) !== inactiveApp) newSeq++;
+  const targetSector = activeSector < 0 ? 0 : (1 - activeSector);
+
+  return {
+    slot0, slot1,
+    activeApp, inactiveApp,
+    activeSeq, newSeq,
+    targetSector,
+  };
 }
 
-function buildNewOtadata(existingData, backupPartition, nextSequence) {
-  const newData = new Uint8Array(existingData);
-  const offset = backupPartition === 'app1' ? 0x1000 : 0;
-  newData.set(u32ToLeBytes(nextSequence), offset);
-  newData.set(u32ToLeBytes(OTA_STATE.NEW), offset + 0x18);
-  newData.set(generateCrc32Le(nextSequence), offset + 0x1C);
+// Builds the 4 KB target sector with the new entry stamped at byte 0. The
+// other sector is left untouched on flash so a power cut during the erase /
+// write window leaves the old (still-valid) entry as a fallback boot
+// pointer, instead of blanking both sectors and forcing the bootloader's
+// "no eligible otadata" default (app0).
+function buildNewOtadataSector(existingSectorData, newSeq) {
+  const newData = new Uint8Array(existingSectorData);
+  newData.set(u32ToLeBytes(newSeq), 0);
+  newData.set(u32ToLeBytes(OTA_STATE.NEW), 0x18);
+  newData.set(generateCrc32Le(newSeq), 0x1C);
   return newData;
 }
 
-function assertOtadataSwitch(ota, expectedPartition, expectedSequence) {
-  const expectedSlot = expectedPartition === 'app1' ? ota.slot1 : ota.slot0;
-  if (!expectedSlot.crcValid || expectedSlot.sequence !== expectedSequence || ota.currentBoot !== expectedPartition) {
+function assertOtadataSwitch(ota, expectedApp, expectedSeq) {
+  if (ota.activeSeq !== expectedSeq || ota.activeApp !== expectedApp) {
     throw new Error(
-      `OTA boot selector did not verify after write. Expected ${expectedPartition} seq ${expectedSequence}, ` +
-      `got ${ota.currentBoot} (app0 seq ${ota.slot0.sequence} crc ${ota.slot0.crcValid ? 'ok' : 'bad'}, ` +
-      `app1 seq ${ota.slot1.sequence} crc ${ota.slot1.crcValid ? 'ok' : 'bad'}).`
+      `OTA boot selector did not verify after write. Expected app${expectedApp} via seq ${expectedSeq}, ` +
+      `got app${ota.activeApp} via seq ${ota.activeSeq} ` +
+      `(slot0 seq ${ota.slot0.sequence} crc ${ota.slot0.crcValid ? 'ok' : 'bad'}, ` +
+      `slot1 seq ${ota.slot1.sequence} crc ${ota.slot1.crcValid ? 'ok' : 'bad'}).`
     );
   }
 }
@@ -173,22 +240,44 @@ function parsePartitionTable(data) {
   return partitions;
 }
 
-function matchesPartitionTable(actual, expected) {
-  return actual.length === expected.length &&
-    expected.every((exp, i) =>
-      actual[i].type === exp.type &&
-      actual[i].offset === exp.offset &&
-      actual[i].size === exp.size
-    );
+// Hard floor at 0x9000: 0x0..0x8000 holds the 2nd-stage bootloader and
+// 0x8000..0x9000 holds the PT itself. A PT entry below that, or one that
+// wraps uint32, or one past the 16 MB flash end, would let a write land in
+// the bootloader region or overlap the live PT. Reject before any erase.
+function extractLayout(partitions) {
+  let otadata = null, app0 = null, app1 = null;
+  for (const p of partitions) {
+    if (p.type === 'data-ota') otadata = p;
+    else if (p.type === 'app-ota_0') app0 = p;
+    else if (p.type === 'app-ota_1') app1 = p;
+  }
+  if (!otadata) throw new Error('Partition table has no otadata partition.');
+  if (!app0 || !app1) throw new Error('Partition table is missing an OTA app slot.');
+  if (otadata.size < OTADATA_BYTES) {
+    throw new Error(`Partition table otadata is too small: ${otadata.size} bytes (need ${OTADATA_BYTES}).`);
+  }
+  for (const p of [otadata, app0, app1]) {
+    // end < off catches uint32 wrap on a hostile size = 0xFFFFFFFF.
+    const end = (p.offset + p.size) >>> 0;
+    if (p.offset < 0x9000 || end < p.offset || end > 0x1000000) {
+      throw new Error(`Partition ${p.type} range 0x${p.offset.toString(16)}..0x${end.toString(16)} is outside the safe flash window.`);
+    }
+  }
+  return {
+    otadataOffset: otadata.offset,
+    appSlots: [
+      { offset: app0.offset, size: app0.size },
+      { offset: app1.offset, size: app1.size },
+    ],
+  };
 }
 
 // --- Main Flasher Class ---
 
 export class CrossPointFlasher {
-  constructor(model = 'x4', port = null) {
+  constructor(port = null) {
     this.espLoader = null;
-    this.model = model;
-    this.layout = getLayout(model);
+    this.layout = null;
     this.port = port;
   }
 
@@ -220,26 +309,12 @@ export class CrossPointFlasher {
     this.espLoader = null;
   }
 
-  async validatePartitionTable() {
-    const data = await this.espLoader.readFlash(0x8000, 0x2000);
-    const partitions = parsePartitionTable(data);
-    const expected = getExpectedPartitionTables(this.model);
-    const matched = expected.find(t => matchesPartitionTable(partitions, t));
-
-    if (!matched) {
-      // If the device's actual layout matches the other model, point the user at it.
-      if (this.model === 'x4' && matchesPartitionTable(partitions, X3_PARTITION_TABLE)) {
-        throw new Error('This device looks like an X3, not an X4. Go back and select Xteink X3.');
-      }
-      throw new Error(`Unexpected partition layout for ${this.model.toUpperCase()}. Make sure you selected the correct device model.`);
-    }
-
-    // If X3 device has X4 partition layout, use X4 layout
-    if (matchesPartitionTable(partitions, X3_PARTITION_TABLE)) {
-      this.layout = X3_LAYOUT;
-    } else {
-      this.layout = X4_LAYOUT;
-    }
+  async readLayout() {
+    // PT lives in one 4 KB sector at 0x8000. parsePartitionTable stops on the
+    // first all-0xFF chunk, well before the sector boundary, so one sector
+    // is the whole table.
+    const data = await this.espLoader.readFlash(0x8000, 0x1000);
+    this.layout = extractLayout(parsePartitionTable(data));
   }
 
   // --- OTA Flash (firmware to backup partition) ---
@@ -255,28 +330,33 @@ export class CrossPointFlasher {
     ];
     const step = (idx, status) => { if (onStepChange) onStepChange(idx, steps[idx], status); };
 
+    // Image-shape gate before connect. A bad .bin (HTML error page, partial
+    // download, wrong-shape file) fails here without touching flash.
+    await validateFirmwareImage(firmwareData);
+
     step(0, 'running');
     await this.connect();
     step(0, 'done');
 
     step(1, 'running');
-    await this.validatePartitionTable();
+    await this.readLayout();
     step(1, 'done');
 
     step(2, 'running');
-    const otaRaw = await this.espLoader.readFlash(0xE000, 0x2000, (_, p, t) => {
+    const otaRaw = await this.espLoader.readFlash(this.layout.otadataOffset, OTADATA_BYTES, (_, p, t) => {
       if (onProgress) onProgress('Read OTA data', p, t);
     });
     const ota = parseOtadata(otaRaw);
     step(2, 'done');
 
     step(3, 'running');
-    const targetOffset = ota.backupPartition === 'app0' ? this.layout.app0Offset : this.layout.app1Offset;
-    if (firmwareData.length > this.layout.appSize) throw new Error(`Firmware too large: ${firmwareData.length} bytes (max ${this.layout.appSize})`);
-    if (firmwareData.length < 0xF0000) throw new Error('Firmware seems too small. Are you sure this is the right file?');
+    const destSlot = this.layout.appSlots[ota.inactiveApp];
+    if (firmwareData.length > destSlot.size) {
+      throw new Error(`Firmware too large: ${firmwareData.length} bytes won't fit in app${ota.inactiveApp} (${destSlot.size} bytes).`);
+    }
 
     await this.espLoader.writeFlash({
-      fileArray: [{ data: this.espLoader.ui8ToBstr(firmwareData), address: targetOffset }],
+      fileArray: [{ data: this.espLoader.ui8ToBstr(firmwareData), address: destSlot.offset }],
       flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep',
       eraseAll: false, compress: true,
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Flash firmware', written, total); },
@@ -284,22 +364,26 @@ export class CrossPointFlasher {
     step(3, 'done');
 
     step(4, 'running');
-    const newOtadata = buildNewOtadata(otaRaw, ota.backupPartition, ota.nextSequence);
+    const sectorStart = ota.targetSector * OTA_SECTOR_BYTES;
+    const existingSector = otaRaw.subarray(sectorStart, sectorStart + OTA_SECTOR_BYTES);
+    const newSector = buildNewOtadataSector(existingSector, ota.newSeq);
     await this.espLoader.writeFlash({
-      fileArray: [{ data: this.espLoader.ui8ToBstr(newOtadata), address: 0xE000 }],
+      fileArray: [{ data: this.espLoader.ui8ToBstr(newSector), address: this.layout.otadataOffset + sectorStart }],
       flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep',
       eraseAll: false, compress: true,
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Update boot partition', written, total); },
     });
-    const verifyOtadata = parseOtadata(await this.espLoader.readFlash(0xE000, 0x2000));
-    assertOtadataSwitch(verifyOtadata, ota.backupPartition, ota.nextSequence);
+    const verifyOtadata = parseOtadata(
+      await this.espLoader.readFlash(this.layout.otadataOffset, OTADATA_BYTES)
+    );
+    assertOtadataSwitch(verifyOtadata, ota.inactiveApp, ota.newSeq);
     step(4, 'done');
 
     step(5, 'running');
     await this.disconnect(skipReset);
     step(5, 'done');
 
-    return { partition: ota.backupPartition, success: true };
+    return { partition: ota.inactiveApp === 0 ? 'app0' : 'app1', success: true };
   }
 
   // --- Full Flash Save ---

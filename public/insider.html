@@ -499,7 +499,7 @@
         states[0] = 'done';
         renderSteps(steps, states);
 
-        const flasher = new CrossPointFlasher(deviceModel, serialPort);
+        const flasher = new CrossPointFlasher(serialPort);
         await flasher.flashFirmware(firmware, {
           skipReset,
           onStepChange: (idx, name, status) => {
@@ -849,7 +849,7 @@
         states[0] = 'done';
         renderCfSteps(states);
 
-        const flasher = new CrossPointFlasher(deviceModel, serialPort);
+        const flasher = new CrossPointFlasher(serialPort);
         await flasher.flashFirmware(firmware, {
           skipReset: cfSkipReset,
           onStepChange: (idx, name, status) => { states[idx + 1] = status; renderCfSteps(states); },
