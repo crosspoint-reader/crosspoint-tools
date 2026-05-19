@@ -1038,7 +1038,7 @@
           <div class="text-sm font-semibold text-stone-700">After flashing</div>
           <!-- Default: hard reset happened on the serial side, user just needs to finish the power cycle -->
           <div id="restart-note-default">
-            <p class="mt-1 text-sm/6 text-stone-500">Press the <strong class="text-stone-600">Reset</strong> button, then press and hold the power button for 3 seconds.</p>
+            <p class="mt-1 text-sm/6 text-stone-500">Press the <strong class="text-stone-600">Reset</strong> button, then press and hold the power button for 3-5 seconds.</p>
           </div>
           <!-- X3 + Crosspoint/beta/custom: no serial reset, device must be power-cycled by unplugging USB -->
           <div id="restart-note-x3-unplug" class="hidden">
@@ -1436,8 +1436,9 @@
       setRunning(true);
       progressCard.classList.remove('hidden');
       document.getElementById('restart-card').classList.remove('hidden');
-      document.getElementById('restart-note-default').classList.toggle('hidden', skipReset);
-      document.getElementById('restart-note-x3-unplug').classList.toggle('hidden', !skipReset);
+      const showUnplug = skipReset && deviceModel !== 'x4';
+      document.getElementById('restart-note-default').classList.toggle('hidden', showUnplug);
+      document.getElementById('restart-note-x3-unplug').classList.toggle('hidden', !showUnplug);
       progressStatus.innerHTML = '';
       progressCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
