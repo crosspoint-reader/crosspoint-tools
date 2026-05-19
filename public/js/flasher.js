@@ -114,36 +114,66 @@ function parseOtaPartitionSlot(data, offset) {
   return { sequence, state: stateVal, crcValid: isEqualBytes(crcBytes, expectedCrc) };
 }
 
+// IDF OTA model: active app slot = (active_seq - 1) % NUM_OTA_PARTITIONS.
+// The otadata sector that holds the active entry has no fixed relation to
+// the app slot it boots; the new entry goes into the OTHER sector. Pairing
+// sector index with app label drifts out of sync once otadata leaves
+// canonical state (interrupted OTA, a prior write that used the wrong
+// mapping) and silently writes firmware into the slot the bootloader is
+// about to skip.
 function parseOtadata(data) {
   const slot0 = parseOtaPartitionSlot(data, 0);
   const slot1 = parseOtaPartitionSlot(data, 0x1000);
-  const candidates = [];
-  if (!INVALID_STATES.has(slot0.state) && slot0.crcValid) candidates.push({ label: 'app0', ...slot0 });
-  if (!INVALID_STATES.has(slot1.state) && slot1.crcValid) candidates.push({ label: 'app1', ...slot1 });
-  candidates.sort((a, b) => b.sequence - a.sequence);
 
-  const currentBoot = candidates[0]?.label || 'app0';
-  const backupPartition = currentBoot === 'app0' ? 'app1' : 'app0';
-  const nextSequence = (candidates[0]?.sequence || 0) + 1;
-  return { slot0, slot1, currentBoot, backupPartition, nextSequence };
+  const eligible = [];
+  if (slot0.sequence !== 0xFFFFFFFF && slot0.crcValid && !INVALID_STATES.has(slot0.state)) {
+    eligible.push({ sector: 0, seq: slot0.sequence });
+  }
+  if (slot1.sequence !== 0xFFFFFFFF && slot1.crcValid && !INVALID_STATES.has(slot1.state)) {
+    eligible.push({ sector: 1, seq: slot1.sequence });
+  }
+  eligible.sort((a, b) => b.seq - a.seq);
+
+  let activeSector, activeSeq, activeApp;
+  if (eligible.length === 0) {
+    activeSector = -1;
+    activeSeq = 0;
+    activeApp = 0;
+  } else {
+    activeSector = eligible[0].sector;
+    activeSeq = eligible[0].seq;
+    activeApp = (activeSeq - 1) % 2;
+  }
+  const inactiveApp = 1 - activeApp;
+  // For NUM_OTA_PARTITIONS == 2, active_seq + 1 always lands on inactiveApp;
+  // a >2 layout would need a scan-forward loop here.
+  const newSeq = activeSeq + 1;
+  const targetSector = activeSector < 0 ? 0 : (1 - activeSector);
+
+  return {
+    slot0, slot1,
+    activeApp, inactiveApp,
+    activeSeq, newSeq,
+    targetSector,
+  };
 }
 
-function buildNewOtadata(existingData, backupPartition, nextSequence) {
+function buildNewOtadata(existingData, targetSector, newSeq) {
   const newData = new Uint8Array(existingData);
-  const offset = backupPartition === 'app1' ? 0x1000 : 0;
-  newData.set(u32ToLeBytes(nextSequence), offset);
+  const offset = targetSector === 1 ? 0x1000 : 0;
+  newData.set(u32ToLeBytes(newSeq), offset);
   newData.set(u32ToLeBytes(OTA_STATE.NEW), offset + 0x18);
-  newData.set(generateCrc32Le(nextSequence), offset + 0x1C);
+  newData.set(generateCrc32Le(newSeq), offset + 0x1C);
   return newData;
 }
 
-function assertOtadataSwitch(ota, expectedPartition, expectedSequence) {
-  const expectedSlot = expectedPartition === 'app1' ? ota.slot1 : ota.slot0;
-  if (!expectedSlot.crcValid || expectedSlot.sequence !== expectedSequence || ota.currentBoot !== expectedPartition) {
+function assertOtadataSwitch(ota, expectedApp, expectedSeq) {
+  if (ota.activeSeq !== expectedSeq || ota.activeApp !== expectedApp) {
     throw new Error(
-      `OTA boot selector did not verify after write. Expected ${expectedPartition} seq ${expectedSequence}, ` +
-      `got ${ota.currentBoot} (app0 seq ${ota.slot0.sequence} crc ${ota.slot0.crcValid ? 'ok' : 'bad'}, ` +
-      `app1 seq ${ota.slot1.sequence} crc ${ota.slot1.crcValid ? 'ok' : 'bad'}).`
+      `OTA boot selector did not verify after write. Expected app${expectedApp} via seq ${expectedSeq}, ` +
+      `got app${ota.activeApp} via seq ${ota.activeSeq} ` +
+      `(slot0 seq ${ota.slot0.sequence} crc ${ota.slot0.crcValid ? 'ok' : 'bad'}, ` +
+      `slot1 seq ${ota.slot1.sequence} crc ${ota.slot1.crcValid ? 'ok' : 'bad'}).`
     );
   }
 }
@@ -271,7 +301,7 @@ export class CrossPointFlasher {
     step(2, 'done');
 
     step(3, 'running');
-    const targetOffset = ota.backupPartition === 'app0' ? this.layout.app0Offset : this.layout.app1Offset;
+    const targetOffset = ota.inactiveApp === 0 ? this.layout.app0Offset : this.layout.app1Offset;
     if (firmwareData.length > this.layout.appSize) throw new Error(`Firmware too large: ${firmwareData.length} bytes (max ${this.layout.appSize})`);
     if (firmwareData.length < 0xF0000) throw new Error('Firmware seems too small. Are you sure this is the right file?');
 
@@ -284,7 +314,7 @@ export class CrossPointFlasher {
     step(3, 'done');
 
     step(4, 'running');
-    const newOtadata = buildNewOtadata(otaRaw, ota.backupPartition, ota.nextSequence);
+    const newOtadata = buildNewOtadata(otaRaw, ota.targetSector, ota.newSeq);
     await this.espLoader.writeFlash({
       fileArray: [{ data: this.espLoader.ui8ToBstr(newOtadata), address: 0xE000 }],
       flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep',
@@ -292,14 +322,14 @@ export class CrossPointFlasher {
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Update boot partition', written, total); },
     });
     const verifyOtadata = parseOtadata(await this.espLoader.readFlash(0xE000, 0x2000));
-    assertOtadataSwitch(verifyOtadata, ota.backupPartition, ota.nextSequence);
+    assertOtadataSwitch(verifyOtadata, ota.inactiveApp, ota.newSeq);
     step(4, 'done');
 
     step(5, 'running');
     await this.disconnect(skipReset);
     step(5, 'done');
 
-    return { partition: ota.backupPartition, success: true };
+    return { partition: ota.inactiveApp === 0 ? 'app0' : 'app1', success: true };
   }
 
   // --- Full Flash Save ---
