@@ -1444,7 +1444,7 @@
       try {
         if (action === 'save-full') {
           progressTitle.textContent = 'Saving Full Flash...';
-          const flasher = new CrossPointFlasher(deviceModel, serialPort);
+          const flasher = new CrossPointFlasher(serialPort);
           const steps = ['Connect to device', 'Read flash (this takes ~25 min)', 'Disconnect'];
           const states = steps.map(() => 'pending');
           renderSteps(steps, states);
@@ -1463,7 +1463,7 @@
           if (!fullFlashFile) throw new Error('No file selected');
           progressTitle.textContent = 'Writing Full Flash...';
           const data = new Uint8Array(await fullFlashFile.arrayBuffer());
-          const flasher = new CrossPointFlasher(deviceModel, serialPort);
+          const flasher = new CrossPointFlasher(serialPort);
           const steps = ['Connect to device', 'Write flash', 'Reset device'];
           const states = steps.map(() => 'pending');
           renderSteps(steps, states);
@@ -1518,7 +1518,7 @@
 
           progressStatus.innerHTML = '';
 
-          const flasher = new CrossPointFlasher(deviceModel, serialPort);
+          const flasher = new CrossPointFlasher(serialPort);
           const steps = [
             'Connect to device',
             'Validate partition table',
