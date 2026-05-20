@@ -110,12 +110,16 @@ echo "=== Writing per-arch macOS update manifests ==="
 # binaries (the only ones still hitting `latest.json`) are all macOS — and
 # Windows users on 0.1.8+ should not fall through to this file.
 
-MAC_SIG=""
-[[ -f "${TAR_FILE}.sig" ]] && MAC_SIG=$(cat "${TAR_FILE}.sig")
-
-if [[ -z "$MAC_SIG" ]]; then
+if [[ ! -f "${TAR_FILE}.sig" ]]; then
   echo "No macOS signature; manifests not written." >&2
 else
+  # Read sig and changelog through jq directly from files / piped input so
+  # we never inject a stray trailing newline. A here-string (<<<) appends
+  # one, and the Tauri updater's base64 decoder then chokes on it
+  # ("Invalid symbol 10, offset N" — symbol 10 is LF).
+  MAC_SIG_JSON=$(jq -Rs . < "${TAR_FILE}.sig")
+  NOTES_JSON=$(printf '%s' "$CHANGELOG_NOTES" | jq -Rs .)
+
   PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   TAR_URL="https://unlocker-releases.crosspointreader.com/v${VERSION}/XteinkUnlocker_${VERSION}_darwin-universal.app.tar.gz"
 
@@ -126,11 +130,11 @@ else
     cat > "$OUT" <<JSON
 {
   "version": "${VERSION}",
-  "notes": $(jq -Rs . <<<"$CHANGELOG_NOTES"),
+  "notes": ${NOTES_JSON},
   "pub_date": "${PUB_DATE}",
   "platforms": {
     "darwin-${ARCH}": {
-      "signature": $(jq -Rs . <<<"$MAC_SIG"),
+      "signature": ${MAC_SIG_JSON},
       "url": "${TAR_URL}"
     }
   }
@@ -144,15 +148,15 @@ JSON
   cat > "$LEGACY" <<JSON
 {
   "version": "${VERSION}",
-  "notes": $(jq -Rs . <<<"$CHANGELOG_NOTES"),
+  "notes": ${NOTES_JSON},
   "pub_date": "${PUB_DATE}",
   "platforms": {
     "darwin-aarch64": {
-      "signature": $(jq -Rs . <<<"$MAC_SIG"),
+      "signature": ${MAC_SIG_JSON},
       "url": "${TAR_URL}"
     },
     "darwin-x86_64": {
-      "signature": $(jq -Rs . <<<"$MAC_SIG"),
+      "signature": ${MAC_SIG_JSON},
       "url": "${TAR_URL}"
     }
   }
