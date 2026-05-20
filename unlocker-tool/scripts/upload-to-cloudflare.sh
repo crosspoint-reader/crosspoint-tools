@@ -119,6 +119,8 @@ else
   PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   TAR_URL="https://unlocker-releases.crosspointreader.com/v${VERSION}/XteinkUnlocker_${VERSION}_darwin-universal.app.tar.gz"
 
+  mkdir -p target/release/bundle
+
   for ARCH in aarch64 x86_64; do
     OUT="target/release/bundle/latest-darwin-${ARCH}.json"
     cat > "$OUT" <<JSON
