@@ -65,7 +65,7 @@ const HIDDEN_RELEASES: Record<string, Model[]> = {
 };
 
 const FIRMWARE_PATCHES_URL =
-  "https://github.com/SoFriendly/xteink-unlocker/tree/main/firmware-patches";
+  "https://github.com/crosspoint-reader/crosspoint-tools/tree/master/unlocker-tool/firmware-patches";
 
 export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
