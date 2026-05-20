@@ -21,8 +21,8 @@ fi
 BUMP_TYPE=$1
 
 CURRENT_BRANCH=$(git branch --show-current)
-if [[ "$CURRENT_BRANCH" != "main" ]]; then
-    echo "warning: on branch '$CURRENT_BRANCH', not 'main'"
+if [[ "$CURRENT_BRANCH" != "master" ]]; then
+    echo "warning: on branch '$CURRENT_BRANCH', not 'master'"
     read -p "Continue anyway? (y/n) " -n 1 -r
     echo
     [[ $REPLY =~ ^[Yy]$ ]] || exit 1
