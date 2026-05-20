@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Debug - Crosspoint Tools</title>
+  <title>Debug - CrossPoint Tools</title>
   <link rel="icon" type="image/png" href="/favicon.png">
   <link href="https://rsms.me/inter/inter.css" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -115,9 +115,9 @@
         const { partitions, matchedLayout } = await flasher.readPartitionTable();
 
         const layoutMeta = {
-          X4: { name: 'Crosspoint', table: X4_PARTITION_TABLE },
+          X4: { name: 'CrossPoint', table: X4_PARTITION_TABLE },
           X3: { name: 'Stock X3', table: X3_PARTITION_TABLE },
-          KO: { name: 'Crosspoint KO fork', table: CROSSPOINT_KO_PARTITION_TABLE },
+          KO: { name: 'CrossPoint KO fork', table: CROSSPOINT_KO_PARTITION_TABLE },
         };
         const meta = matchedLayout ? layoutMeta[matchedLayout] : null;
         const expectedTable = meta ? meta.table : X4_PARTITION_TABLE;
@@ -125,13 +125,13 @@
 
         let badge;
         if (matchedLayout === 'X4') {
-          badge = `<span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700"><span class="size-1.5 rounded-full bg-brand-500"></span>Crosspoint layout — ready to flash</span>`;
+          badge = `<span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700"><span class="size-1.5 rounded-full bg-brand-500"></span>CrossPoint layout — ready to flash</span>`;
         } else if (matchedLayout === 'KO') {
-          badge = `<span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700"><span class="size-1.5 rounded-full bg-brand-500"></span>Crosspoint KO fork layout — ready to flash</span>`;
+          badge = `<span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700"><span class="size-1.5 rounded-full bg-brand-500"></span>CrossPoint KO fork layout — ready to flash</span>`;
         } else if (matchedLayout === 'X3') {
-          badge = `<span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700"><span class="size-1.5 rounded-full bg-amber-500"></span>Stock X3 layout — needs repartition before flashing Crosspoint</span>`;
+          badge = `<span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700"><span class="size-1.5 rounded-full bg-amber-500"></span>Stock X3 layout — needs repartition before flashing CrossPoint</span>`;
         } else {
-          badge = `<span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700"><span class="size-1.5 rounded-full bg-red-500"></span>Unknown layout (no match for Stock X3, Crosspoint, or KO fork)</span>`;
+          badge = `<span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700"><span class="size-1.5 rounded-full bg-red-500"></span>Unknown layout (no match for Stock X3, CrossPoint, or KO fork)</span>`;
         }
 
         status.textContent = '';

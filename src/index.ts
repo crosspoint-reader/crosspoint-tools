@@ -319,7 +319,7 @@ async function handleBuildSummary(
       },
       {
         role: 'user',
-        content: `Here are the pull requests and commits in the latest nightly build of Crosspoint, an open-source firmware for Xteink e-readers:\n\n${changesText}\n\nSummarize the most important user-facing changes.`,
+        content: `Here are the pull requests and commits in the latest nightly build of CrossPoint, an open-source firmware for Xteink e-readers:\n\n${changesText}\n\nSummarize the most important user-facing changes.`,
       },
     ],
     max_tokens: 200,
@@ -1647,7 +1647,7 @@ async function handleFontBuildResultDownload(
 const BANNER_KEY = 'site-banner';
 const DEFAULT_BANNER = {
   enabled: true,
-  text: 'New: Crosspoint beta released with support for remote font downloads & SD storage. Update via firmware flasher https://crosspoint.tools/#flash-tools',
+  text: 'New: CrossPoint beta released with support for remote font downloads & SD storage. Update via firmware flasher https://crosspoint.tools/#flash-tools',
 };
 
 async function handleBannerGet(env: Env, headers: Record<string, string>): Promise<Response> {
