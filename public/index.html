@@ -526,21 +526,20 @@
       <symbol id="icon-battery-1" viewBox="0 0 17 12"><g fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="0" width="13" height="1"/><rect x="1" y="11" width="13" height="1"/><rect x="0" y="1" width="1" height="10"/><rect x="14" y="1" width="1" height="10"/><rect x="15" y="3" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="16" y="4" width="1" height="4"/><rect x="2" y="2" width="3" height="8"/></g></symbol>
     </defs>
   </svg>
-  <nav class="sticky top-0 z-50 border-b border-stone-200 bg-white/90 backdrop-blur-sm">
+  <nav class="border-b border-stone-200 bg-white">
     <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
       <a href="/" class="flex items-center gap-2 text-stone-900 no-underline" aria-label="Homepage">
         <img src="/logo.png" alt="" class="size-7 rounded-md">
         <span class="text-base/6 font-medium tracking-tight sm:text-sm/6">CrossPoint Reader</span>
       </a>
       <div class="flex items-center gap-1">
-<a href="/insider" class="rounded-md px-3 py-1.5 text-sm/5 font-medium text-stone-500 no-underline hover:text-stone-700 max-sm:hidden">Insider Builds</a>
-        <a href="/fonts" class="rounded-md px-3 py-1.5 text-sm/5 font-medium text-stone-500 no-underline hover:text-stone-700 max-sm:hidden">Font Builder <span class="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Beta</span></a>
+<a href="/fonts" class="rounded-md px-3 py-1.5 text-sm/5 font-medium text-stone-500 no-underline hover:text-stone-700 max-sm:hidden">Font Builder <span class="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Beta</span></a>
         <a href="#" data-open-download-modal class="rounded-md px-3 py-1.5 text-sm/5 font-medium text-stone-500 no-underline hover:text-stone-700">Download Firmware</a>
         <a href="#unlock-tool" class="rounded-md px-3 py-1.5 text-sm/5 font-medium text-stone-500 no-underline hover:text-stone-700">Unlock Tool</a>
-        <!-- <a href="https://app.royalty.dev/crosspoint-reader/crosspoint-reader" target="_blank" rel="noopener" class="ml-1 inline-flex items-center gap-1.5 rounded-md bg-[#B8953A] py-1.5 pr-3 pl-2 text-sm/5 font-semibold text-white no-underline hover:bg-[#9A7A2E] transition-colors">
+        <a href="https://app.royalty.dev/crosspoint-reader/crosspoint-reader" target="_blank" rel="noopener" class="ml-4 sm:ml-6 inline-flex items-center gap-1.5 rounded-md bg-[#B8953A] py-1.5 pr-3 pl-2 text-sm/5 font-semibold text-white no-underline hover:bg-[#9A7A2E] transition-colors">
           <img src="/crown.svg" alt="" class="size-4 brightness-0 invert">
           Fund CrossPoint
-        </a> -->
+        </a>
       </div>
     </div>
   </nav>
@@ -1189,7 +1188,10 @@
       // Show nightly changelog when Nightly is selected
       const showNightlyChangelog = selectedFw === 'nightly';
       document.getElementById('x3-changelog').classList.toggle('hidden', !showNightlyChangelog);
-      if (showNightlyChangelog && !x3ChangelogLoaded) loadX3Changelog();
+      if (showNightlyChangelog) {
+        if (!x3ChangelogLoaded) loadX3Changelog();
+        loadX3Summary();
+      }
     }
     updateFirmware();
 
@@ -1314,18 +1316,24 @@
         const cleanMsg = msg.charAt(0).toUpperCase() + msg.slice(1);
         return `<li class="flex gap-3 py-2.5 text-sm"><div class="min-w-0 flex-1"><div class="text-stone-800">${escapeHtml(cleanMsg)}</div><div class="mt-0.5 text-xs text-stone-400">${escapeHtml(c.author)}</div></div><span class="shrink-0 pt-0.5 text-xs text-stone-400 tabular-nums">${c.date ? relativeTime(c.date) : ''}</span></li>`;
       }).join('');
+    }
 
-      // Load AI summary
+    async function loadX3Summary() {
+      const show = (text) => {
+        const el = document.getElementById('x3-changelog-summary');
+        el.textContent = text;
+        el.classList.remove('hidden');
+      };
+      const tryFetch = async (url) => {
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.summary || null;
+      };
       try {
-        const res = await fetch('/api/build/summary');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.summary) {
-            const el = document.getElementById('x3-changelog-summary');
-            el.textContent = data.summary;
-            el.classList.remove('hidden');
-          }
-        }
+        let summary = await tryFetch('/api/build/summary');
+        if (!summary) summary = await tryFetch('/api/build/summary?regenerate=1');
+        if (summary) show(summary);
       } catch {}
     }
 
