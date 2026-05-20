@@ -102,7 +102,7 @@ $latest = [PSCustomObject]@{
     }
 }
 
-$latestJsonPath = "$bundleRoot\latest-windows-x86_64.json"
+$latestJsonPath = Join-Path $RepoRoot "$bundleRoot\latest-windows-x86_64.json"
 $json = $latest | ConvertTo-Json -Depth 10
 [System.IO.File]::WriteAllText($latestJsonPath, $json, [System.Text.UTF8Encoding]::new($false))
 
