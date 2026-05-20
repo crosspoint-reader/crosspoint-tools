@@ -2,9 +2,9 @@
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
     "targets": ["appimage", "deb", "rpm"],
-    "resources": [
-      "../../target/x86_64-unknown-linux-gnu/release/unlocker-helper"
-    ],
+    "resources": {
+      "../../target/release/unlocker-helper": "unlocker-helper"
+    },
     "linux": {
       "deb": {
         "depends": [
