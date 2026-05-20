@@ -1,13 +1,14 @@
-name: Build Linux
+name: Build Unlocker (Linux)
 
 # Builds + signs + uploads the Linux x86_64 artifacts (AppImage + .AppImage.sig,
 # deb, rpm) and writes latest-linux-x86_64.json to R2.
 #
-# Trigger: a `vX.Y.Z` tag push (matches scripts/release.sh) or manual dispatch.
+# Trigger: a `vX.Y.Z` tag push (matches unlocker-tool/scripts/release.sh) or manual dispatch.
 #
 # Required repository secrets:
 #   TAURI_SIGNING_PRIVATE_KEY            minisign private key (single-line)
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD   optional, if the key is password-protected
+#   UNLOCKER_TLS_PRIVKEY_PEM             TLS private key baked into the helper
 #   CLOUDFLARE_ACCOUNT_ID
 #   CLOUDFLARE_R2_ACCESS_KEY
 #   CLOUDFLARE_R2_SECRET_KEY
@@ -27,6 +28,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+
+defaults:
+  run:
+    working-directory: unlocker-tool
 
 jobs:
   build:
@@ -71,7 +76,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('unlocker-tool/**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -80,7 +85,7 @@ jobs:
         run: rm -rf target/x86_64-unknown-linux-gnu/release/bundle
 
       - name: Install frontend dependencies
-        working-directory: app
+        working-directory: unlocker-tool/app
         run: npm ci
 
       - name: Materialize bundled TLS private key
@@ -108,10 +113,10 @@ jobs:
         with:
           name: linux-x86_64
           path: |
-            target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
-            target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.sig
-            target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
-            target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
+            unlocker-tool/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+            unlocker-tool/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage.sig
+            unlocker-tool/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+            unlocker-tool/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
 
       - name: Install AWS CLI
         if: startsWith(github.ref, 'refs/tags/v') || inputs.upload
@@ -134,9 +139,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
-            target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
-            target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
+            unlocker-tool/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+            unlocker-tool/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+            unlocker-tool/target/x86_64-unknown-linux-gnu/release/bundle/rpm/*.rpm
           draft: false
           generate_release_notes: true
         env:
