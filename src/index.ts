@@ -14,7 +14,7 @@ export default {
     // Proxy fonts.json for SD card font loading (device manifest)
     if (url.pathname === '/fonts.json') {
       const res = await fetch(
-        'https://github.com/adriancaruana/crosspoint-reader/releases/download/sd-fonts/fonts.json',
+        'https://github.com/crosspoint-reader/crosspoint-fonts/releases/download/sd-fonts-m1-b4/fonts.json',
         { headers: { 'User-Agent': 'CrossPoint-Tools' } }
       );
       return new Response(res.body, {
@@ -1336,6 +1336,15 @@ const FONT_BUILD_LOCK_TTL = 10 * 60;
 const FONT_BUILD_STYLES = ['regular', 'bold', 'italic', 'bolditalic'] as const;
 type FontBuildStyle = typeof FONT_BUILD_STYLES[number];
 
+function isValidFontIntervals(intervals: string): boolean {
+  if (intervals.length < 1 || intervals.length > 200) return false;
+
+  const preset = '[A-Za-z0-9_-]+';
+  const range = '\\(0x[0-9A-Fa-f]+-0x[0-9A-Fa-f]+\\)';
+  const token = `(?:${preset}|${range})`;
+  return new RegExp(`^${token}(?:,${token})*$`).test(intervals);
+}
+
 async function handleFontBuildUpload(
   request: Request,
   env: Env,
@@ -1367,7 +1376,7 @@ async function handleFontBuildUpload(
   }
 
   const intervals = ((formData.get('intervals') as string | null)?.trim() || 'builtin');
-  if (!/^[a-zA-Z0-9_,-]{1,200}$/.test(intervals)) {
+  if (!isValidFontIntervals(intervals)) {
     return json({ error: 'Invalid intervals' }, 400, headers);
   }
 

@@ -50,9 +50,9 @@ Lets a user replace one or more built-in fonts in the firmware:
 
 Converts arbitrary TTF/OTF files into `.cpfont` files for SD-card loading **without recompiling firmware**:
 
-1. The user uploads up to four styles (regular, bold, italic, bold-italic) plus a family name, point sizes, and a Unicode interval preset at `/fonts`
+1. The user uploads up to four styles (regular, bold, italic, bold-italic) plus a family name, point sizes, and either a Unicode interval preset or custom converter ranges at `/fonts`
 2. Worker stores the TTFs in R2 under `font-builds/{buildId}/in/` and dispatches the workflow
-3. Workflow checks out `crosspoint-reader/crosspoint-reader` (currently pinned to the `feature/sd-fonts-v1` branch via the `readerRef` input), installs `freetype-py fonttools brotli`, and runs `lib/EpdFont/scripts/fontconvert_sdcard.py` from the firmware repo **unmodified** — same script the device-side build uses, so output is byte-identical to a host run
+3. Workflow checks out `crosspoint-reader/crosspoint-reader` (default `readerRef` is `master`), installs `freetype-py fonttools brotli`, and runs `lib/EpdFont/scripts/fontconvert_sdcard.py` from the firmware repo **unmodified** — same script the device-side build uses, so output is byte-identical to a host run
 4. Each `.cpfont` is uploaded back to the Worker under `font-builds/{buildId}/out/`
 5. The frontend polls `/api/font-build/status`, streams the script's stderr (glyph counts, kerning pair counts) into the UI, and offers individual or zipped downloads
 
