@@ -228,6 +228,7 @@ pub fn router(cfg: Arc<ServerConfig>) -> Router {
             "/repos/{owner}/{repo}/releases/latest",
             get(github_releases_latest),
         )
+        .route("/repos/{owner}/{repo}/releases", get(github_releases_list))
         .fallback(catch_all)
         .layer(middleware::from_fn(log_request))
         .with_state(cfg)
@@ -453,10 +454,34 @@ async fn github_releases_latest(
         host = ?headers.get(header::HOST),
         user_agent = ?headers.get(header::USER_AGENT),
         %owner, %repo,
-        "device requested update via GitHub API"
+        "device requested update via GitHub API (latest)"
     );
 
     cfg.on_manifest_request.notify_one();
+    Json(build_release(&cfg, &repo))
+}
+
+/// Spoofs `GET /repos/{owner}/{repo}/releases` — returns an array of releases.
+/// The Inx fork of CrossPoint queries this list endpoint (not `/latest`),
+/// iterates the array, and picks an asset. Return a single-element array
+/// with the same release payload `/latest` would return.
+async fn github_releases_list(
+    State(cfg): State<Arc<ServerConfig>>,
+    AxPath((owner, repo)): AxPath<(String, String)>,
+    headers: HeaderMap,
+) -> Json<serde_json::Value> {
+    tracing::info!(
+        host = ?headers.get(header::HOST),
+        user_agent = ?headers.get(header::USER_AGENT),
+        %owner, %repo,
+        "device requested update via GitHub API (list)"
+    );
+
+    cfg.on_manifest_request.notify_one();
+    Json(serde_json::Value::Array(vec![build_release(&cfg, &repo)]))
+}
+
+fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
 
     // Serve the firmware over plain HTTP rather than HTTPS. Two reasons:
     //
@@ -512,11 +537,11 @@ async fn github_releases_latest(
     // as 99.9.9 which is greater than any real version.
     tracing::info!(%download_url, %tag, is_crossink, "serving manifest");
 
-    Json(serde_json::json!({
+    serde_json::json!({
         "tag_name": tag,
         "name": format!("CrossPoint {}", cfg.crosspoint_version),
         "assets": assets,
-    }))
+    })
 }
 
 /// Stub for `POST /api/v1/device/activate` — V5.5.3+ stock firmware POSTs here
