@@ -482,7 +482,8 @@ async fn github_releases_list(
 }
 
 fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
-    // Serve the firmware over plain HTTP rather than HTTPS. Two reasons:
+    // Serve most GitHub-shaped firmware downloads over plain HTTP rather
+    // than HTTPS. Two reasons:
     //
     // 1. On memory-constrained devices (X3 in particular) `esp_https_ota_begin`
     //    fails with `ESP_ERR_NO_MEM` because mbedTLS + the HTTP client + the
@@ -493,11 +494,14 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
     //    bridge100 hotspot, the DNS resolver, and the served bytes. Nothing
     //    can MITM the device on this private network.
     //
-    // Requires `CONFIG_OTA_ALLOW_HTTP=y` in the CrossPoint build's sdkconfig
-    // (default in arduino-esp32). If a future CrossPoint build flips it off,
-    // esp_https_ota will reject the http:// URL and we'd need to revert
-    // this — easy to spot in the helper log: the firmware GET never arrives.
-    let download_url = "http://unlocker.crosspointreader.com/firmware/firmware.bin".to_string();
+    // Requires `CONFIG_OTA_ALLOW_HTTP=y` in the device firmware's sdkconfig
+    // (default in arduino-esp32). INX calls `esp_https_ota_begin()` and does
+    // not carry an sdkconfig override enabling HTTP OTA, so give INX an HTTPS
+    // URL. Our cert is valid for unlocker.crosspointreader.com and that host is
+    // DNS-spoofed to the local helper.
+    let is_inx = repo.eq_ignore_ascii_case("inx");
+    let scheme = if is_inx { "https" } else { "http" };
+    let download_url = format!("{scheme}://unlocker.crosspointreader.com/firmware/firmware.bin");
 
     // `tag_name` stays unprefixed — CrossPoint's `sscanf("%d.%d.%d")` would
     // fail on a leading `v`. CrossInk's parser strips the optional `v`, so
@@ -534,7 +538,7 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
     // Use a very high version so the device always considers it newer.
     // CrossPoint's version check uses sscanf("%d.%d.%d") so this parses
     // as 99.9.9 which is greater than any real version.
-    tracing::info!(%download_url, %tag, is_crossink, "serving manifest");
+    tracing::info!(%download_url, %tag, is_crossink, is_inx, "serving manifest");
 
     serde_json::json!({
         "tag_name": tag,

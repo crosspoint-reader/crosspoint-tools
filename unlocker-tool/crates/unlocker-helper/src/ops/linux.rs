@@ -295,10 +295,19 @@ pub async fn pfctl_add(from_port: u16, to_port: u16) -> Result<()> {
     Ok(())
 }
 
+fn subnet24_for_bridge(bridge_ip: &str) -> Result<String> {
+    let ip: std::net::Ipv4Addr = bridge_ip
+        .parse()
+        .with_context(|| format!("parse bridge IP {bridge_ip}"))?;
+    let octets = ip.octets();
+    Ok(format!("{}.{}.{}.0/24", octets[0], octets[1], octets[2]))
+}
+
 async fn try_iptables_add(bridge_ip: &str, from_port: u16, to_port: u16) -> Result<()> {
     let to = to_port.to_string();
     let from = from_port.to_string();
     let dst = format!("{bridge_ip}:{to}");
+    let subnet = subnet24_for_bridge(bridge_ip)?;
 
     // UDP
     sh(
@@ -308,8 +317,8 @@ async fn try_iptables_add(bridge_ip: &str, from_port: u16, to_port: u16) -> Resu
             "nat",
             "-A",
             "PREROUTING",
-            "-d",
-            bridge_ip,
+            "-s",
+            &subnet,
             "-p",
             "udp",
             "--dport",
@@ -330,8 +339,8 @@ async fn try_iptables_add(bridge_ip: &str, from_port: u16, to_port: u16) -> Resu
             "nat",
             "-A",
             "PREROUTING",
-            "-d",
-            bridge_ip,
+            "-s",
+            &subnet,
             "-p",
             "tcp",
             "--dport",
@@ -348,6 +357,8 @@ async fn try_iptables_add(bridge_ip: &str, from_port: u16, to_port: u16) -> Resu
 }
 
 async fn try_nftables_add(bridge_ip: &str, from_port: u16, to_port: u16) -> Result<()> {
+    let subnet = subnet24_for_bridge(bridge_ip)?;
+
     // Ensure our table and chain exist (idempotent).
     let _ = sh("nft", &["add", "table", "ip", NFT_TABLE]).await;
     let chain_spec = format!(
@@ -356,12 +367,12 @@ async fn try_nftables_add(bridge_ip: &str, from_port: u16, to_port: u16) -> Resu
     let _ = sh("nft", &[&chain_spec]).await;
 
     let udp_rule = format!(
-        "add rule ip {NFT_TABLE} prerouting ip daddr {bridge_ip} udp dport {from_port} dnat to {bridge_ip}:{to_port}"
+        "add rule ip {NFT_TABLE} prerouting ip saddr {subnet} udp dport {from_port} dnat to {bridge_ip}:{to_port}"
     );
     sh("nft", &[&udp_rule]).await?;
 
     let tcp_rule = format!(
-        "add rule ip {NFT_TABLE} prerouting ip daddr {bridge_ip} tcp dport {from_port} dnat to {bridge_ip}:{to_port}"
+        "add rule ip {NFT_TABLE} prerouting ip saddr {subnet} tcp dport {from_port} dnat to {bridge_ip}:{to_port}"
     );
     sh("nft", &[&tcp_rule]).await?;
 
