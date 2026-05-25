@@ -68,7 +68,34 @@ function channelLabel(channel) {
   if (channel === 'stable') return 'Stable';
   if (channel === 'insider') return 'Insider (nightly)';
   if (channel === 'beta') return 'Beta';
+  if (channel === 'stock-en') return 'Stock · English';
+  if (channel === 'stock-ch') return 'Stock · Chinese';
   return channel;
+}
+
+function stockReleases(model) {
+  return [
+    {
+      id: `stock-en-${model}`,
+      name: 'Stock English Firmware',
+      channel: 'stock-en',
+      version: '',
+      released_at: '',
+      size: 0,
+      firmware_url: `/api/firmware/stock?model=${model}&lang=en`,
+      supported_devices: [model],
+    },
+    {
+      id: `stock-ch-${model}`,
+      name: 'Stock Chinese Firmware',
+      channel: 'stock-ch',
+      version: '',
+      released_at: '',
+      size: 0,
+      firmware_url: `/api/firmware/stock?model=${model}&lang=ch`,
+      supported_devices: [model],
+    },
+  ];
 }
 
 function formatSize(bytes) {
@@ -99,9 +126,12 @@ function renderFirmwareList() {
     return;
   }
 
-  const releases = (state.catalog.releases || []).filter(r =>
-    !r.supported_devices || r.supported_devices.includes(state.model)
-  );
+  const releases = [
+    ...(state.catalog.releases || []).filter(r =>
+      !r.supported_devices || r.supported_devices.includes(state.model)
+    ),
+    ...stockReleases(state.model),
+  ];
   if (releases.length === 0) {
     list.innerHTML = '<p class="text-sm text-stone-400">No firmware available right now.</p>';
     action.classList.add('hidden');
@@ -112,8 +142,8 @@ function renderFirmwareList() {
     state.selectedReleaseId = null;
   }
 
-  // Order: stable, insider, betas (newest first)
-  const order = { stable: 0, insider: 1, beta: 2 };
+  // Order: stable, insider, betas, stock (newest first)
+  const order = { stable: 0, insider: 1, beta: 2, 'stock-en': 3, 'stock-ch': 4 };
   const sorted = [...releases].sort((a, b) => {
     const ca = order[a.channel] ?? 99;
     const cb = order[b.channel] ?? 99;
