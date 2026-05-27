@@ -104,9 +104,17 @@ function formatSize(bytes) {
   return `${mb.toFixed(1)} MB`;
 }
 
+function allReleases() {
+  if (!state.catalog) return [];
+  const base = (state.catalog.releases || []).filter(r =>
+    !r.supported_devices || !state.model || r.supported_devices.includes(state.model)
+  );
+  return state.model ? [...base, ...stockReleases(state.model)] : base;
+}
+
 function selectedRelease() {
-  if (!state.catalog || !state.selectedReleaseId) return null;
-  return state.catalog.releases.find(r => r.id === state.selectedReleaseId) || null;
+  if (!state.selectedReleaseId) return null;
+  return allReleases().find(r => r.id === state.selectedReleaseId) || null;
 }
 
 function renderFirmwareList() {
