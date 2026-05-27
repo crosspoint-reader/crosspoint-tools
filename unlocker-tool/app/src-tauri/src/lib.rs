@@ -337,7 +337,25 @@ async fn install_helper(app: AppHandle) -> Result<(), String> {
         let perms = std::fs::Permissions::from_mode(0o755);
         let _ = std::fs::set_permissions(&helper_path, perms);
 
-        let path_str = shell_quote(&helper_path.to_string_lossy());
+        // AppImages mount their payload via FUSE under /tmp/.mount_XXXX/, owned
+        // by the invoking user with no allow_other — root can't traverse the
+        // mount, so `pkexec /bin/sh -c '<mount>/unlocker-helper'` dies with
+        // "Permission denied". Stage the binary to a path root can read.
+        let launch_path = if std::env::var_os("APPIMAGE").is_some()
+            || helper_path
+                .to_string_lossy()
+                .starts_with("/tmp/.mount_")
+        {
+            let staged = std::path::PathBuf::from("/tmp/unlocker-helper.bin");
+            std::fs::copy(&helper_path, &staged)
+                .map_err(|e| format!("failed to stage helper to {}: {e}", staged.display()))?;
+            let _ = std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o755));
+            staged
+        } else {
+            helper_path.clone()
+        };
+
+        let path_str = shell_quote(&launch_path.to_string_lossy());
 
         // Use pkexec for the GUI Linux admin prompt. The helper is a
         // long-running RPC server, so pkexec starts a short root shell that
