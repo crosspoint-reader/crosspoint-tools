@@ -30,6 +30,11 @@ impl DnsConfig {
                 "api.github.com".to_string(),
                 // Firmware download URL uses our cert's hostname.
                 "unlocker.crosspointreader.com".to_string(),
+                // CPR-vCodex fork hosts its OTA manifest on GitHub Pages.
+                // Its esp_http_client sets `skip_cert_common_name_check=true`,
+                // so the bundled LE cert (CN=unlocker.crosspointreader.com)
+                // still passes TLS as long as the chain validates.
+                "franssjz.github.io".to_string(),
             ],
             answer_with: bridge_ip,
         }

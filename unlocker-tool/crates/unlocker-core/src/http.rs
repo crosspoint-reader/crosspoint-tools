@@ -229,6 +229,14 @@ pub fn router(cfg: Arc<ServerConfig>) -> Router {
             get(github_releases_latest),
         )
         .route("/repos/{owner}/{repo}/releases", get(github_releases_list))
+        // CPR-vCodex fork: manifest lives on GitHub Pages at
+        // franssjz.github.io/cpr-vcodex/firmware/manifest.json. Schema is
+        // custom (FirmwareManifestJsonParser only reads top-level `version`,
+        // `downloadUrl`, `size`), not the GitHub releases shape.
+        .route(
+            "/cpr-vcodex/firmware/manifest.json",
+            get(vcodex_manifest),
+        )
         .fallback(catch_all)
         .layer(middleware::from_fn(log_request))
         .with_state(cfg)
@@ -552,6 +560,33 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
         "name": format!("CrossPoint {}", cfg.crosspoint_version),
         "assets": assets,
     })
+}
+
+/// Spoofs the CPR-vCodex fork's OTA manifest. The fork's
+/// `FirmwareManifestJsonParser` only reads top-level `version`, `downloadUrl`,
+/// and `size`; everything else (name, sha256, source, builds, …) is ignored.
+/// Download uses `esp_http_client`/`HttpDownloader`, not `esp_https_ota`, so
+/// the plain-HTTP firmware URL works without `CONFIG_OTA_ALLOW_HTTP`.
+async fn vcodex_manifest(
+    State(cfg): State<Arc<ServerConfig>>,
+    headers: HeaderMap,
+) -> Json<serde_json::Value> {
+    tracing::info!(
+        host = ?headers.get(header::HOST),
+        user_agent = ?headers.get(header::USER_AGENT),
+        "device requested update via CPR-vCodex manifest"
+    );
+
+    cfg.on_manifest_request.notify_one();
+
+    let download_url = "http://unlocker.crosspointreader.com/firmware/firmware.bin";
+    tracing::info!(%download_url, "serving vcodex manifest");
+
+    Json(serde_json::json!({
+        "version": "99.9.9",
+        "downloadUrl": download_url,
+        "size": cfg.firmware_size,
+    }))
 }
 
 /// Stub for `POST /api/v1/device/activate` — V5.5.3+ stock firmware POSTs here
