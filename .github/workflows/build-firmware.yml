@@ -2,6 +2,11 @@ name: Build CrossPoint Firmware
 
 on:
   workflow_dispatch:
+    inputs:
+      webhookBaseUrl:
+        description: 'Base URL for webhook callbacks'
+        required: false
+        default: 'https://crosspointreader.com'
   schedule:
     - cron: '0 6 * * *'
 
@@ -9,6 +14,13 @@ jobs:
   check-and-build:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve webhook base URL
+        env:
+          WEBHOOK_BASE_URL_RAW: ${{ inputs.webhookBaseUrl }}
+        run: |
+          BASE="${WEBHOOK_BASE_URL_RAW:-https://crosspointreader.com}"
+          echo "WEBHOOK_BASE_URL=${BASE%/}" >> "$GITHUB_ENV"
+
       - name: Check for new commits
         id: check
         run: |
@@ -41,7 +53,7 @@ jobs:
           fi
 
           # Check if we already built this commit successfully
-          BUILD_JSON=$(curl -s "https://crosspointreader.com/api/build/latest")
+          BUILD_JSON=$(curl -s "${WEBHOOK_BASE_URL}/api/build/latest")
           CURRENT=$(echo "$BUILD_JSON" | jq -r '.commit // empty')
           CURRENT_STATUS=$(echo "$BUILD_JSON" | jq -r '.status // empty')
           if [ "$CURRENT" = "$LATEST" ] && [ "$CURRENT_STATUS" = "success" ]; then
@@ -65,7 +77,7 @@ jobs:
             --arg commitShort "$COMMIT_SHORT" \
             --arg commitMessage "$COMMIT_MSG" \
             '{status:$status, commit:$commit, commitShort:$commitShort, commitMessage:$commitMessage}' \
-          | curl -s -X POST "https://crosspointreader.com/api/build/status" \
+          | curl -s -X POST "${WEBHOOK_BASE_URL}/api/build/status" \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
               -H "Content-Type: application/json" \
               -d @-
@@ -127,7 +139,7 @@ jobs:
       - name: Upload firmware to R2
         if: steps.check.outputs.skip == 'false'
         run: |
-          curl -s -X PUT "https://crosspointreader.com/api/build/upload" \
+          curl -s -X PUT "${WEBHOOK_BASE_URL}/api/build/upload" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/octet-stream" \
             -H "X-Build-Commit: ${{ steps.check.outputs.commit }}" \
@@ -155,7 +167,7 @@ jobs:
             --argjson firmwareSize "$SIZE" \
             --argjson changelog "$CHANGELOG" \
             '{status:$status, commit:$commit, commitShort:$commitShort, commitMessage:$commitMessage, version:$version, firmwareSize:$firmwareSize, changelog:$changelog, error:null, buildLog:null}' \
-          | curl -s -X POST "https://crosspointreader.com/api/build/status" \
+          | curl -s -X POST "${WEBHOOK_BASE_URL}/api/build/status" \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
               -H "Content-Type: application/json" \
               -d @-
@@ -190,7 +202,7 @@ jobs:
               fi
 
               # Check if we already cached this version
-              CACHED=$(curl -s "https://crosspointreader.com/api/firmware/stock/info?model=$model&lang=$lang" | jq -r '.version // empty')
+              CACHED=$(curl -s "${WEBHOOK_BASE_URL}/api/firmware/stock/info?model=$model&lang=$lang" | jq -r '.version // empty')
               # We don't have a way to check the R2 cached version vs API version easily,
               # so just re-cache every time (idempotent, ~6MB upload)
 
@@ -205,7 +217,7 @@ jobs:
               SIZE=$(stat -c%s "/tmp/stock-${model}-${lang}.bin")
               echo "  Uploading to R2: $model/$lang $VERSION ($SIZE bytes)"
 
-              curl -s -X PUT "https://crosspointreader.com/api/firmware/stock/cache?model=$model&lang=$lang" \
+              curl -s -X PUT "${WEBHOOK_BASE_URL}/api/firmware/stock/cache?model=$model&lang=$lang" \
                 -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
                 -H "Content-Type: application/octet-stream" \
                 -H "X-Firmware-Version: $VERSION" \
@@ -227,7 +239,7 @@ jobs:
             --arg commitShort "$COMMIT_SHORT" \
             --arg error "Build failed — check GitHub Actions logs" \
             '{status:$status, commit:$commit, commitShort:$commitShort, error:$error}' \
-          | curl -s -X POST "https://crosspointreader.com/api/build/status" \
+          | curl -s -X POST "${WEBHOOK_BASE_URL}/api/build/status" \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
               -H "Content-Type: application/json" \
               -d @-

@@ -5,6 +5,10 @@ export interface Env {
   AI: Ai;
   GITHUB_WEBHOOK_SECRET: string;
   GITHUB_TOKEN?: string;
+  WEBHOOK_BASE_URL?: string;
+  ALLOW_INSECURE_DEV_WEBHOOKS?: string;
+  GITHUB_ACTIONS_REPO?: string;
+  GITHUB_ACTIONS_REF?: string;
   REPO_URL: string;
 }
 

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "tunnel": "CLOUDFLARED_PATH=\"${CLOUDFLARED_PATH:-$(command -v cloudflared)}\" wrangler tunnel quick-start http://127.0.0.1:8787",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"
   },

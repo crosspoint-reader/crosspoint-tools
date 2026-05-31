@@ -176,6 +176,45 @@ async function handleApi(
   }
 }
 
+function getWebhookBaseUrl(request: Request, env: Env): string {
+  const raw = (env.WEBHOOK_BASE_URL || new URL(request.url).origin).trim();
+  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+}
+
+function getGitHubActionsRepo(env: Env): string {
+  const repo = (env.GITHUB_ACTIONS_REPO || 'crosspoint-reader/crosspoint-tools').trim();
+  return repo || 'crosspoint-reader/crosspoint-tools';
+}
+
+function getGitHubActionsRef(env: Env): string {
+  const ref = (env.GITHUB_ACTIONS_REF || 'master').trim();
+  return ref || 'master';
+}
+
+function getWorkflowDispatchUrl(env: Env, workflowFile: string): string {
+  return `https://api.github.com/repos/${getGitHubActionsRepo(env)}/actions/workflows/${workflowFile}/dispatches`;
+}
+
+function isAuthorizedWebhookRequest(request: Request, env: Env): boolean {
+  const auth = request.headers.get('Authorization');
+  if (auth === `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+    return true;
+  }
+
+  const allowBypass = /^(1|true|yes)$/i.test((env.ALLOW_INSECURE_DEV_WEBHOOKS || '').trim());
+  if (allowBypass) {
+    console.warn('Allowing webhook request without matching secret because ALLOW_INSECURE_DEV_WEBHOOKS is enabled.');
+    return true;
+  }
+
+  return false;
+}
+
+function getGitHubAuthToken(env: Env): string | null {
+  const token = (env.GITHUB_TOKEN || '').trim();
+  return token ? token : null;
+}
+
 // --- Build Metadata ---
 
 async function handleLatestBuild(
@@ -377,9 +416,13 @@ async function handleManualTrigger(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const gitHubToken = getGitHubAuthToken(env);
+  if (!gitHubToken) {
+    return json({ error: 'Missing GITHUB_TOKEN in local/deployed worker config' }, 500, headers);
   }
 
   // Look up the commit the workflow will actually build, so the caller can
@@ -393,7 +436,7 @@ async function handleManualTrigger(
       {
         headers: {
           'User-Agent': 'crosspoint-tools',
-          Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+          Authorization: `Bearer ${gitHubToken}`,
           Accept: 'application/vnd.github.v3+json',
         },
       }
@@ -409,15 +452,20 @@ async function handleManualTrigger(
 
   // Dispatch the GitHub Actions workflow
   const ghRes = await fetch(
-    'https://api.github.com/repos/crosspoint-reader/crosspoint-tools/actions/workflows/build-firmware.yml/dispatches',
+    getWorkflowDispatchUrl(env, 'build-firmware.yml'),
     {
       method: 'POST',
       headers: {
         'User-Agent': 'crosspoint-tools',
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        Authorization: `Bearer ${gitHubToken}`,
         Accept: 'application/vnd.github.v3+json',
       },
-      body: JSON.stringify({ ref: 'master' }),
+      body: JSON.stringify({
+        ref: getGitHubActionsRef(env),
+        inputs: {
+          webhookBaseUrl: getWebhookBaseUrl(request, env),
+        },
+      }),
     }
   );
 
@@ -441,8 +489,7 @@ async function handleBuildStatus(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -480,8 +527,7 @@ async function handleBuildUpload(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -655,8 +701,7 @@ async function handleStockFirmwareCache(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1100,23 +1145,32 @@ async function handleCustomBuildUpload(
   };
   await env.BUILD_META.put(`custom-build:${buildId}`, JSON.stringify(meta));
 
+  const gitHubToken = getGitHubAuthToken(env);
+  if (!gitHubToken) {
+    await env.BUILD_META.delete('custom-build-lock');
+    await env.BUILD_META.delete(`custom-build:${buildId}`);
+    await env.BUILD_META.delete(`custom-build:user:${uid}`);
+    return json({ error: 'Missing GITHUB_TOKEN in local/deployed worker config' }, 500, headers);
+  }
+
   // Dispatch GitHub Actions workflow
   const ghRes = await fetch(
-    'https://api.github.com/repos/crosspoint-reader/crosspoint-tools/actions/workflows/build-custom-firmware.yml/dispatches',
+    getWorkflowDispatchUrl(env, 'build-custom-firmware.yml'),
     {
       method: 'POST',
       headers: {
         'User-Agent': 'crosspoint-tools',
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        Authorization: `Bearer ${gitHubToken}`,
         Accept: 'application/vnd.github.v3+json',
       },
       body: JSON.stringify({
-        ref: 'master',
+        ref: getGitHubActionsRef(env),
         inputs: {
           buildId,
           fonts: JSON.stringify(Object.keys(replacedFonts)),
           fontLabels: JSON.stringify(fontLabels),
           fontSizes: JSON.stringify(fontSizes),
+          webhookBaseUrl: getWebhookBaseUrl(request, env),
         },
       }),
     }
@@ -1230,8 +1284,7 @@ async function handleCustomBuildFontDownload(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1266,8 +1319,7 @@ async function handleCustomBuildUploadResult(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1292,8 +1344,7 @@ async function handleCustomBuildStatusUpdate(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1459,22 +1510,31 @@ async function handleFontBuildUpload(
   };
   await env.BUILD_META.put(`font-build:${buildId}`, JSON.stringify(meta));
 
+  const gitHubToken = getGitHubAuthToken(env);
+  if (!gitHubToken) {
+    await env.BUILD_META.delete(`font-build-lock:${uid}`);
+    await env.BUILD_META.delete(`font-build:user:${uid}`);
+    await env.BUILD_META.delete(`font-build:${buildId}`);
+    return json({ error: 'Missing GITHUB_TOKEN in local/deployed worker config' }, 500, headers);
+  }
+
   const ghRes = await fetch(
-    'https://api.github.com/repos/crosspoint-reader/crosspoint-tools/actions/workflows/build-fonts.yml/dispatches',
+    getWorkflowDispatchUrl(env, 'build-fonts.yml'),
     {
       method: 'POST',
       headers: {
         'User-Agent': 'crosspoint-tools',
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        Authorization: `Bearer ${gitHubToken}`,
         Accept: 'application/vnd.github.v3+json',
       },
       body: JSON.stringify({
-        ref: 'master',
+        ref: getGitHubActionsRef(env),
         inputs: {
           buildId,
           family,
           sizes: sizes.join(','),
           intervals,
+          webhookBaseUrl: getWebhookBaseUrl(request, env),
         },
       }),
     }
@@ -1482,10 +1542,12 @@ async function handleFontBuildUpload(
 
   if (!ghRes.ok) {
     await env.BUILD_META.delete(`font-build-lock:${uid}`);
+    await env.BUILD_META.delete(`font-build:user:${uid}`);
     await env.BUILD_META.delete(`font-build:${buildId}`);
     const body = await ghRes.text();
     console.error(`Font build dispatch failed: ${ghRes.status} ${body}`);
-    return json({ error: 'Failed to start build' }, 502, headers);
+    const isAuthFailure = ghRes.status === 401 || ghRes.status === 403;
+    return json({ error: isAuthFailure ? 'GitHub workflow dispatch failed: missing or invalid GITHUB_TOKEN' : 'Failed to start build' }, 502, headers);
   }
 
   const response = json({ buildId, styles: uploadedStyles }, 202, headers);
@@ -1548,8 +1610,7 @@ async function handleFontBuildFileDownload(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1588,8 +1649,7 @@ async function handleFontBuildUploadResult(
   if (request.method !== 'PUT') {
     return json({ error: 'Method not allowed' }, 405, headers);
   }
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1620,8 +1680,7 @@ async function handleFontBuildStatusUpdate(
   if (request.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405, headers);
   }
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1715,8 +1774,7 @@ async function handleBannerUpdate(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1796,8 +1854,7 @@ async function handleBetaCreate(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1874,8 +1931,7 @@ async function handleBetaUpdate(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1940,8 +1996,7 @@ async function handleBetaDelete(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 

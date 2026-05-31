@@ -126,7 +126,33 @@ Set these on the `SoFriendly/crosspoint-tools` repo (Settings → Secrets → Ac
 
 ```bash
 npm run dev   # Starts wrangler dev server on localhost:8787
+npm run tunnel   # Exposes localhost:8787 through a temporary public tunnel
 ```
+
+If you want local builds to dispatch GitHub Actions, set `GITHUB_TOKEN` in `.dev.vars` to a token that can trigger workflows on the repo you are targeting. By default that is `crosspoint-reader/crosspoint-tools`, but you can override it with:
+
+- `GITHUB_ACTIONS_REPO=owner/repo`
+- `GITHUB_ACTIONS_REF=branch-or-tag`
+
+Without `GITHUB_TOKEN`, font/custom/manual build triggers will fail before the GitHub Actions step starts.
+
+If Wrangler fails while downloading `cloudflared`, install it yourself and rerun the tunnel command:
+
+```bash
+brew install cloudflared
+npm run tunnel
+```
+
+The `tunnel` script prefers an existing `cloudflared` on your `PATH` via `CLOUDFLARED_PATH`, so Wrangler can skip its own download step.
+
+For end-to-end build testing, the worker now passes the current request origin to GitHub Actions as the webhook callback base URL. In practice that means:
+
+- Use `npm run dev` for local handler testing only.
+- Run `npm run dev` in one terminal and `npm run tunnel` in a second terminal when you need GitHub Actions to call your dev worker back.
+- Open the site through the tunnel URL, not `localhost`, so the worker dispatches GitHub Actions with the tunnel origin.
+- If you want to keep browsing on `localhost` while callbacks go elsewhere, set `WEBHOOK_BASE_URL=https://your-tunnel-or-dev-host` in `.dev.vars`.
+- If you do not know the shared GitHub `WEBHOOK_SECRET`, set `ALLOW_INSECURE_DEV_WEBHOOKS=true` in `.dev.vars` for local-only testing so your dev worker accepts GitHub callbacks without matching the production secret.
+- If you want to use your own fork or sandbox repo for Actions, set `GITHUB_ACTIONS_REPO` and optionally `GITHUB_ACTIONS_REF` in `.dev.vars`, then add the same workflow files and `WEBHOOK_SECRET` secret to that repo.
 
 ## Acknowledgments
 
