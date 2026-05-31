@@ -16,10 +16,6 @@ on:
         description: 'Codepoint interval presets'
         required: false
         default: 'builtin'
-      readerRef:
-        description: 'crosspoint-reader ref to pull fontconvert_sdcard.py from'
-        required: false
-        default: 'master'
 
 concurrency:
   group: font-build-${{ inputs.buildId }}
@@ -36,13 +32,8 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"buildId":"${{ inputs.buildId }}","status":"building"}'
 
-      - name: Checkout crosspoint-reader (script source of truth)
+      - name: Checkout crosspoint-tools
         uses: actions/checkout@v6
-        with:
-          repository: crosspoint-reader/crosspoint-reader
-          ref: ${{ inputs.readerRef }}
-          path: reader
-          submodules: false
 
       - name: Download uploaded TTFs
         id: download
@@ -57,6 +48,18 @@ jobs:
                 "https://crosspointreader.com/api/font-build/files/${{ inputs.buildId }}/$style.ttf"; then
               echo "Downloaded $style ($(stat -c%s "$target") bytes)"
               ARGS+=("--$style" "$target")
+            else
+              rm -f "$target"
+            fi
+          done
+          for style in regular bold italic bolditalic; do
+            target="/tmp/ttfs/fallback-$style.ttf"
+            if curl -sf \
+                -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+                -o "$target" \
+                "https://crosspointreader.com/api/font-build/files/${{ inputs.buildId }}/fallback/$style.ttf"; then
+              echo "Downloaded fallback $style ($(stat -c%s "$target") bytes)"
+              ARGS+=("--fallback-$style" "$target")
             else
               rm -f "$target"
             fi
@@ -79,7 +82,7 @@ jobs:
         run: |
           mkdir -p out
           mapfile -t STYLE_ARGS < /tmp/style_args.txt
-          python reader/lib/EpdFont/scripts/fontconvert_sdcard.py \
+          python scripts/font-builder/fontconvert_sdcard.py \
             "${STYLE_ARGS[@]}" \
             --name "${{ inputs.family }}" \
             --intervals "${{ inputs.intervals }}" \
@@ -119,7 +122,7 @@ jobs:
             -d "{
               \"buildId\": \"${{ inputs.buildId }}\",
               \"status\": \"success\",
-              \"readerRef\": \"${{ inputs.readerRef }}\",
+              \"generatorVersion\": \"${{ github.sha }}\",
               \"log\": $LOG_TAIL
             }"
 

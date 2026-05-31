@@ -62,11 +62,13 @@ export interface FontBuildMetadata {
   status: 'pending' | 'building' | 'success' | 'failed';
   uid: string;
   family: string;
+  fallbackFamily?: string;
   sizes: number[];
   intervals: string;
   styles: string[];                       // styles uploaded, e.g. ["regular","bold"]
+  fallbackStyles?: string[];              // optional fallback family uploads
   outputs?: string[];                     // .cpfont filenames produced
-  readerRef?: string;                     // ref of crosspoint-reader the script ran from
+  generatorVersion?: string;              // revision of the local font generator that ran
   log?: string;                           // tail of stderr (glyph/kern stats)
   error?: string;
   createdAt: string;

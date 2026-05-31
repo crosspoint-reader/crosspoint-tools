@@ -50,13 +50,13 @@ Lets a user replace one or more built-in fonts in the firmware:
 
 Converts arbitrary TTF/OTF files into `.cpfont` files for SD-card loading **without recompiling firmware**:
 
-1. The user uploads up to four styles (regular, bold, italic, bold-italic) plus a family name, point sizes, and either a Unicode interval preset or custom converter ranges at `/fonts`
+1. The user uploads up to four primary styles (regular, bold, italic, bold-italic), an optional fallback family with matching styles, plus a family name, point sizes, and either a Unicode interval preset or custom converter ranges at `/fonts`
 2. Worker stores the TTFs in R2 under `font-builds/{buildId}/in/` and dispatches the workflow
-3. Workflow checks out `crosspoint-reader/crosspoint-reader` (default `readerRef` is `master`), installs `freetype-py fonttools brotli`, and runs `lib/EpdFont/scripts/fontconvert_sdcard.py` from the firmware repo **unmodified** — same script the device-side build uses, so output is byte-identical to a host run
+3. Workflow checks out this repo, installs `freetype-py fonttools brotli`, and runs the vendored SD-card generator at `scripts/font-builder/fontconvert_sdcard.py`
 4. Each `.cpfont` is uploaded back to the Worker under `font-builds/{buildId}/out/`
 5. The frontend polls `/api/font-build/status`, streams the script's stderr (glyph counts, kerning pair counts) into the UI, and offers individual or zipped downloads
 
-The script is deliberately **not** vendored into this repo — the firmware repo owns the conversion logic. To bump the script version, change the `readerRef` workflow input (or the dispatch payload in `handleFontBuildUpload`) to a different ref/tag.
+The current generator started as a snapshot of `crosspoint-reader`'s `lib/EpdFont/scripts/fontconvert_sdcard.py`, but it now lives in this repo so the website can evolve SD-card-specific features like multi-family fallback handling independently.
 
 Built `.cpfont` files install on the device by copying to the SD card under `/fonts/YourFont/` (or `/.fonts/YourFont/` for a hidden folder).
 
@@ -132,7 +132,7 @@ npm run dev   # Starts wrangler dev server on localhost:8787
 
 The WebSerial flasher is based on [xteink-flasher](https://github.com/crosspoint-reader/xteink-flasher), licensed under the MIT License. The partition table handling, OTA flashing logic, and device model support were adapted from that project.
 
-The SD-card font builder runs `fontconvert_sdcard.py` from the [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader) firmware repo verbatim, so any kerning/ligature behavior is whatever that script implements — this site is just a thin frontend.
+The SD-card font builder uses the vendored generator in `scripts/font-builder/`, originally sourced from the [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader) firmware repo. Kerning, ligature, and interval behavior now live here, so changes to website-only font features can be made locally without waiting on firmware-repo updates.
 
 ## License
 
