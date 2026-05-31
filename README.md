@@ -50,7 +50,7 @@ Lets a user replace one or more built-in fonts in the firmware:
 
 Converts arbitrary TTF/OTF files into `.cpfont` files for SD-card loading **without recompiling firmware**:
 
-1. The user uploads up to four primary styles (regular, bold, italic, bold-italic), an optional fallback family regular style, plus a family name, point sizes, and either a Unicode interval preset or custom converter ranges at `/fonts`
+1. The user uploads up to four primary styles (regular, bold, italic, bold-italic), up to two fallback family regular styles, plus a family name, point sizes, and either a Unicode interval preset or custom converter ranges at `/fonts`
 2. Worker stores the TTFs in R2 under `font-builds/{buildId}/in/` and dispatches the workflow
 3. Workflow checks out this repo, installs `freetype-py fonttools brotli`, and runs the vendored SD-card generator at `scripts/font-builder/fontconvert_sdcard.py`
 4. Each `.cpfont` is uploaded back to the Worker under `font-builds/{buildId}/out/`

@@ -126,31 +126,40 @@ def resolve_intervals(preset_str):
     return merged
 
 
-def resolve_style_coverage(primary_face, fallback_face, intervals):
-    """Resolve intervals against primary coverage, then optional fallback coverage.
+def resolve_style_coverage(primary_face, fallback_faces, intervals):
+    """Resolve intervals against primary coverage, then optional fallback chain.
 
-    Returns (validated_intervals, primary_codepoints, fallback_codepoints).
-    Any codepoint covered by the primary face stays there; the fallback face only
-    fills holes left by the primary font.
+    Returns (validated_intervals, codepoint_sources, source_codepoints).
+    codepoint_sources maps codepoint -> source index (0 = primary, 1+ = fallbacks).
+    Each fallback face only fills holes left by earlier faces in the chain.
     """
     validated_intervals = []
-    primary_codepoints = set()
-    fallback_codepoints = set()
+    codepoint_sources = {}
+    source_codepoints = [set()]
+    source_codepoints.extend(set() for _ in fallback_faces)
 
     for i_start, i_end in intervals:
         run_start = None
         run_end = None
         for code_point in range(i_start, i_end + 1):
+            source_index = None
             if primary_face.get_char_index(code_point) > 0:
-                primary_codepoints.add(code_point)
-            elif fallback_face is not None and fallback_face.get_char_index(code_point) > 0:
-                fallback_codepoints.add(code_point)
+                source_index = 0
             else:
+                for idx, fallback_face in enumerate(fallback_faces, start=1):
+                    if fallback_face is not None and fallback_face.get_char_index(code_point) > 0:
+                        source_index = idx
+                        break
+
+            if source_index is None:
                 if run_start is not None:
                     validated_intervals.append((run_start, run_end))
                     run_start = None
                     run_end = None
                 continue
+
+            source_codepoints[source_index].add(code_point)
+            codepoint_sources[code_point] = source_index
 
             if run_start is None:
                 run_start = code_point
@@ -159,7 +168,7 @@ def resolve_style_coverage(primary_face, fallback_face, intervals):
         if run_start is not None:
             validated_intervals.append((run_start, run_end))
 
-    return validated_intervals, primary_codepoints, fallback_codepoints
+    return validated_intervals, codepoint_sources, source_codepoints
 
 
 GlyphProps = namedtuple("GlyphProps", [
@@ -555,7 +564,7 @@ def extract_ligatures_fonttools(font_path, codepoints):
 
 
 def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=False,
-                         fallback_fontfile=None):
+                         fallback_fontfiles=None):
     """Rasterize all glyphs for one font style. Returns StyleRasterData."""
     import freetype
 
@@ -568,10 +577,12 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # it before set_char_size() would waste work at the default size and risk
     # Invalid_Size_Handle on some fonts.
     face.set_char_size(size << 6, size << 6, 150, 150)
-    fallback_face = None
-    if fallback_fontfile:
+    fallback_faces = []
+    for fallback_fontfile in (fallback_fontfiles or []):
         fallback_face = freetype.Face(fallback_fontfile)
         fallback_face.set_char_size(size << 6, size << 6, 150, 150)
+        fallback_faces.append(fallback_face)
+    source_faces = [face] + fallback_faces
 
     load_flags = freetype.FT_LOAD_RENDER
     if force_autohint:
@@ -588,10 +599,13 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # font fill any holes. That keeps the primary family authoritative while
     # still widening glyph coverage for SD-card fonts.
     print(f"  [{style_label}] Validating intervals against font coverage...", file=sys.stderr)
-    intervals, primary_cps, fallback_cps = resolve_style_coverage(face, fallback_face, intervals)
+    intervals, codepoint_sources, source_codepoints = resolve_style_coverage(face, fallback_faces, intervals)
     total_glyphs = sum(end - start + 1 for start, end in intervals)
     print(f"  [{style_label}] Validated: {len(intervals)} intervals, {total_glyphs} glyphs", file=sys.stderr)
-    print(f"  [{style_label}] Coverage split: {len(primary_cps)} primary, {len(fallback_cps)} fallback", file=sys.stderr)
+    coverage_parts = [f"{len(source_codepoints[0])} primary"]
+    for idx in range(1, len(source_codepoints)):
+        coverage_parts.append(f"{len(source_codepoints[idx])} fallback{idx}")
+    print(f"  [{style_label}] Coverage split: {', '.join(coverage_parts)}", file=sys.stderr)
 
     # Rasterize all glyphs
     total_bitmap_size = 0
@@ -599,9 +613,7 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
 
     for i_start, i_end in intervals:
         for code_point in range(i_start, i_end + 1):
-            source_face = face
-            if code_point in fallback_cps:
-                source_face = fallback_face
+            source_face = source_faces[codepoint_sources.get(code_point, 0)]
             f = load_glyph_for_face(source_face, code_point)
             if f is None:
                 glyph = GlyphProps(0, 0, 0, 0, 0, 0, total_bitmap_size, code_point)
@@ -698,10 +710,11 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     ppem = size * 150.0 / 72.0
 
     kern_map = {}
-    if primary_cps:
-        kern_map.update(extract_kerning_fonttools(fontfile, primary_cps, ppem))
-    if fallback_fontfile and fallback_cps:
-        kern_map.update(extract_kerning_fonttools(fallback_fontfile, fallback_cps, ppem))
+    source_fontfiles = [fontfile]
+    source_fontfiles.extend(fallback_fontfiles or [])
+    for idx, cps in enumerate(source_codepoints):
+        if cps:
+            kern_map.update(extract_kerning_fonttools(source_fontfiles[idx], cps, ppem))
     # SMP codepoints (> U+FFFF) cannot be stored in the uint16 kern codepoint
     # field; drop them before class derivation to avoid a downstream
     # struct.error when packing the binary kern tables.
@@ -721,10 +734,9 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # extract_ligatures_fonttools (see the codepoints_set filter), so every
     # entry returned here is already 16-bit safe.
     ligature_pairs = []
-    if primary_cps:
-        ligature_pairs.extend(extract_ligatures_fonttools(fontfile, primary_cps))
-    if fallback_fontfile and fallback_cps:
-        ligature_pairs.extend(extract_ligatures_fonttools(fallback_fontfile, fallback_cps))
+    for idx, cps in enumerate(source_codepoints):
+        if cps:
+            ligature_pairs.extend(extract_ligatures_fonttools(source_fontfiles[idx], cps))
     ligature_pairs.sort(key=lambda p: p[0])
     if len(ligature_pairs) > 255:
         print(f"  [{style_label}] WARNING: {len(ligature_pairs)} ligature pairs exceeds uint8_t max (255), truncating",
@@ -820,13 +832,15 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
     raster_data = {}  # style_id -> StyleRasterData
     for style_id in sorted(style_fonts.keys()):
         fontfile = style_fonts[style_id]
-        fallback_fontfile = None
+        fallback_fontfiles = []
         if fallback_style_fonts:
-            fallback_fontfile = fallback_style_fonts.get(style_id) or fallback_style_fonts.get(0)
+            if style_id != 0:
+                fallback_fontfiles.extend(fallback_style_fonts.get(style_id, []))
+            fallback_fontfiles.extend(fallback_style_fonts.get(0, []))
         print(f"  Rasterizing style {style_id}...", file=sys.stderr)
         raster_data[style_id] = rasterize_font_style(
             fontfile, size, intervals, style_id=style_id,
-            force_autohint=force_autohint, fallback_fontfile=fallback_fontfile)
+            force_autohint=force_autohint, fallback_fontfiles=fallback_fontfiles or None)
 
     # Pack binary sections for each style
     packed_sections = {}  # style_id -> tuple of section bytearrays
@@ -939,6 +953,8 @@ def main():
                         help="Font file for bold-italic style.")
     parser.add_argument("--fallback-regular", dest="fallback_font_regular",
                         help="Fallback font file for regular style.")
+    parser.add_argument("--fallback2-regular", dest="fallback2_font_regular",
+                        help="Second fallback font file for regular style.")
     parser.add_argument("--fallback-bold", dest="fallback_font_bold",
                         help="Fallback font file for bold style.")
     parser.add_argument("--fallback-italic", dest="fallback_font_italic",
@@ -968,13 +984,15 @@ def main():
 
     fallback_style_fonts = {}
     if args.fallback_font_regular:
-        fallback_style_fonts[0] = args.fallback_font_regular
+        fallback_style_fonts.setdefault(0, []).append(args.fallback_font_regular)
+    if args.fallback2_font_regular:
+        fallback_style_fonts.setdefault(0, []).append(args.fallback2_font_regular)
     if args.fallback_font_bold:
-        fallback_style_fonts[1] = args.fallback_font_bold
+        fallback_style_fonts.setdefault(1, []).append(args.fallback_font_bold)
     if args.fallback_font_italic:
-        fallback_style_fonts[2] = args.fallback_font_italic
+        fallback_style_fonts.setdefault(2, []).append(args.fallback_font_italic)
     if args.fallback_font_bolditalic:
-        fallback_style_fonts[3] = args.fallback_font_bolditalic
+        fallback_style_fonts.setdefault(3, []).append(args.fallback_font_bolditalic)
 
     is_multistyle = len(style_fonts) > 0
     fontfile = args.fontfile

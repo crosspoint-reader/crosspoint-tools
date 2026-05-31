@@ -1410,12 +1410,12 @@ async function collectUploadedFontStyles(
   return { uploadedStyles, validatedFiles };
 }
 
-async function collectUploadedFallbackRegular(formData: FormData): Promise<ArrayBuffer | null> {
-  const entry = formData.get('fallback_regular') as string | File | null;
+async function collectUploadedFallbackRegular(formData: FormData, key: string): Promise<ArrayBuffer | null> {
+  const entry = formData.get(key) as string | File | null;
   if (!entry || typeof entry === 'string') return null;
   const data = await entry.arrayBuffer();
   if (!isValidFontFile(data)) {
-    throw new Error('Invalid font file for fallback_regular');
+    throw new Error(`Invalid font file for ${key}`);
   }
   return data;
 }
@@ -1453,9 +1453,14 @@ async function handleFontBuildUpload(
     return json({ error: 'Invalid or missing family name' }, 400, headers);
   }
 
-  const fallbackFamily = (formData.get('fallbackFamily') as string | null)?.trim() || '';
-  if (fallbackFamily && !FONT_FAMILY_NAME_RE.test(fallbackFamily)) {
-    return json({ error: 'Invalid fallback family name' }, 400, headers);
+  const fallbackFamilyInputs = [
+    { family: (formData.get('fallbackFamily') as string | null)?.trim() || '', fileKey: 'fallback_regular' },
+    { family: (formData.get('fallback2Family') as string | null)?.trim() || '', fileKey: 'fallback2_regular' },
+  ];
+  for (const entry of fallbackFamilyInputs) {
+    if (entry.family && !FONT_FAMILY_NAME_RE.test(entry.family)) {
+      return json({ error: 'Invalid fallback family name' }, 400, headers);
+    }
   }
 
   const sizesRaw = (formData.get('sizes') as string | null)?.trim() || '';
@@ -1471,10 +1476,17 @@ async function handleFontBuildUpload(
 
   let uploadedStyles: FontBuildStyle[] = [];
   let validatedFiles = new Map<FontBuildStyle, ArrayBuffer>();
-  let fallbackRegularData: ArrayBuffer | null = null;
+  let fallbackUploads: Array<{ family: string; data: ArrayBuffer }> = [];
   try {
     ({ uploadedStyles, validatedFiles } = await collectUploadedFontStyles(formData));
-    fallbackRegularData = await collectUploadedFallbackRegular(formData);
+    for (const entry of fallbackFamilyInputs) {
+      const data = await collectUploadedFallbackRegular(formData, entry.fileKey);
+      if (data) {
+        fallbackUploads.push({ family: entry.family, data });
+      } else if (entry.family) {
+        return json({ error: 'A fallback regular style is required when using a fallback family' }, 400, headers);
+      }
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Invalid font upload';
     return json({ error: message }, 400, headers);
@@ -1486,11 +1498,11 @@ async function handleFontBuildUpload(
   if (!uploadedStyles.includes('regular')) {
     return json({ error: 'A regular style is required' }, 400, headers);
   }
-  if (fallbackRegularData && !fallbackFamily) {
-    return json({ error: 'Fallback font uploads require a fallback family name' }, 400, headers);
-  }
-  if (fallbackFamily && !fallbackRegularData) {
-    return json({ error: 'A fallback regular style is required when using a fallback family' }, 400, headers);
+  for (const entry of fallbackFamilyInputs) {
+    const hasUpload = fallbackUploads.some(upload => upload.family === entry.family);
+    if (hasUpload && !entry.family) {
+      return json({ error: 'Fallback font uploads require a fallback family name' }, 400, headers);
+    }
   }
 
   const buildId = generateBuildId();
@@ -1498,8 +1510,8 @@ async function handleFontBuildUpload(
   for (const [style, data] of validatedFiles) {
     await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/in/${style}.ttf`, data);
   }
-  if (fallbackRegularData) {
-    await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/in/fallback/regular.ttf`, fallbackRegularData);
+  for (let i = 0; i < fallbackUploads.length; i++) {
+    await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/in/fallback${i + 1}/regular.ttf`, fallbackUploads[i].data);
   }
 
   await env.BUILD_META.put(`font-build-lock:${uid}`, buildId, { expirationTtl: FONT_BUILD_LOCK_TTL });
@@ -1510,11 +1522,12 @@ async function handleFontBuildUpload(
     status: 'pending',
     uid,
     family,
-    fallbackFamily: fallbackFamily || undefined,
+    fallbackFamily: fallbackUploads[0]?.family || undefined,
+    fallbackFamilies: fallbackUploads.length ? fallbackUploads.map(upload => upload.family) : undefined,
     sizes,
     intervals,
     styles: uploadedStyles,
-    fallbackStyles: fallbackRegularData ? ['regular'] : undefined,
+    fallbackStyles: fallbackUploads.length ? ['regular'] : undefined,
     createdAt: new Date().toISOString(),
   };
   await env.BUILD_META.put(`font-build:${buildId}`, JSON.stringify(meta));
@@ -1632,7 +1645,7 @@ async function handleFontBuildFileDownload(
   let filename: string;
   try { filename = decodeURIComponent(rawFilename); } catch { return json({ error: 'Invalid path' }, 400, headers); }
   const normalized = filename.replace(/\\/g, '/');
-  if (!/^(?:fallback\/)?regular\.ttf$/i.test(normalized) && !/^(bold|italic|bolditalic)\.ttf$/i.test(normalized)) {
+  if (!/^(?:fallback(?:[12])?\/)?regular\.ttf$/i.test(normalized) && !/^(bold|italic|bolditalic)\.ttf$/i.test(normalized)) {
     return json({ error: 'Invalid style' }, 400, headers);
   }
 

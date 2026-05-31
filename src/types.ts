@@ -67,6 +67,7 @@ export interface FontBuildMetadata {
   uid: string;
   family: string;
   fallbackFamily?: string;
+  fallbackFamilies?: string[];
   sizes: number[];
   intervals: string;
   styles: string[];                       // styles uploaded, e.g. ["regular","bold"]

@@ -67,9 +67,19 @@ jobs:
           if curl -sf \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
               -o "$target" \
-              "${WEBHOOK_BASE_URL}/api/font-build/files/${{ inputs.buildId }}/fallback/regular.ttf"; then
+              "${WEBHOOK_BASE_URL}/api/font-build/files/${{ inputs.buildId }}/fallback1/regular.ttf"; then
             echo "Downloaded fallback regular ($(stat -c%s "$target") bytes)"
             ARGS+=("--fallback-regular" "$target")
+          else
+            rm -f "$target"
+          fi
+          target="/tmp/ttfs/fallback2-regular.ttf"
+          if curl -sf \
+              -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+              -o "$target" \
+              "${WEBHOOK_BASE_URL}/api/font-build/files/${{ inputs.buildId }}/fallback2/regular.ttf"; then
+            echo "Downloaded fallback 2 regular ($(stat -c%s "$target") bytes)"
+            ARGS+=("--fallback2-regular" "$target")
           else
             rm -f "$target"
           fi

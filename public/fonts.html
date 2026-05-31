@@ -123,51 +123,75 @@
 
         <div class="mt-6 rounded-2xl border border-dashed border-stone-300 bg-stone-50/70 p-5">
           <div class="flex flex-wrap items-center gap-2">
-            <h2 class="text-sm font-semibold text-stone-900">Fallback Font Family</h2>
+            <h2 class="text-sm font-semibold text-stone-900">Fallback Font Families</h2>
             <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-stone-500 ring-1 ring-inset ring-stone-200">Optional</span>
           </div>
-          <p class="mt-1.5 max-w-[52ch] text-sm/6 text-stone-500">Add a second family below if you want a separate glyph source for characters the main family does not cover.</p>
+          <p class="mt-1.5 text-sm/6 text-stone-500">Add up to two regular-style fallback families to fill glyph gaps left by the main family. Coverage is resolved in order: primary, fallback 1, then fallback 2.</p>
 
-          <div class="mt-4">
-            <label for="fallbackFamilyName" class="block text-sm/6 font-medium text-stone-700">Fallback Family Name</label>
+          <div class="mt-4 rounded-xl border border-stone-200 bg-white p-4">
+            <label for="fallbackFamilyName" class="block text-sm/6 font-medium text-stone-700">Fallback Family 1 Name</label>
             <input type="text" id="fallbackFamilyName" placeholder="e.g. Noto Sans Symbols" class="mt-1.5 block w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm placeholder:text-stone-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none">
-            <p class="mt-1.5 text-xs text-stone-400">Same character rules as the main family. If you upload fallback files, add the family name here too.</p>
+            <p class="mt-1.5 text-xs text-stone-400">Same character rules as the main family. If you upload the fallback file, add the family name here too.</p>
+
+            <div class="mt-4">
+              <label class="block text-sm/6 font-medium text-stone-700">Quick add fallback family 1 from folder</label>
+              <p class="mt-1 text-xs text-stone-400">Picks the regular file from the detected fallback family and ignores bold or italic variants.</p>
+              <input type="file" id="fallbackFontFolder" accept=".ttf,.otf,.TTF,.OTF" webkitdirectory class="mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100">
+              <div id="fallbackAutoDetectResult" class="mt-2 hidden rounded-lg bg-white px-3 py-2 text-xs text-stone-600 font-mono ring-1 ring-inset ring-stone-200"></div>
+            </div>
+
+            <div class="mt-4">
+              <div>
+                <label class="block text-sm/6 font-medium text-stone-700">Fallback 1 Regular <span class="text-xs text-stone-400">(required if used)</span></label>
+                <input type="file" id="fallbackFontRegular" accept=".ttf,.otf,.TTF,.OTF" class="mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-100">
+              </div>
+            </div>
           </div>
 
-          <div class="mt-4">
-            <label class="block text-sm/6 font-medium text-stone-700">Quick add fallback family from folder</label>
-            <p class="mt-1 text-xs text-stone-400">Picks the regular file from the detected fallback family and ignores bold or italic variants.</p>
-            <input type="file" id="fallbackFontFolder" accept=".ttf,.otf,.TTF,.OTF" webkitdirectory class="mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100">
-            <div id="fallbackAutoDetectResult" class="mt-2 hidden rounded-lg bg-white px-3 py-2 text-xs text-stone-600 font-mono ring-1 ring-inset ring-stone-200"></div>
-          </div>
+          <div class="mt-4 rounded-xl border border-stone-200 bg-white p-4">
+            <label for="fallback2FamilyName" class="block text-sm/6 font-medium text-stone-700">Fallback Family 2 Name</label>
+            <input type="text" id="fallback2FamilyName" placeholder="e.g. Noto Emoji" class="mt-1.5 block w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm placeholder:text-stone-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none">
+            <p class="mt-1.5 text-xs text-stone-400">Optional second fallback family, checked only after fallback family 1.</p>
 
-          <div class="mt-4">
-            <div>
-              <label class="block text-sm/6 font-medium text-stone-700">Fallback Regular <span class="text-xs text-stone-400">(required if used)</span></label>
-              <input type="file" id="fallbackFontRegular" accept=".ttf,.otf,.TTF,.OTF" class="mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-100">
+            <div class="mt-4">
+              <label class="block text-sm/6 font-medium text-stone-700">Quick add fallback family 2 from folder</label>
+              <p class="mt-1 text-xs text-stone-400">Again, only the detected regular file is used.</p>
+              <input type="file" id="fallback2FontFolder" accept=".ttf,.otf,.TTF,.OTF" webkitdirectory class="mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100">
+              <div id="fallback2AutoDetectResult" class="mt-2 hidden rounded-lg bg-white px-3 py-2 text-xs text-stone-600 font-mono ring-1 ring-inset ring-stone-200"></div>
+            </div>
+
+            <div class="mt-4">
+              <div>
+                <label class="block text-sm/6 font-medium text-stone-700">Fallback 2 Regular <span class="text-xs text-stone-400">(required if used)</span></label>
+                <input type="file" id="fallback2FontRegular" accept=".ttf,.otf,.TTF,.OTF" class="mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-100">
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Options -->
         <div class="mt-6 flex flex-wrap items-end gap-6">
-          <div>
+          <div class="w-full">
             <label for="intervalPreset" class="flex items-center gap-1.5 text-sm/6 font-medium text-stone-700">
               Unicode Coverage
               <span class="group relative">
                 <span class="flex size-4 cursor-help items-center justify-center rounded-full bg-stone-200 text-[10px] font-bold text-stone-500">?</span>
                 <span class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-[28rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg bg-stone-800 px-3 py-2.5 text-xs font-normal leading-relaxed text-stone-100 shadow-lg group-hover:block">
-                  Controls which characters are included in the font files. More coverage = larger files.
+                  Controls which Unicode ranges the builder is allowed to include in the output. More coverage = larger files.
                   <br><br>
-                  <strong class="text-white">Built-in</strong> — Matches the default CrossPoint fonts. Covers English, most European languages, Cyrillic (Russian, Ukrainian, etc.), combining diacritics, math operators, arrows, and common ligatures. Best for most users.
+                  Choosing a preset does <strong class="text-white">not</strong> create glyphs by itself. You still need to upload a primary font or fallback font that actually contains those characters, or they will be omitted from the generated <code class="rounded bg-stone-700/60 px-1 py-0.5 font-mono text-[11px] text-stone-100">.cpfont</code>.
                   <br><br>
-                  <strong class="text-white">Latin Extended</strong> — Broader Latin coverage including Vietnamese, African languages, and additional diacritics. Smaller than Built-in (no Cyrillic). Use if you only need Latin scripts but need wide accent support.
+                  <strong class="text-white">Built-in</strong> — Enables the same general Unicode ranges as the default CrossPoint fonts: English, most European languages, Cyrillic (Russian, Ukrainian, etc.), combining diacritics, math operators, arrows, and common ligatures. Best for most users if your uploaded fonts already contain those glyphs.
                   <br><br>
-                  <strong class="text-white">Reading (recommended for fiction)</strong> — Comprehensive coverage for English-language literary fiction including scifi/popsci. Adds Greek (physics terms like λ, φ), super/subscripts, currency, arrows, math operators, uncommon dialogue punctuation, CJK quote marks, and miscellaneous symbols including music notes (♪ ♫ ♬), stars (★), and dingbats (✓). Required for books like Project Hail Mary, The Martian, and most contemporary fiction with technical content.
+                  <strong class="text-white">Latin Extended</strong> — Enables broader Latin ranges including Vietnamese, African languages, and additional diacritics. Smaller than Built-in (no Cyrillic). Use if you only need Latin scripts and your uploaded fonts include those glyphs.
+                  <br><br>
+                  <strong class="text-white">Reading (recommended for fiction)</strong> — Enables the extra ranges often needed by English-language literary fiction and scifi/popsci: Greek (physics terms like λ, φ), super/subscripts, currency, arrows, math operators, uncommon dialogue punctuation, CJK quote marks, and miscellaneous symbols including music notes (♪ ♫ ♬), stars (★), and dingbats (✓). Use this when your uploaded fonts or fallback fonts actually contain those glyphs.
+                  <br><br>
+                  <strong class="text-white">Note on Fallback Fonts</strong> — Optional fallback fonts only fill missing codepoints. The main family is always checked first, then fallback family 1, then fallback family 2. Fallback fonts do not replace glyphs the main family already has.
                 </span>
               </span>
             </label>
-            <select id="intervalPreset" class="mt-1.5 block rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 shadow-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none">
+            <select id="intervalPreset" class="mt-1.5 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 shadow-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none">
               <option value="reading" selected>Reading — fiction with symbols (recommended)</option>
               <option value="builtin">Built-in — matches default fonts</option>
               <option value="latin-ext">Latin Extended</option>
@@ -371,6 +395,13 @@
       regularId: 'fallbackFontRegular',
     });
 
+    bindFamilyAutoDetect({
+      folderInputId: 'fallback2FontFolder',
+      familyInputId: 'fallback2FamilyName',
+      resultId: 'fallback2AutoDetectResult',
+      regularId: 'fallback2FontRegular',
+    });
+
     function log(msg, level) {
       var panel = document.getElementById('logPanel');
       panel.classList.remove('hidden');
@@ -418,13 +449,24 @@
       }
       var fallbackFamilyRaw = document.getElementById('fallbackFamilyName').value.trim();
       var fallbackRegular = document.getElementById('fallbackFontRegular').files[0];
+      var fallback2FamilyRaw = document.getElementById('fallback2FamilyName').value.trim();
+      var fallback2Regular = document.getElementById('fallback2FontRegular').files[0];
       var hasFallbackFiles = !!fallbackRegular;
+      var hasFallback2Files = !!fallback2Regular;
       if (hasFallbackFiles && !fallbackFamilyRaw) {
-        alert('Please enter a fallback font family name.');
+        alert('Please enter a fallback family 1 name.');
         return;
       }
       if ((fallbackFamilyRaw || hasFallbackFiles) && !fallbackRegular) {
-        alert('Please select a fallback Regular font file.');
+        alert('Please select a fallback family 1 Regular font file.');
+        return;
+      }
+      if (hasFallback2Files && !fallback2FamilyRaw) {
+        alert('Please enter a fallback family 2 name.');
+        return;
+      }
+      if ((fallback2FamilyRaw || hasFallback2Files) && !fallback2Regular) {
+        alert('Please select a fallback family 2 Regular font file.');
         return;
       }
 
@@ -472,10 +514,14 @@
           fd.append('fallbackFamily', fallbackFamilyRaw);
         }
         if (fallbackRegular) fd.append('fallback_regular', fallbackRegular);
+        if (fallback2FamilyRaw) {
+          fd.append('fallback2Family', fallback2FamilyRaw);
+        }
+        if (fallback2Regular) fd.append('fallback2_regular', fallback2Regular);
 
         var uploadCount =
           1 + (bold ? 1 : 0) + (italic ? 1 : 0) + (boldItalic ? 1 : 0) +
-          (fallbackRegular ? 1 : 0);
+          (fallbackRegular ? 1 : 0) + (fallback2Regular ? 1 : 0);
         log('Uploading ' + uploadCount + ' file(s)...', 'info');
 
         var res = await fetch('/api/font-build/upload', {
