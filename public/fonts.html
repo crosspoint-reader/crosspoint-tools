@@ -136,32 +136,15 @@
 
           <div class="mt-4">
             <label class="block text-sm/6 font-medium text-stone-700">Quick add fallback family from folder</label>
-            <p class="mt-1 text-xs text-stone-400">Works the same way as the primary family picker and tries to map regular, bold, italic, and bold italic automatically.</p>
+            <p class="mt-1 text-xs text-stone-400">Picks the regular file from the detected fallback family and ignores bold or italic variants.</p>
             <input type="file" id="fallbackFontFolder" accept=".ttf,.otf,.TTF,.OTF" webkitdirectory class="mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100">
             <div id="fallbackAutoDetectResult" class="mt-2 hidden rounded-lg bg-white px-3 py-2 text-xs text-stone-600 font-mono ring-1 ring-inset ring-stone-200"></div>
           </div>
 
-          <div class="relative my-4">
-            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-stone-200"></div></div>
-            <div class="relative flex justify-center"><span class="bg-stone-50 px-3 text-xs text-stone-400">or pick fallback files individually</span></div>
-          </div>
-
-          <div class="grid gap-4 sm:grid-cols-2">
+          <div class="mt-4">
             <div>
               <label class="block text-sm/6 font-medium text-stone-700">Fallback Regular <span class="text-xs text-stone-400">(required if used)</span></label>
               <input type="file" id="fallbackFontRegular" accept=".ttf,.otf,.TTF,.OTF" class="mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-100">
-            </div>
-            <div>
-              <label class="block text-sm/6 font-medium text-stone-700">Fallback Bold <span class="text-xs text-stone-400">(optional)</span></label>
-              <input type="file" id="fallbackFontBold" accept=".ttf,.otf,.TTF,.OTF" class="mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-100">
-            </div>
-            <div>
-              <label class="block text-sm/6 font-medium text-stone-700">Fallback Italic <span class="text-xs text-stone-400">(optional)</span></label>
-              <input type="file" id="fallbackFontItalic" accept=".ttf,.otf,.TTF,.OTF" class="mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-100">
-            </div>
-            <div>
-              <label class="block text-sm/6 font-medium text-stone-700">Fallback Bold Italic <span class="text-xs text-stone-400">(optional)</span></label>
-              <input type="file" id="fallbackFontBoldItalic" accept=".ttf,.otf,.TTF,.OTF" class="mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-100">
             </div>
           </div>
         </div>
@@ -346,9 +329,9 @@
         }
 
         setFileInput(config.regularId, result.regular);
-        setFileInput(config.boldId, result.bold);
-        setFileInput(config.italicId, result.italic);
-        setFileInput(config.boldItalicId, result.bolditalic);
+        if (config.boldId) setFileInput(config.boldId, result.bold);
+        if (config.italicId) setFileInput(config.italicId, result.italic);
+        if (config.boldItalicId) setFileInput(config.boldItalicId, result.bolditalic);
 
         var nameInput = document.getElementById(config.familyInputId);
         if (!nameInput.value && familyName) {
@@ -358,9 +341,9 @@
         var resultEl = document.getElementById(config.resultId);
         var lines = [];
         if (result.regular) lines.push('Regular: ' + result.regular.name);
-        if (result.bold) lines.push('Bold: ' + result.bold.name);
-        if (result.italic) lines.push('Italic: ' + result.italic.name);
-        if (result.bolditalic) lines.push('Bold Italic: ' + result.bolditalic.name);
+        if (config.boldId && result.bold) lines.push('Bold: ' + result.bold.name);
+        if (config.italicId && result.italic) lines.push('Italic: ' + result.italic.name);
+        if (config.boldItalicId && result.bolditalic) lines.push('Bold Italic: ' + result.bolditalic.name);
         var otherFamilies = Object.keys(families).filter(function(f) { return f !== bestFam; });
         if (otherFamilies.length) {
           lines.push('Other families found: ' + otherFamilies.join(', '));
@@ -386,9 +369,6 @@
       familyInputId: 'fallbackFamilyName',
       resultId: 'fallbackAutoDetectResult',
       regularId: 'fallbackFontRegular',
-      boldId: 'fallbackFontBold',
-      italicId: 'fallbackFontItalic',
-      boldItalicId: 'fallbackFontBoldItalic',
     });
 
     function log(msg, level) {
@@ -438,10 +418,7 @@
       }
       var fallbackFamilyRaw = document.getElementById('fallbackFamilyName').value.trim();
       var fallbackRegular = document.getElementById('fallbackFontRegular').files[0];
-      var fallbackBold = document.getElementById('fallbackFontBold').files[0];
-      var fallbackItalic = document.getElementById('fallbackFontItalic').files[0];
-      var fallbackBoldItalic = document.getElementById('fallbackFontBoldItalic').files[0];
-      var hasFallbackFiles = !!(fallbackRegular || fallbackBold || fallbackItalic || fallbackBoldItalic);
+      var hasFallbackFiles = !!fallbackRegular;
       if (hasFallbackFiles && !fallbackFamilyRaw) {
         alert('Please enter a fallback font family name.');
         return;
@@ -495,13 +472,10 @@
           fd.append('fallbackFamily', fallbackFamilyRaw);
         }
         if (fallbackRegular) fd.append('fallback_regular', fallbackRegular);
-        if (fallbackBold) fd.append('fallback_bold', fallbackBold);
-        if (fallbackItalic) fd.append('fallback_italic', fallbackItalic);
-        if (fallbackBoldItalic) fd.append('fallback_bolditalic', fallbackBoldItalic);
 
         var uploadCount =
           1 + (bold ? 1 : 0) + (italic ? 1 : 0) + (boldItalic ? 1 : 0) +
-          (fallbackRegular ? 1 : 0) + (fallbackBold ? 1 : 0) + (fallbackItalic ? 1 : 0) + (fallbackBoldItalic ? 1 : 0);
+          (fallbackRegular ? 1 : 0);
         log('Uploading ' + uploadCount + ' file(s)...', 'info');
 
         var res = await fetch('/api/font-build/upload', {

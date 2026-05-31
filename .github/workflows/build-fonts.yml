@@ -63,18 +63,16 @@ jobs:
               rm -f "$target"
             fi
           done
-          for style in regular bold italic bolditalic; do
-            target="/tmp/ttfs/fallback-$style.ttf"
-            if curl -sf \
-                -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
-                -o "$target" \
-                "${WEBHOOK_BASE_URL}/api/font-build/files/${{ inputs.buildId }}/fallback/$style.ttf"; then
-              echo "Downloaded fallback $style ($(stat -c%s "$target") bytes)"
-              ARGS+=("--fallback-$style" "$target")
-            else
-              rm -f "$target"
-            fi
-          done
+          target="/tmp/ttfs/fallback-regular.ttf"
+          if curl -sf \
+              -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+              -o "$target" \
+              "${WEBHOOK_BASE_URL}/api/font-build/files/${{ inputs.buildId }}/fallback/regular.ttf"; then
+            echo "Downloaded fallback regular ($(stat -c%s "$target") bytes)"
+            ARGS+=("--fallback-regular" "$target")
+          else
+            rm -f "$target"
+          fi
           if [ ${#ARGS[@]} -eq 0 ]; then
             echo "No TTFs available for build ${{ inputs.buildId }}" >&2
             exit 1
