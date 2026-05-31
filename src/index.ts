@@ -26,12 +26,20 @@ export default {
       });
     }
 
-    // Redirect /themes to the SD themes manifest in the firmware repo
-    if (url.pathname === '/themes' || url.pathname === '/themes.json') {
-      return Response.redirect(
+    // Proxy themes.json for SD card theme loading (device manifest)
+    if (url.pathname === '/themes/themes.json' || url.pathname === '/themes' || url.pathname === '/themes.json') {
+      const res = await fetch(
         'https://raw.githubusercontent.com/crosspoint-reader/crosspoint-reader/feat-sd-themes/sd-themes/themes.json',
-        302
+        { headers: { 'User-Agent': 'CrossPoint-Tools' } }
       );
+      return new Response(res.body, {
+        status: res.status,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=3600',
+        },
+      });
     }
 
     // Gate insider builds behind Royalty.dev subscription
