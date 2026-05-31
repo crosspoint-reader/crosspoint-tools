@@ -26,6 +26,14 @@ export default {
       });
     }
 
+    // Redirect /themes to the SD themes manifest in the firmware repo
+    if (url.pathname === '/themes' || url.pathname === '/themes.json') {
+      return Response.redirect(
+        'https://raw.githubusercontent.com/crosspoint-reader/crosspoint-reader/feat-sd-themes/sd-themes/themes.json',
+        302
+      );
+    }
+
     // Gate insider builds behind Royalty.dev subscription
     if (url.pathname === '/insider' || url.pathname === '/insider.html' ||
         url.pathname === '/early-access' || url.pathname === '/early-access.html') {
