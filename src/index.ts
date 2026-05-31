@@ -26,20 +26,26 @@ export default {
       });
     }
 
-    // Proxy themes.json for SD card theme loading (device manifest)
-    if (url.pathname === '/themes/themes.json' || url.pathname === '/themes' || url.pathname === '/themes.json') {
+    // Proxy /themes/* to the SD themes directory in the firmware repo.
+    // Covers the manifest (/themes/themes.json) and every asset it references
+    // (e.g. /themes/carousel/icons/book.bmp). The upstream content-type is
+    // passed through so binary assets aren't mislabeled as JSON.
+    if (url.pathname === '/themes' || url.pathname === '/themes.json') {
+      return Response.redirect(new URL('/themes/themes.json', url.origin).toString(), 302);
+    }
+    if (url.pathname.startsWith('/themes/')) {
+      const rel = url.pathname.slice('/themes/'.length);
       const res = await fetch(
-        'https://raw.githubusercontent.com/crosspoint-reader/crosspoint-reader/feat-sd-themes/sd-themes/themes.json',
+        `https://raw.githubusercontent.com/crosspoint-reader/crosspoint-reader/feat-sd-themes/sd-themes/${rel}`,
         { headers: { 'User-Agent': 'CrossPoint-Tools' } }
       );
-      return new Response(res.body, {
-        status: res.status,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'public, max-age=3600',
-        },
+      const headers = new Headers({
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=3600',
       });
+      const upstreamType = res.headers.get('Content-Type');
+      if (upstreamType) headers.set('Content-Type', upstreamType);
+      return new Response(res.body, { status: res.status, headers });
     }
 
     // Gate insider builds behind Royalty.dev subscription
