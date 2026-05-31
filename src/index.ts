@@ -39,9 +39,15 @@ export default {
         `https://raw.githubusercontent.com/crosspoint-reader/crosspoint-reader/feat-sd-themes/sd-themes/${rel}`,
         { headers: { 'User-Agent': 'CrossPoint-Tools' } }
       );
+      // Buffer the (small) theme files so we can send an explicit Content-Length.
+      // Streaming res.body through would make Cloudflare use chunked transfer
+      // encoding with no Content-Length, which hangs keep-alive HTTP clients
+      // that wait for a zero-length read (the device downloader).
+      const body = await res.arrayBuffer();
       const headers = new Headers({
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=3600',
+        'Content-Length': String(body.byteLength),
       });
       // GitHub raw serves .json as text/plain; label it correctly, otherwise
       // pass the upstream type through (so .bmp stays image/bmp, etc.).
@@ -51,7 +57,7 @@ export default {
         const upstreamType = res.headers.get('Content-Type');
         if (upstreamType) headers.set('Content-Type', upstreamType);
       }
-      return new Response(res.body, { status: res.status, headers });
+      return new Response(body, { status: res.status, headers });
     }
 
     // Gate insider builds behind Royalty.dev subscription
