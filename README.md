@@ -145,6 +145,8 @@ npm run tunnel
 
 The `tunnel` script prefers an existing `cloudflared` on your `PATH` via `CLOUDFLARED_PATH`, so Wrangler can skip its own download step.
 
+On Windows, run `npm run tunnel` from Git Bash/WSL if you want Unix-like tooling, or set `CLOUDFLARED_PATH` to your `cloudflared.exe` path before launching it from PowerShell or Command Prompt.
+
 For end-to-end build testing, the worker now passes the current request origin to GitHub Actions as the webhook callback base URL. In practice that means:
 
 - Use `npm run dev` for local handler testing only.
