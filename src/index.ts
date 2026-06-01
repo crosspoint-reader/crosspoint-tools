@@ -44,9 +44,13 @@ export default {
       // encoding with no Content-Length, which hangs keep-alive HTTP clients
       // that wait for a zero-length read (the device downloader).
       const body = await res.arrayBuffer();
+      // no-transform stops Cloudflare from re-compressing the response at the
+      // edge. Without it, a client advertising `Accept-Encoding: gzip` (the
+      // device's esp_http_client) gets a gzipped, Transfer-Encoding: chunked
+      // response with NO Content-Length — which hangs/breaks the downloader.
       const headers = new Headers({
         'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'public, max-age=3600, no-transform',
         'Content-Length': String(body.byteLength),
       });
       // GitHub raw serves .json as text/plain; label it correctly, otherwise
