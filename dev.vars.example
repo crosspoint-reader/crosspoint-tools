@@ -1,0 +1,6 @@
+GITHUB_WEBHOOK_SECRET=your-webhook-secret-here
+# GITHUB_TOKEN=github_pat_or_classic_pat_that_can_dispatch_workflows
+# GITHUB_ACTIONS_REPO=yourname/crosspoint-tools-dev
+# GITHUB_ACTIONS_REF=main
+# WEBHOOK_BASE_URL=https://your-tunnel-or-dev-host
+# ALLOW_INSECURE_DEV_WEBHOOKS=true

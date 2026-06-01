@@ -17,6 +17,10 @@ on:
         description: 'JSON object mapping family names to [s,m,l,xl] point sizes'
         required: false
         default: '{}'
+      webhookBaseUrl:
+        description: 'Base URL for webhook callbacks'
+        required: false
+        default: 'https://crosspointreader.com'
 
 concurrency:
   group: custom-font-build
@@ -26,9 +30,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve webhook base URL
+        env:
+          WEBHOOK_BASE_URL_RAW: ${{ inputs.webhookBaseUrl }}
+        run: |
+          BASE="${WEBHOOK_BASE_URL_RAW:-https://crosspointreader.com}"
+          echo "WEBHOOK_BASE_URL=${BASE%/}" >> "$GITHUB_ENV"
+
       - name: Mark build as started
         run: |
-          curl -s -X POST "https://crosspointreader.com/api/custom-build/status-update" \
+          curl -s -X POST "${WEBHOOK_BASE_URL}/api/custom-build/status-update" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
             -d '{"buildId":"${{ inputs.buildId }}","status":"building"}'
@@ -54,7 +65,7 @@ jobs:
             # font_path is like "NotoSerif/NotoSerif-Regular.ttf"
             target="$FONT_SOURCE_DIR/$font_path"
 
-            curl -sf "https://crosspointreader.com/api/custom-build/fonts/${{ inputs.buildId }}/$font_path" \
+            curl -sf "${WEBHOOK_BASE_URL}/api/custom-build/fonts/${{ inputs.buildId }}/$font_path" \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
               -o "$target"
 
@@ -210,7 +221,7 @@ jobs:
 
       - name: Upload custom firmware
         run: |
-          curl -sf -X PUT "https://crosspointreader.com/api/custom-build/upload-result" \
+          curl -sf -X PUT "${WEBHOOK_BASE_URL}/api/custom-build/upload-result" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "X-Build-Id: ${{ inputs.buildId }}" \
             -H "Content-Type: application/octet-stream" \
@@ -219,7 +230,7 @@ jobs:
       - name: Update build status (success)
         run: |
           SIZE=$(stat -c%s ".pio/build/gh_release/firmware.bin")
-          curl -s -X POST "https://crosspointreader.com/api/custom-build/status-update" \
+          curl -s -X POST "${WEBHOOK_BASE_URL}/api/custom-build/status-update" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
             -d "{
@@ -232,7 +243,7 @@ jobs:
       - name: Mark build failed
         if: failure()
         run: |
-          curl -s -X POST "https://crosspointreader.com/api/custom-build/status-update" \
+          curl -s -X POST "${WEBHOOK_BASE_URL}/api/custom-build/status-update" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
             -d "{

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "tunnel": "node scripts/tunnel.js",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"
   },

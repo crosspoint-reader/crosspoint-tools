@@ -214,6 +214,45 @@ async function handleApi(
   }
 }
 
+function getWebhookBaseUrl(request: Request, env: Env): string {
+  const raw = (env.WEBHOOK_BASE_URL || new URL(request.url).origin).trim();
+  return raw.endsWith('/') ? raw.slice(0, -1) : raw;
+}
+
+function getGitHubActionsRepo(env: Env): string {
+  const repo = (env.GITHUB_ACTIONS_REPO || 'crosspoint-reader/crosspoint-tools').trim();
+  return repo || 'crosspoint-reader/crosspoint-tools';
+}
+
+function getGitHubActionsRef(env: Env): string {
+  const ref = (env.GITHUB_ACTIONS_REF || 'master').trim();
+  return ref || 'master';
+}
+
+function getWorkflowDispatchUrl(env: Env, workflowFile: string): string {
+  return `https://api.github.com/repos/${getGitHubActionsRepo(env)}/actions/workflows/${workflowFile}/dispatches`;
+}
+
+function isAuthorizedWebhookRequest(request: Request, env: Env): boolean {
+  const auth = request.headers.get('Authorization');
+  if (auth === `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+    return true;
+  }
+
+  const allowBypass = /^(1|true|yes)$/i.test((env.ALLOW_INSECURE_DEV_WEBHOOKS || '').trim());
+  if (allowBypass) {
+    console.warn('Allowing webhook request without matching secret because ALLOW_INSECURE_DEV_WEBHOOKS is enabled.');
+    return true;
+  }
+
+  return false;
+}
+
+function getGitHubAuthToken(env: Env): string | null {
+  const token = (env.GITHUB_TOKEN || '').trim();
+  return token ? token : null;
+}
+
 // --- Build Metadata ---
 
 async function handleLatestBuild(
@@ -415,9 +454,13 @@ async function handleManualTrigger(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const gitHubToken = getGitHubAuthToken(env);
+  if (!gitHubToken) {
+    return json({ error: 'Missing GITHUB_TOKEN in local/deployed worker config' }, 500, headers);
   }
 
   // Look up the commit the workflow will actually build, so the caller can
@@ -431,7 +474,7 @@ async function handleManualTrigger(
       {
         headers: {
           'User-Agent': 'crosspoint-tools',
-          Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+          Authorization: `Bearer ${gitHubToken}`,
           Accept: 'application/vnd.github.v3+json',
         },
       }
@@ -447,15 +490,20 @@ async function handleManualTrigger(
 
   // Dispatch the GitHub Actions workflow
   const ghRes = await fetch(
-    'https://api.github.com/repos/crosspoint-reader/crosspoint-tools/actions/workflows/build-firmware.yml/dispatches',
+    getWorkflowDispatchUrl(env, 'build-firmware.yml'),
     {
       method: 'POST',
       headers: {
         'User-Agent': 'crosspoint-tools',
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        Authorization: `Bearer ${gitHubToken}`,
         Accept: 'application/vnd.github.v3+json',
       },
-      body: JSON.stringify({ ref: 'master' }),
+      body: JSON.stringify({
+        ref: getGitHubActionsRef(env),
+        inputs: {
+          webhookBaseUrl: getWebhookBaseUrl(request, env),
+        },
+      }),
     }
   );
 
@@ -479,8 +527,7 @@ async function handleBuildStatus(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -518,8 +565,7 @@ async function handleBuildUpload(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -693,8 +739,7 @@ async function handleStockFirmwareCache(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1138,23 +1183,32 @@ async function handleCustomBuildUpload(
   };
   await env.BUILD_META.put(`custom-build:${buildId}`, JSON.stringify(meta));
 
+  const gitHubToken = getGitHubAuthToken(env);
+  if (!gitHubToken) {
+    await env.BUILD_META.delete('custom-build-lock');
+    await env.BUILD_META.delete(`custom-build:${buildId}`);
+    await env.BUILD_META.delete(`custom-build:user:${uid}`);
+    return json({ error: 'Missing GITHUB_TOKEN in local/deployed worker config' }, 500, headers);
+  }
+
   // Dispatch GitHub Actions workflow
   const ghRes = await fetch(
-    'https://api.github.com/repos/crosspoint-reader/crosspoint-tools/actions/workflows/build-custom-firmware.yml/dispatches',
+    getWorkflowDispatchUrl(env, 'build-custom-firmware.yml'),
     {
       method: 'POST',
       headers: {
         'User-Agent': 'crosspoint-tools',
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        Authorization: `Bearer ${gitHubToken}`,
         Accept: 'application/vnd.github.v3+json',
       },
       body: JSON.stringify({
-        ref: 'master',
+        ref: getGitHubActionsRef(env),
         inputs: {
           buildId,
           fonts: JSON.stringify(Object.keys(replacedFonts)),
           fontLabels: JSON.stringify(fontLabels),
           fontSizes: JSON.stringify(fontSizes),
+          webhookBaseUrl: getWebhookBaseUrl(request, env),
         },
       }),
     }
@@ -1268,8 +1322,7 @@ async function handleCustomBuildFontDownload(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1304,8 +1357,7 @@ async function handleCustomBuildUploadResult(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1330,8 +1382,7 @@ async function handleCustomBuildStatusUpdate(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1363,16 +1414,49 @@ async function handleCustomBuildStatusUpdate(
   return json({ ok: true }, 200, headers);
 }
 
-// --- Font Build (.cpfont generation via firmware-repo script) ---
+// --- Font Build (.cpfont generation via local Python generator) ---
 //
-// Single source of truth: `lib/EpdFont/scripts/fontconvert_sdcard.py` in the
-// crosspoint-reader repo. The web tool uploads TTFs, dispatches a GitHub
-// Actions workflow that checks out crosspoint-reader and runs that script
-// unmodified, then downloads the resulting .cpfont files. No JS reimplementation.
+// The web tool uploads TTFs, dispatches a GitHub Actions workflow, runs the
+// vendored SD-card font generator in this repo, then downloads the resulting
+// .cpfont files. That keeps the conversion logic local so the website can
+// evolve features like fallback-family handling independently of firmware CI.
 
 const FONT_BUILD_LOCK_TTL = 10 * 60;
 const FONT_BUILD_STYLES = ['regular', 'bold', 'italic', 'bolditalic'] as const;
 type FontBuildStyle = typeof FONT_BUILD_STYLES[number];
+const FONT_FAMILY_NAME_RE = /^[A-Za-z0-9 _-]{1,40}$/;
+
+async function collectUploadedFontStyles(
+  formData: FormData,
+  prefix = ''
+): Promise<{ uploadedStyles: FontBuildStyle[]; validatedFiles: Map<FontBuildStyle, ArrayBuffer> }> {
+  const uploadedStyles: FontBuildStyle[] = [];
+  const validatedFiles = new Map<FontBuildStyle, ArrayBuffer>();
+
+  for (const style of FONT_BUILD_STYLES) {
+    const key = prefix ? `${prefix}${style}` : style;
+    const entry = formData.get(key) as string | File | null;
+    if (!entry || typeof entry === 'string') continue;
+    const data = await entry.arrayBuffer();
+    if (!isValidFontFile(data)) {
+      throw new Error(`Invalid font file for ${key}`);
+    }
+    validatedFiles.set(style, data);
+    uploadedStyles.push(style);
+  }
+
+  return { uploadedStyles, validatedFiles };
+}
+
+async function collectUploadedFallbackRegular(formData: FormData, key: string): Promise<ArrayBuffer | null> {
+  const entry = formData.get(key) as string | File | null;
+  if (!entry || typeof entry === 'string') return null;
+  const data = await entry.arrayBuffer();
+  if (!isValidFontFile(data)) {
+    throw new Error(`Invalid font file for ${key}`);
+  }
+  return data;
+}
 
 function isValidFontIntervals(intervals: string): boolean {
   if (intervals.length < 1 || intervals.length > 200) return false;
@@ -1403,8 +1487,18 @@ async function handleFontBuildUpload(
   const formData = await request.formData();
 
   const family = (formData.get('family') as string | null)?.trim();
-  if (!family || !/^[A-Za-z0-9 _-]{1,40}$/.test(family)) {
+  if (!family || !FONT_FAMILY_NAME_RE.test(family)) {
     return json({ error: 'Invalid or missing family name' }, 400, headers);
+  }
+
+  const fallbackFamilyInputs = [
+    { family: (formData.get('fallbackFamily') as string | null)?.trim() || '', fileKey: 'fallback_regular' },
+    { family: (formData.get('fallback2Family') as string | null)?.trim() || '', fileKey: 'fallback2_regular' },
+  ];
+  for (const entry of fallbackFamilyInputs) {
+    if (entry.family && !FONT_FAMILY_NAME_RE.test(entry.family)) {
+      return json({ error: 'Invalid fallback family name' }, 400, headers);
+    }
   }
 
   const sizesRaw = (formData.get('sizes') as string | null)?.trim() || '';
@@ -1418,18 +1512,22 @@ async function handleFontBuildUpload(
     return json({ error: 'Invalid intervals' }, 400, headers);
   }
 
-  const uploadedStyles: FontBuildStyle[] = [];
-  const validatedFiles = new Map<FontBuildStyle, ArrayBuffer>();
-  for (const style of FONT_BUILD_STYLES) {
-    const entry = formData.get(style) as string | File | null;
-    if (!entry || typeof entry === 'string') continue;
-    const file = entry;
-    const data = await file.arrayBuffer();
-    if (!isValidFontFile(data)) {
-      return json({ error: `Invalid font file for ${style}` }, 400, headers);
+  let uploadedStyles: FontBuildStyle[] = [];
+  let validatedFiles = new Map<FontBuildStyle, ArrayBuffer>();
+  let fallbackUploads: Array<{ family: string; data: ArrayBuffer }> = [];
+  try {
+    ({ uploadedStyles, validatedFiles } = await collectUploadedFontStyles(formData));
+    for (const entry of fallbackFamilyInputs) {
+      const data = await collectUploadedFallbackRegular(formData, entry.fileKey);
+      if (data) {
+        fallbackUploads.push({ family: entry.family, data });
+      } else if (entry.family) {
+        return json({ error: 'A fallback regular style is required when using a fallback family' }, 400, headers);
+      }
     }
-    validatedFiles.set(style, data);
-    uploadedStyles.push(style);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Invalid font upload';
+    return json({ error: message }, 400, headers);
   }
 
   if (uploadedStyles.length === 0) {
@@ -1438,11 +1536,20 @@ async function handleFontBuildUpload(
   if (!uploadedStyles.includes('regular')) {
     return json({ error: 'A regular style is required' }, 400, headers);
   }
+  for (const entry of fallbackFamilyInputs) {
+    const hasUpload = fallbackUploads.some(upload => upload.family === entry.family);
+    if (hasUpload && !entry.family) {
+      return json({ error: 'Fallback font uploads require a fallback family name' }, 400, headers);
+    }
+  }
 
   const buildId = generateBuildId();
 
   for (const [style, data] of validatedFiles) {
     await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/in/${style}.ttf`, data);
+  }
+  for (let i = 0; i < fallbackUploads.length; i++) {
+    await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/in/fallback${i + 1}/regular.ttf`, fallbackUploads[i].data);
   }
 
   await env.BUILD_META.put(`font-build-lock:${uid}`, buildId, { expirationTtl: FONT_BUILD_LOCK_TTL });
@@ -1453,29 +1560,41 @@ async function handleFontBuildUpload(
     status: 'pending',
     uid,
     family,
+    fallbackFamily: fallbackUploads[0]?.family || undefined,
+    fallbackFamilies: fallbackUploads.length ? fallbackUploads.map(upload => upload.family) : undefined,
     sizes,
     intervals,
     styles: uploadedStyles,
+    fallbackStyles: fallbackUploads.length ? ['regular'] : undefined,
     createdAt: new Date().toISOString(),
   };
   await env.BUILD_META.put(`font-build:${buildId}`, JSON.stringify(meta));
 
+  const gitHubToken = getGitHubAuthToken(env);
+  if (!gitHubToken) {
+    await env.BUILD_META.delete(`font-build-lock:${uid}`);
+    await env.BUILD_META.delete(`font-build:user:${uid}`);
+    await env.BUILD_META.delete(`font-build:${buildId}`);
+    return json({ error: 'Missing GITHUB_TOKEN in local/deployed worker config' }, 500, headers);
+  }
+
   const ghRes = await fetch(
-    'https://api.github.com/repos/crosspoint-reader/crosspoint-tools/actions/workflows/build-fonts.yml/dispatches',
+    getWorkflowDispatchUrl(env, 'build-fonts.yml'),
     {
       method: 'POST',
       headers: {
         'User-Agent': 'crosspoint-tools',
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        Authorization: `Bearer ${gitHubToken}`,
         Accept: 'application/vnd.github.v3+json',
       },
       body: JSON.stringify({
-        ref: 'master',
+        ref: getGitHubActionsRef(env),
         inputs: {
           buildId,
           family,
           sizes: sizes.join(','),
           intervals,
+          webhookBaseUrl: getWebhookBaseUrl(request, env),
         },
       }),
     }
@@ -1483,10 +1602,12 @@ async function handleFontBuildUpload(
 
   if (!ghRes.ok) {
     await env.BUILD_META.delete(`font-build-lock:${uid}`);
+    await env.BUILD_META.delete(`font-build:user:${uid}`);
     await env.BUILD_META.delete(`font-build:${buildId}`);
     const body = await ghRes.text();
     console.error(`Font build dispatch failed: ${ghRes.status} ${body}`);
-    return json({ error: 'Failed to start build' }, 502, headers);
+    const isAuthFailure = ghRes.status === 401 || ghRes.status === 403;
+    return json({ error: isAuthFailure ? 'GitHub workflow dispatch failed: missing or invalid GITHUB_TOKEN' : 'Failed to start build' }, 502, headers);
   }
 
   const response = json({ buildId, styles: uploadedStyles }, 202, headers);
@@ -1549,23 +1670,24 @@ async function handleFontBuildFileDownload(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
   // Path: /api/font-build/files/{buildId}/{style}.ttf
-  const parts = url.pathname.replace('/api/font-build/files/', '').split('/');
-  if (parts.length !== 2) return json({ error: 'Invalid path' }, 400, headers);
-  const [buildId, rawFilename] = parts;
+  const rawPath = url.pathname.replace('/api/font-build/files/', '');
+  const slashIndex = rawPath.indexOf('/');
+  if (slashIndex === -1) return json({ error: 'Invalid path' }, 400, headers);
+  const buildId = rawPath.slice(0, slashIndex);
+  const rawFilename = rawPath.slice(slashIndex + 1);
   let filename: string;
   try { filename = decodeURIComponent(rawFilename); } catch { return json({ error: 'Invalid path' }, 400, headers); }
-  const style = filename.replace(/\.ttf$/i, '') as FontBuildStyle;
-  if (!FONT_BUILD_STYLES.includes(style)) {
+  const normalized = filename.replace(/\\/g, '/');
+  if (!/^(?:fallback(?:[12])?\/)?regular\.ttf$/i.test(normalized) && !/^(bold|italic|bolditalic)\.ttf$/i.test(normalized)) {
     return json({ error: 'Invalid style' }, 400, headers);
   }
 
-  const object = await env.FIRMWARE_BUCKET.get(`font-builds/${buildId}/in/${style}.ttf`);
+  const object = await env.FIRMWARE_BUCKET.get(`font-builds/${buildId}/in/${normalized}`);
   if (!object) return json({ error: 'Not found' }, 404, headers);
 
   return new Response(object.body, {
@@ -1586,8 +1708,7 @@ async function handleFontBuildUploadResult(
   if (request.method !== 'PUT') {
     return json({ error: 'Method not allowed' }, 405, headers);
   }
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1618,15 +1739,14 @@ async function handleFontBuildStatusUpdate(
   if (request.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405, headers);
   }
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
   const body = await request.json() as {
     buildId: string;
     status: FontBuildMetadata['status'];
-    readerRef?: string;
+    generatorVersion?: string;
     log?: string;
     error?: string;
   };
@@ -1636,7 +1756,7 @@ async function handleFontBuildStatusUpdate(
 
   const meta = JSON.parse(raw) as FontBuildMetadata;
   meta.status = body.status;
-  if (body.readerRef) meta.readerRef = body.readerRef;
+  if (body.generatorVersion) meta.generatorVersion = body.generatorVersion;
   if (body.log) meta.log = body.log;
   if (body.error) meta.error = body.error;
   if (body.status === 'success' || body.status === 'failed') {
@@ -1713,8 +1833,7 @@ async function handleBannerUpdate(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1794,8 +1913,7 @@ async function handleBetaCreate(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1872,8 +1990,7 @@ async function handleBetaUpdate(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
@@ -1938,8 +2055,7 @@ async function handleBetaDelete(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${env.GITHUB_WEBHOOK_SECRET}`) {
+  if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 

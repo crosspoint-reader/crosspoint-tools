@@ -30,6 +30,37 @@
   <script src="https://cdn.usefathom.com/script.js" data-site="OHQZUNQD" defer></script>
 </head>
 <body class="min-h-dvh bg-stone-50 font-sans">
+  <nav class="border-b border-stone-200 bg-white">
+    <div class="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <a href="/" class="flex min-w-0 items-center gap-2 text-stone-900 no-underline" aria-label="Homepage">
+        <img src="/logo.png" alt="" class="size-7 shrink-0 rounded-md">
+        <span class="text-sm/5 font-medium tracking-tight sm:text-sm/6">
+          <span class="sm:hidden">CrossPoint</span>
+          <span class="hidden sm:inline">CrossPoint Reader</span>
+        </span>
+      </a>
+      <div class="flex w-full flex-wrap items-center justify-between sm:ml-6 sm:flex-1">
+        <a href="/fonts" class="rounded-md px-3 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
+          <span class="sm:hidden">Fonts</span>
+          <span class="hidden sm:inline">Font Builder <span class="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Beta</span></span>
+        </a>
+        <a href="/roadmap" class="rounded-md px-3 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">Roadmap</a>
+        <a href="#" data-open-download-modal class="rounded-md px-3 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
+          <span class="sm:hidden">Download</span>
+          <span class="hidden sm:inline">Download Firmware</span>
+        </a>
+        <a href="/#unlock-tool" class="rounded-md px-3 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
+          <span class="sm:hidden">Unlock</span>
+          <span class="hidden sm:inline">Unlock Tool</span>
+        </a>
+        <a href="https://app.royalty.dev/crosspoint-reader/crosspoint-reader" target="_blank" rel="noopener" class="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#B8953A] py-1.5 pr-3 pl-2 text-xs/5 font-semibold text-white no-underline transition-colors hover:bg-[#9A7A2E] sm:text-sm/5">
+          <img src="/crown.svg" alt="" class="size-4 brightness-0 invert">
+          <span class="sm:hidden">Fund</span>
+          <span class="hidden sm:inline">Fund CrossPoint</span>
+        </a>
+      </div>
+    </div>
+  </nav>
   <div class="mx-auto max-w-md px-6 py-16">
     <div class="text-center">
       <img src="/logo.png" alt="" class="mx-auto size-10 rounded-lg">
@@ -566,6 +597,11 @@
       refreshStatus();
       loadBetaList();
     }
+  </script>
+  <script type="module">
+    import { initDownloadModal } from '/js/download-modal.js';
+
+    initDownloadModal();
   </script>
 </body>
 </html>

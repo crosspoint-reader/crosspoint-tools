@@ -5,6 +5,10 @@ export interface Env {
   AI: Ai;
   GITHUB_WEBHOOK_SECRET: string;
   GITHUB_TOKEN?: string;
+  WEBHOOK_BASE_URL?: string;
+  ALLOW_INSECURE_DEV_WEBHOOKS?: string;
+  GITHUB_ACTIONS_REPO?: string;
+  GITHUB_ACTIONS_REF?: string;
   REPO_URL: string;
 }
 
@@ -62,11 +66,14 @@ export interface FontBuildMetadata {
   status: 'pending' | 'building' | 'success' | 'failed';
   uid: string;
   family: string;
+  fallbackFamily?: string;
+  fallbackFamilies?: string[];
   sizes: number[];
   intervals: string;
   styles: string[];                       // styles uploaded, e.g. ["regular","bold"]
+  fallbackStyles?: string[];              // optional fallback family uploads
   outputs?: string[];                     // .cpfont filenames produced
-  readerRef?: string;                     // ref of crosspoint-reader the script ran from
+  generatorVersion?: string;              // revision of the local font generator that ran
   log?: string;                           // tail of stderr (glyph/kern stats)
   error?: string;
   createdAt: string;

@@ -16,10 +16,10 @@ on:
         description: 'Codepoint interval presets'
         required: false
         default: 'builtin'
-      readerRef:
-        description: 'crosspoint-reader ref to pull fontconvert_sdcard.py from'
+      webhookBaseUrl:
+        description: 'Base URL for webhook callbacks'
         required: false
-        default: 'master'
+        default: 'https://crosspointreader.com'
 
 concurrency:
   group: font-build-${{ inputs.buildId }}
@@ -28,21 +28,29 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      BUILD_ID: ${{ inputs.buildId }}
     steps:
+      - name: Resolve webhook base URL
+        env:
+          WEBHOOK_BASE_URL_RAW: ${{ inputs.webhookBaseUrl }}
+        run: |
+          BASE="${WEBHOOK_BASE_URL_RAW:-https://crosspointreader.com}"
+          echo "WEBHOOK_BASE_URL=${BASE%/}" >> "$GITHUB_ENV"
+          BUILD_ID_URLENC=$(jq -rn --arg value "$BUILD_ID" '$value | @uri')
+          echo "BUILD_ID_URLENC=$BUILD_ID_URLENC" >> "$GITHUB_ENV"
+
       - name: Mark build as started
         run: |
-          curl -sf -X POST "https://crosspointreader.com/api/font-build/status-update" \
+          payload=$(jq -nc --arg buildId "$BUILD_ID" --arg status "building" \
+            '{buildId: $buildId, status: $status}')
+          curl -sf -X POST "${WEBHOOK_BASE_URL}/api/font-build/status-update" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
-            -d '{"buildId":"${{ inputs.buildId }}","status":"building"}'
+            -d "$payload"
 
-      - name: Checkout crosspoint-reader (script source of truth)
+      - name: Checkout crosspoint-tools
         uses: actions/checkout@v6
-        with:
-          repository: crosspoint-reader/crosspoint-reader
-          ref: ${{ inputs.readerRef }}
-          path: reader
-          submodules: false
 
       - name: Download uploaded TTFs
         id: download
@@ -54,15 +62,35 @@ jobs:
             if curl -sf \
                 -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
                 -o "$target" \
-                "https://crosspointreader.com/api/font-build/files/${{ inputs.buildId }}/$style.ttf"; then
+                "${WEBHOOK_BASE_URL}/api/font-build/files/${BUILD_ID_URLENC}/$style.ttf"; then
               echo "Downloaded $style ($(stat -c%s "$target") bytes)"
               ARGS+=("--$style" "$target")
             else
               rm -f "$target"
             fi
           done
+          target="/tmp/ttfs/fallback-regular.ttf"
+          if curl -sf \
+              -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+              -o "$target" \
+              "${WEBHOOK_BASE_URL}/api/font-build/files/${BUILD_ID_URLENC}/fallback1/regular.ttf"; then
+            echo "Downloaded fallback regular ($(stat -c%s "$target") bytes)"
+            ARGS+=("--fallback-regular" "$target")
+          else
+            rm -f "$target"
+          fi
+          target="/tmp/ttfs/fallback2-regular.ttf"
+          if curl -sf \
+              -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+              -o "$target" \
+              "${WEBHOOK_BASE_URL}/api/font-build/files/${BUILD_ID_URLENC}/fallback2/regular.ttf"; then
+            echo "Downloaded fallback 2 regular ($(stat -c%s "$target") bytes)"
+            ARGS+=("--fallback2-regular" "$target")
+          else
+            rm -f "$target"
+          fi
           if [ ${#ARGS[@]} -eq 0 ]; then
-            echo "No TTFs available for build ${{ inputs.buildId }}" >&2
+            echo "No TTFs available for build $BUILD_ID" >&2
             exit 1
           fi
           # Persist style flags for the next step
@@ -79,7 +107,7 @@ jobs:
         run: |
           mkdir -p out
           mapfile -t STYLE_ARGS < /tmp/style_args.txt
-          python reader/lib/EpdFont/scripts/fontconvert_sdcard.py \
+          python scripts/font-builder/fontconvert_sdcard.py \
             "${STYLE_ARGS[@]}" \
             --name "${{ inputs.family }}" \
             --intervals "${{ inputs.intervals }}" \
@@ -96,11 +124,11 @@ jobs:
             echo "Uploading $name ($size bytes)"
             curl -sf -X PUT \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
-              -H "X-Build-Id: ${{ inputs.buildId }}" \
+              -H "X-Build-Id: $BUILD_ID" \
               -H "X-Filename: $name" \
               -H "Content-Type: application/octet-stream" \
               --data-binary "@$f" \
-              "https://crosspointreader.com/api/font-build/upload-result"
+              "${WEBHOOK_BASE_URL}/api/font-build/upload-result"
             count=$((count + 1))
           done
           if [ "$count" -eq 0 ]; then
@@ -113,26 +141,28 @@ jobs:
         run: |
           # Attach the build log tail so users can see glyph/kern stats.
           LOG_TAIL=$(tail -c 4000 /tmp/build.log | jq -Rs .)
-          curl -sf -X POST "https://crosspointreader.com/api/font-build/status-update" \
+          payload=$(jq -nc \
+            --arg buildId "$BUILD_ID" \
+            --arg status "success" \
+            --arg generatorVersion "${{ github.sha }}" \
+            --argjson log "$LOG_TAIL" \
+            '{buildId: $buildId, status: $status, generatorVersion: $generatorVersion, log: $log}')
+          curl -sf -X POST "${WEBHOOK_BASE_URL}/api/font-build/status-update" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"buildId\": \"${{ inputs.buildId }}\",
-              \"status\": \"success\",
-              \"readerRef\": \"${{ inputs.readerRef }}\",
-              \"log\": $LOG_TAIL
-            }"
+            -d "$payload"
 
       - name: Mark build failed
         if: failure()
         run: |
           LOG_TAIL=$(tail -c 4000 /tmp/build.log 2>/dev/null | jq -Rs . || echo '""')
-          curl -sf -X POST "https://crosspointreader.com/api/font-build/status-update" \
+          payload=$(jq -nc \
+            --arg buildId "$BUILD_ID" \
+            --arg status "failed" \
+            --arg error "Build failed. See GitHub Actions logs." \
+            --argjson log "$LOG_TAIL" \
+            '{buildId: $buildId, status: $status, error: $error, log: $log}')
+          curl -sf -X POST "${WEBHOOK_BASE_URL}/api/font-build/status-update" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"buildId\": \"${{ inputs.buildId }}\",
-              \"status\": \"failed\",
-              \"error\": \"Build failed. See GitHub Actions logs.\",
-              \"log\": $LOG_TAIL
-            }" || true
+            -d "$payload" || true

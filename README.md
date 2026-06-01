@@ -50,13 +50,13 @@ Lets a user replace one or more built-in fonts in the firmware:
 
 Converts arbitrary TTF/OTF files into `.cpfont` files for SD-card loading **without recompiling firmware**:
 
-1. The user uploads up to four styles (regular, bold, italic, bold-italic) plus a family name, point sizes, and either a Unicode interval preset or custom converter ranges at `/fonts`
+1. The user uploads up to four primary styles (regular, bold, italic, bold-italic), up to two fallback family regular styles, plus a family name, point sizes, and either a Unicode interval preset or custom converter ranges at `/fonts`
 2. Worker stores the TTFs in R2 under `font-builds/{buildId}/in/` and dispatches the workflow
-3. Workflow checks out `crosspoint-reader/crosspoint-reader` (default `readerRef` is `master`), installs `freetype-py fonttools brotli`, and runs `lib/EpdFont/scripts/fontconvert_sdcard.py` from the firmware repo **unmodified** — same script the device-side build uses, so output is byte-identical to a host run
+3. Workflow checks out this repo, installs `freetype-py fonttools brotli`, and runs the vendored SD-card generator at `scripts/font-builder/fontconvert_sdcard.py`
 4. Each `.cpfont` is uploaded back to the Worker under `font-builds/{buildId}/out/`
 5. The frontend polls `/api/font-build/status`, streams the script's stderr (glyph counts, kerning pair counts) into the UI, and offers individual or zipped downloads
 
-The script is deliberately **not** vendored into this repo — the firmware repo owns the conversion logic. To bump the script version, change the `readerRef` workflow input (or the dispatch payload in `handleFontBuildUpload`) to a different ref/tag.
+The current generator started as a snapshot of `crosspoint-reader`'s `lib/EpdFont/scripts/fontconvert_sdcard.py`, but it now lives in this repo so the website can evolve SD-card-specific features like multi-family fallback handling independently.
 
 Built `.cpfont` files install on the device by copying to the SD card under `/fonts/YourFont/` (or `/.fonts/YourFont/` for a hidden folder).
 
@@ -126,13 +126,41 @@ Set these on the `SoFriendly/crosspoint-tools` repo (Settings → Secrets → Ac
 
 ```bash
 npm run dev   # Starts wrangler dev server on localhost:8787
+npm run tunnel   # Exposes localhost:8787 through a temporary public tunnel
 ```
+
+If you want local builds to dispatch GitHub Actions, set `GITHUB_TOKEN` in `.dev.vars` to a token that can trigger workflows on the repo you are targeting. By default that is `crosspoint-reader/crosspoint-tools`, but you can override it with:
+
+- `GITHUB_ACTIONS_REPO=owner/repo`
+- `GITHUB_ACTIONS_REF=branch-or-tag`
+
+Without `GITHUB_TOKEN`, font/custom/manual build triggers will fail before the GitHub Actions step starts.
+
+If Wrangler fails while downloading `cloudflared`, install it yourself and rerun the tunnel command:
+
+```bash
+brew install cloudflared
+npm run tunnel
+```
+
+The `tunnel` script prefers an existing `cloudflared` on your `PATH` via `CLOUDFLARED_PATH`, so Wrangler can skip its own download step.
+
+On Windows, run `npm run tunnel` from Git Bash/WSL if you want Unix-like tooling, or set `CLOUDFLARED_PATH` to your `cloudflared.exe` path before launching it from PowerShell or Command Prompt.
+
+For end-to-end build testing, the worker now passes the current request origin to GitHub Actions as the webhook callback base URL. In practice that means:
+
+- Use `npm run dev` for local handler testing only.
+- Run `npm run dev` in one terminal and `npm run tunnel` in a second terminal when you need GitHub Actions to call your dev worker back.
+- Open the site through the tunnel URL, not `localhost`, so the worker dispatches GitHub Actions with the tunnel origin.
+- If you want to keep browsing on `localhost` while callbacks go elsewhere, set `WEBHOOK_BASE_URL=https://your-tunnel-or-dev-host` in `.dev.vars`.
+- If you do not know the shared GitHub `WEBHOOK_SECRET`, set `ALLOW_INSECURE_DEV_WEBHOOKS=true` in `.dev.vars` for local-only testing so your dev worker accepts GitHub callbacks without matching the production secret.
+- If you want to use your own fork or sandbox repo for Actions, set `GITHUB_ACTIONS_REPO` and optionally `GITHUB_ACTIONS_REF` in `.dev.vars`, then add the same workflow files and `WEBHOOK_SECRET` secret to that repo.
 
 ## Acknowledgments
 
 The WebSerial flasher is based on [xteink-flasher](https://github.com/crosspoint-reader/xteink-flasher), licensed under the MIT License. The partition table handling, OTA flashing logic, and device model support were adapted from that project.
 
-The SD-card font builder runs `fontconvert_sdcard.py` from the [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader) firmware repo verbatim, so any kerning/ligature behavior is whatever that script implements — this site is just a thin frontend.
+The SD-card font builder uses the vendored generator in `scripts/font-builder/`, originally sourced from the [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader) firmware repo. Kerning, ligature, and interval behavior now live here, so changes to website-only font features can be made locally without waiting on firmware-repo updates.
 
 ## License
 
