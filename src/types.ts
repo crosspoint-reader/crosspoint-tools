@@ -9,6 +9,12 @@ export interface Env {
   ALLOW_INSECURE_DEV_WEBHOOKS?: string;
   GITHUB_ACTIONS_REPO?: string;
   GITHUB_ACTIONS_REF?: string;
+  // Firmware repo + ref the theme-icon build workflow checks out to run the
+  // canonical generate-theme-icons.py / convert_icon.py scripts. Defaults to
+  // crosspoint-reader/crosspoint-reader @ feat-sd-themes (the branch that
+  // currently holds the scripts); set FIRMWARE_THEME_REF=master once merged.
+  FIRMWARE_THEME_REPO?: string;
+  FIRMWARE_THEME_REF?: string;
   REPO_URL: string;
 }
 
@@ -75,6 +81,21 @@ export interface FontBuildMetadata {
   outputs?: string[];                     // .cpfont filenames produced
   generatorVersion?: string;              // revision of the local font generator that ran
   log?: string;                           // tail of stderr (glyph/kern stats)
+  error?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface ThemeBuildMetadata {
+  buildId: string;
+  status: 'pending' | 'building' | 'success' | 'failed';
+  uid: string;
+  // Icon keys the user supplied a custom SVG/PNG for (e.g. ["folder","wifi"]).
+  // An empty list means "regenerate the standard Lyra icon set unchanged".
+  customIcons: string[];
+  firmwareRef: string;                    // firmware ref the scripts were run from
+  outputs?: string[];                     // .bmp filenames produced
+  log?: string;                           // tail of build log
   error?: string;
   createdAt: string;
   completedAt?: string;

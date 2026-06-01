@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Theme Builder - CrossPoint Reader</title>
+  <meta name="description" content="Build, preview, and export CrossPoint SD-card themes in your browser.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://rsms.me/inter/inter.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['InterVariable', 'Inter', 'sans-serif'],
+            serif: ['Lora', 'serif'],
+            mono: ['"Geist Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f5f3', 100: '#d6e5de', 200: '#b3cfc2', 300: '#8fb9a6',
+              400: '#69917D', 500: '#4a7a62', 600: '#3d6652', 700: '#315243',
+              800: '#253e33', 900: '#1a2c24',
+            },
+          },
+        },
+      },
+    }
+  </script>
+</head>
+<body class="min-h-dvh bg-stone-50 font-sans text-stone-900">
+  <nav class="border-b border-stone-200 bg-white">
+    <div class="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <a href="/" class="flex min-w-0 items-center gap-2 text-stone-900 no-underline" aria-label="Homepage">
+        <img src="/logo.png" alt="" class="size-7 shrink-0 rounded-md">
+        <span class="text-sm/6 font-medium tracking-tight">CrossPoint Reader</span>
+      </a>
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">
+        Theme Builder
+        <span class="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Hidden Preview</span>
+      </span>
+    </div>
+  </nav>
+
+  <header class="border-b border-stone-200 bg-white">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <h1 class="font-serif text-2xl font-medium tracking-tight text-stone-900">SD Theme Builder</h1>
+      <p class="mt-1 max-w-2xl text-sm text-stone-500">Visually build a CrossPoint SD theme and preview it on a simulated device screen. Exports a firmware-compatible <code class="rounded bg-stone-100 px-1 py-0.5 font-mono text-xs">theme.json</code> (schema 1, inherits <code class="rounded bg-stone-100 px-1 py-0.5 font-mono text-xs">lyra</code>).</p>
+    </div>
+  </header>
+
+  <main class="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+
+    <!-- LEFT: editor -->
+    <div class="order-2 lg:order-1">
+      <!-- Start row -->
+      <div class="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-stone-200 bg-white p-4">
+        <div>
+          <label class="block text-xs font-medium text-stone-600">Start from preset</label>
+          <select id="presetSelect" class="mt-1 rounded-md border border-stone-300 px-2 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"></select>
+        </div>
+        <button id="loadPresetBtn" type="button" class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">Load preset</button>
+        <div class="ml-auto">
+          <label for="importInput" class="cursor-pointer rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">Import theme.json…</label>
+          <input id="importInput" type="file" accept=".json,application/json" class="hidden">
+        </div>
+      </div>
+
+      <div id="controls" class="rounded-xl border border-stone-200 bg-white px-4 py-2"></div>
+    </div>
+
+    <!-- RIGHT: preview + output -->
+    <div class="order-1 space-y-4 lg:order-2">
+
+      <!-- Device mockup -->
+      <div class="rounded-xl border border-stone-200 bg-white p-4">
+        <div class="mb-3 flex items-center justify-between">
+          <div class="inline-flex rounded-lg bg-stone-100 p-0.5 text-xs font-medium">
+            <button type="button" data-device="x3" class="rounded-md bg-brand-600 px-3 py-1 text-white">X3</button>
+            <button type="button" data-device="x4" class="rounded-md px-3 py-1 text-stone-600">X4</button>
+          </div>
+          <div class="inline-flex flex-wrap gap-1 text-xs font-medium">
+            <button type="button" data-surface="home" class="rounded-md bg-stone-900 px-2.5 py-1 text-white">Home</button>
+            <button type="button" data-surface="settings" class="rounded-md px-2.5 py-1 text-stone-600 hover:bg-stone-100">Settings</button>
+            <button type="button" data-surface="files" class="rounded-md px-2.5 py-1 text-stone-600 hover:bg-stone-100">Files</button>
+            <button type="button" data-surface="hints" class="rounded-md px-2.5 py-1 text-stone-600 hover:bg-stone-100">Hints</button>
+          </div>
+        </div>
+
+        <!-- the device bezel -->
+        <div class="mx-auto w-fit rounded-[28px] bg-stone-800 p-3 shadow-lg">
+          <div class="overflow-hidden rounded-[14px] bg-white ring-1 ring-black/10">
+            <canvas id="deviceCanvas" width="480" height="800" class="block h-auto w-[300px]" style="image-rendering: pixelated;"></canvas>
+          </div>
+        </div>
+
+        <div class="mt-3 flex items-center justify-center gap-3 text-xs text-stone-500">
+          <button id="selPrev" type="button" class="rounded-md border border-stone-300 px-2 py-1 hover:bg-stone-50">‹ Prev</button>
+          <span>simulated selection</span>
+          <button id="selNext" type="button" class="rounded-md border border-stone-300 px-2 py-1 hover:bg-stone-50">Next ›</button>
+        </div>
+      </div>
+
+      <!-- Validation -->
+      <div id="validation" class="rounded-xl border border-stone-200 bg-white p-4 text-xs"></div>
+
+      <!-- Export -->
+      <div class="rounded-xl border border-stone-200 bg-white p-4">
+        <div class="flex flex-wrap gap-2">
+          <button id="downloadZipBtn" type="button" class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700">Download package (.zip)</button>
+          <button id="downloadJsonBtn" type="button" class="rounded-md border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">Download theme.json</button>
+          <button id="copyJsonBtn" type="button" class="rounded-md border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 hover:bg-stone-50">Copy JSON</button>
+        </div>
+        <label class="mt-3 flex items-center gap-2 text-xs text-stone-600">
+          <input id="writeAll" type="checkbox" class="size-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500">
+          Write all metric fields (not just changes)
+        </label>
+        <p class="mt-2 text-[11px] text-stone-400">Icon BMPs are generated by the official CrossPoint Python script in CI (see <span class="font-medium">Icon Assets</span>). Build them first to include <code class="font-mono">icons/*.bmp</code> in the package; otherwise the zip contains <code class="font-mono">theme.json</code> only.</p>
+      </div>
+
+      <!-- JSON output -->
+      <details class="rounded-xl border border-stone-200 bg-white p-4">
+        <summary class="cursor-pointer text-sm font-medium text-stone-800">theme.json preview</summary>
+        <pre id="jsonOutput" class="mt-3 max-h-96 overflow-auto rounded-lg bg-stone-900 p-3 font-mono text-[11px] leading-relaxed text-stone-100"></pre>
+      </details>
+    </div>
+  </main>
+
+  <script src="/js/theme-builder.js"></script>
+</body>
+</html>

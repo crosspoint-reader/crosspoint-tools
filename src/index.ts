@@ -1,4 +1,4 @@
-import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource } from './types';
+import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource } from './types';
 
 const ROYALTY_REPO_ID = 'SoFriendly/crosspoint-tools';
 
@@ -43,7 +43,23 @@ export default {
       // Streaming res.body through would make Cloudflare use chunked transfer
       // encoding with no Content-Length, which hangs keep-alive HTTP clients
       // that wait for a zero-length read (the device downloader).
-      const body = await res.arrayBuffer();
+      let body = await res.arrayBuffer();
+      // The firmware builds asset URLs as `baseUrl + file.url`, with no
+      // separator, so the manifest's baseUrl must keep the /themes/ path
+      // boundary by ending in a trailing slash. Upstream ships it without one
+      // (".../themes"), which concatenates to ".../themesroundedraff/...".
+      // Rewrite the served manifest to guarantee the trailing slash.
+      if (rel === 'themes.json' && res.ok) {
+        try {
+          const manifest = JSON.parse(new TextDecoder().decode(body));
+          if (typeof manifest.baseUrl === 'string' && !manifest.baseUrl.endsWith('/')) {
+            manifest.baseUrl += '/';
+          }
+          body = new TextEncoder().encode(JSON.stringify(manifest)).buffer as ArrayBuffer;
+        } catch {
+          // Malformed upstream JSON — pass it through untouched.
+        }
+      }
       // no-transform stops Cloudflare from re-compressing the response at the
       // edge. Without it, a client advertising `Accept-Encoding: gzip` (the
       // device's esp_http_client) gets a gzipped, Transfer-Encoding: chunked
@@ -171,6 +187,21 @@ async function handleApi(
       case '/api/font-build/status-update':
         return handleFontBuildStatusUpdate(request, env, corsHeaders);
 
+      case '/api/theme-build/icons':
+        return handleThemeBuildStart(request, env, corsHeaders);
+
+      case '/api/theme-build/status':
+        return handleThemeBuildStatus(request, env, corsHeaders);
+
+      case '/api/theme-build/clear':
+        return handleThemeBuildClear(request, env, corsHeaders);
+
+      case '/api/theme-build/upload-result':
+        return handleThemeBuildUploadResult(request, env, corsHeaders);
+
+      case '/api/theme-build/status-update':
+        return handleThemeBuildStatusUpdate(request, env, corsHeaders);
+
       case '/api/beta':
         if (request.method === 'GET') return handleBetaList(env, corsHeaders);
         if (request.method === 'POST') return handleBetaCreate(request, env, corsHeaders);
@@ -205,6 +236,14 @@ async function handleApi(
         // /api/font-build/result/{filename}            — user downloads outputs
         if (url.pathname.startsWith('/api/font-build/result/')) {
           return handleFontBuildResultDownload(request, url, env, corsHeaders);
+        }
+        // /api/theme-build/files/{buildId}/{key}.{ext}  — workflow downloads custom icon inputs
+        if (url.pathname.startsWith('/api/theme-build/files/')) {
+          return handleThemeBuildFileDownload(request, url, env, corsHeaders);
+        }
+        // /api/theme-build/result/{filename}.bmp        — user downloads generated BMPs
+        if (url.pathname.startsWith('/api/theme-build/result/')) {
+          return handleThemeBuildResultDownload(request, url, env, corsHeaders);
         }
         return json({ error: 'Not found' }, 404, corsHeaders);
     }
@@ -1809,6 +1848,333 @@ async function handleFontBuildResultDownload(
       ...headers,
       'Content-Type': 'application/octet-stream',
       'Content-Disposition': `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+      'Content-Length': String(object.size),
+    },
+  });
+}
+
+// --- Theme Icon Build (.bmp generation via firmware-repo Python scripts) ---
+//
+// Mirrors the font-build flow, but the canonical conversion logic is NOT
+// vendored here: the build-theme-icons.yml workflow checks out the firmware
+// repo at FIRMWARE_THEME_REF and runs its scripts/convert_icon.py and
+// scripts/generate-theme-icons.py so the BMP format stays a single source of
+// truth in the firmware repo. The web builder bundles the returned BMPs into
+// the exported theme package zip.
+
+const THEME_BUILD_LOCK_TTL = 10 * 60;
+
+// Map of icon key -> { header stem written under src/components/icons, square
+// pixel size }. Keys mirror theme.json `assets.icons`; note "settings" maps to
+// the firmware's settings2.h / settings2.bmp.
+const THEME_ICON_SPECS: Record<string, { header: string; size: number }> = {
+  book: { header: 'book', size: 32 },
+  book24: { header: 'book24', size: 24 },
+  bookmark: { header: 'bookmark', size: 32 },
+  cover: { header: 'cover', size: 32 },
+  file24: { header: 'file24', size: 24 },
+  folder: { header: 'folder', size: 32 },
+  folder24: { header: 'folder24', size: 24 },
+  hotspot: { header: 'hotspot', size: 32 },
+  image24: { header: 'image24', size: 24 },
+  library: { header: 'library', size: 32 },
+  recent: { header: 'recent', size: 32 },
+  settings: { header: 'settings2', size: 32 },
+  text24: { header: 'text24', size: 24 },
+  transfer: { header: 'transfer', size: 32 },
+  wifi: { header: 'wifi', size: 32 },
+};
+
+function getThemeFirmwareRepo(env: Env): string {
+  return (env.FIRMWARE_THEME_REPO || 'crosspoint-reader/crosspoint-reader').trim() || 'crosspoint-reader/crosspoint-reader';
+}
+function getThemeFirmwareRef(env: Env): string {
+  // The theme/icon Python scripts currently live on the feat-sd-themes branch.
+  // Override with the FIRMWARE_THEME_REF var (set it to "master" once merged).
+  return (env.FIRMWARE_THEME_REF || 'feat-sd-themes').trim() || 'feat-sd-themes';
+}
+
+// POST /api/theme-build/icons — multipart form. Each file field is named by its
+// icon key (e.g. "folder", "settings") and holds an SVG or PNG to convert. A
+// build with zero files regenerates the standard Lyra set unchanged.
+async function handleThemeBuildStart(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+
+  let uid = getUserId(request);
+  if (!uid) uid = generateUserId();
+
+  const lock = await env.BUILD_META.get(`theme-build-lock:${uid}`);
+  if (lock) {
+    return json({ error: 'Your previous icon build is still running. Try again shortly.' }, 409, headers);
+  }
+
+  const formData = await request.formData();
+  const customIcons: string[] = [];
+  const iconDescriptors: Array<{ key: string; header: string; width: number; height: number; ext: string }> = [];
+  const toStore: Array<{ key: string; ext: string; data: ArrayBuffer }> = [];
+
+  for (const [key, value] of formData.entries() as IterableIterator<[string, string | File]>) {
+    if (typeof value === 'string') continue;
+    const spec = THEME_ICON_SPECS[key];
+    if (!spec) {
+      return json({ error: `Unknown icon key: ${key}` }, 400, headers);
+    }
+    const name = (value.name || '').toLowerCase();
+    const ext = name.endsWith('.svg') ? 'svg' : name.endsWith('.png') ? 'png' : '';
+    if (!ext) {
+      return json({ error: `Icon "${key}" must be an .svg or .png file` }, 400, headers);
+    }
+    if (value.size > 2 * 1024 * 1024) {
+      return json({ error: `Icon "${key}" is too large (max 2 MB)` }, 400, headers);
+    }
+    const data = await value.arrayBuffer();
+    toStore.push({ key, ext, data });
+    customIcons.push(key);
+    iconDescriptors.push({ key, header: spec.header, width: spec.size, height: spec.size, ext });
+  }
+
+  const buildId = generateBuildId();
+  for (const item of toStore) {
+    await env.FIRMWARE_BUCKET.put(`theme-icon-builds/${buildId}/in/${item.key}.${item.ext}`, item.data);
+  }
+
+  const firmwareRef = getThemeFirmwareRef(env);
+  await env.BUILD_META.put(`theme-build-lock:${uid}`, buildId, { expirationTtl: THEME_BUILD_LOCK_TTL });
+  await env.BUILD_META.put(`theme-build:user:${uid}`, buildId);
+
+  const meta: ThemeBuildMetadata = {
+    buildId,
+    status: 'pending',
+    uid,
+    customIcons,
+    firmwareRef,
+    createdAt: new Date().toISOString(),
+  };
+  await env.BUILD_META.put(`theme-build:${buildId}`, JSON.stringify(meta));
+
+  const gitHubToken = getGitHubAuthToken(env);
+  if (!gitHubToken) {
+    await env.BUILD_META.delete(`theme-build-lock:${uid}`);
+    await env.BUILD_META.delete(`theme-build:user:${uid}`);
+    await env.BUILD_META.delete(`theme-build:${buildId}`);
+    return json({ error: 'Missing GITHUB_TOKEN in local/deployed worker config' }, 500, headers);
+  }
+
+  const ghRes = await fetch(
+    getWorkflowDispatchUrl(env, 'build-theme-icons.yml'),
+    {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'crosspoint-tools',
+        Authorization: `Bearer ${gitHubToken}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+      body: JSON.stringify({
+        ref: getGitHubActionsRef(env),
+        inputs: {
+          buildId,
+          icons: JSON.stringify(iconDescriptors),
+          firmwareRepo: getThemeFirmwareRepo(env),
+          firmwareRef,
+          webhookBaseUrl: getWebhookBaseUrl(request, env),
+        },
+      }),
+    }
+  );
+
+  if (!ghRes.ok) {
+    await env.BUILD_META.delete(`theme-build-lock:${uid}`);
+    await env.BUILD_META.delete(`theme-build:user:${uid}`);
+    await env.BUILD_META.delete(`theme-build:${buildId}`);
+    const body = await ghRes.text();
+    console.error(`Theme icon build dispatch failed: ${ghRes.status} ${body}`);
+    const isAuthFailure = ghRes.status === 401 || ghRes.status === 403;
+    return json({ error: isAuthFailure ? 'GitHub workflow dispatch failed: missing or invalid GITHUB_TOKEN' : 'Failed to start build' }, 502, headers);
+  }
+
+  const response = json({ buildId, customIcons }, 202, headers);
+  setUserIdCookie(response, uid);
+  return response;
+}
+
+async function handleThemeBuildStatus(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const uid = getUserId(request);
+  if (!uid) return json({ build: null }, 200, headers);
+
+  const buildId = await env.BUILD_META.get(`theme-build:user:${uid}`);
+  if (!buildId) return json({ build: null }, 200, headers);
+
+  const raw = await env.BUILD_META.get(`theme-build:${buildId}`);
+  if (!raw) return json({ build: null }, 200, headers);
+
+  const meta = JSON.parse(raw) as ThemeBuildMetadata;
+  // List outputs from R2 (strongly consistent) rather than tracking in KV, to
+  // avoid read-modify-write races across concurrent upload-result handlers.
+  const prefix = `theme-icon-builds/${buildId}/out/`;
+  const list = await env.FIRMWARE_BUCKET.list({ prefix });
+  meta.outputs = list.objects
+    .map(o => (o.key.startsWith(prefix) ? o.key.slice(prefix.length) : o.key))
+    .filter(name => name.endsWith('.bmp'))
+    .sort();
+
+  return json({ build: meta }, 200, headers);
+}
+
+async function handleThemeBuildClear(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+  const uid = getUserId(request);
+  if (!uid) return json({ ok: true }, 200, headers);
+
+  const buildId = await env.BUILD_META.get(`theme-build:user:${uid}`);
+  if (buildId) {
+    await env.BUILD_META.delete(`theme-build:user:${uid}`);
+    await env.BUILD_META.delete(`theme-build:${buildId}`);
+    await env.BUILD_META.delete(`theme-build-lock:${uid}`);
+  }
+  return json({ ok: true }, 200, headers);
+}
+
+// Workflow downloads uploaded custom icon inputs from here.
+// Path: /api/theme-build/files/{buildId}/{key}.{ext}
+async function handleThemeBuildFileDownload(
+  request: Request,
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const rawPath = url.pathname.replace('/api/theme-build/files/', '');
+  const slashIndex = rawPath.indexOf('/');
+  if (slashIndex === -1) return json({ error: 'Invalid path' }, 400, headers);
+  const buildId = rawPath.slice(0, slashIndex);
+  const filename = rawPath.slice(slashIndex + 1);
+  // {key}.{svg|png}, key restricted to the known icon set.
+  const match = /^([A-Za-z0-9_]+)\.(svg|png)$/.exec(filename);
+  if (!match || !THEME_ICON_SPECS[match[1]]) {
+    return json({ error: 'Invalid icon path' }, 400, headers);
+  }
+
+  const object = await env.FIRMWARE_BUCKET.get(`theme-icon-builds/${buildId}/in/${filename}`);
+  if (!object) return json({ error: 'Not found' }, 404, headers);
+
+  return new Response(object.body, {
+    headers: {
+      ...headers,
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(object.size),
+    },
+  });
+}
+
+// Workflow uploads each generated .bmp here, stored under .../out/.
+async function handleThemeBuildUploadResult(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'PUT') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const buildId = request.headers.get('X-Build-Id');
+  const filename = request.headers.get('X-Filename');
+  if (!buildId || !filename) {
+    return json({ error: 'Missing X-Build-Id or X-Filename' }, 400, headers);
+  }
+  if (!/^[A-Za-z0-9_-]+\.bmp$/.test(filename)) {
+    return json({ error: 'Invalid filename' }, 400, headers);
+  }
+
+  const data = await request.arrayBuffer();
+  await env.FIRMWARE_BUCKET.put(`theme-icon-builds/${buildId}/out/${filename}`, data);
+  return json({ ok: true, size: data.byteLength }, 200, headers);
+}
+
+async function handleThemeBuildStatusUpdate(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const body = await request.json() as {
+    buildId: string;
+    status: ThemeBuildMetadata['status'];
+    log?: string;
+    error?: string;
+  };
+
+  const raw = await env.BUILD_META.get(`theme-build:${body.buildId}`);
+  if (!raw) return json({ error: 'Build not found' }, 404, headers);
+
+  const meta = JSON.parse(raw) as ThemeBuildMetadata;
+  meta.status = body.status;
+  if (body.log) meta.log = body.log;
+  if (body.error) meta.error = body.error;
+  if (body.status === 'success' || body.status === 'failed') {
+    meta.completedAt = new Date().toISOString();
+    if (meta.uid) await env.BUILD_META.delete(`theme-build-lock:${meta.uid}`);
+  }
+
+  await env.BUILD_META.put(`theme-build:${body.buildId}`, JSON.stringify(meta));
+  return json({ ok: true }, 200, headers);
+}
+
+// User downloads a generated BMP. Path: /api/theme-build/result/{name}.bmp
+// Resolved against the user's current build via cookie so buildIds can't be
+// guessed to read another user's outputs.
+async function handleThemeBuildResultDownload(
+  request: Request,
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const uid = getUserId(request);
+  if (!uid) return json({ error: 'Not found' }, 404, headers);
+
+  const buildId = await env.BUILD_META.get(`theme-build:user:${uid}`);
+  if (!buildId) return json({ error: 'Not found' }, 404, headers);
+
+  const filename = url.pathname.replace('/api/theme-build/result/', '');
+  if (!/^[A-Za-z0-9_-]+\.bmp$/.test(filename)) {
+    return json({ error: 'Invalid filename' }, 400, headers);
+  }
+
+  const object = await env.FIRMWARE_BUCKET.get(`theme-icon-builds/${buildId}/out/${filename}`);
+  if (!object) return json({ error: 'Not found' }, 404, headers);
+
+  return new Response(object.body, {
+    headers: {
+      ...headers,
+      'Content-Type': 'image/bmp',
+      'Content-Disposition': `attachment; filename="${filename}"`,
       'Content-Length': String(object.size),
     },
   });

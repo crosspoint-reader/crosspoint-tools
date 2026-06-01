@@ -1,0 +1,165 @@
+name: Build theme icons
+
+# Generates firmware-exact 1-bit BMP icon assets for the web Theme Builder by
+# running the CANONICAL Python scripts from the firmware repo — they are not
+# vendored here. convert_icon.py turns any custom SVG/PNG into a compiled 1-bit
+# header; generate-theme-icons.py then emits the BMPs in the exact format the
+# device parser expects. The Worker stores the results in R2 and the web
+# builder bundles them into the exported theme package.
+
+on:
+  workflow_dispatch:
+    inputs:
+      buildId:
+        description: 'Theme icon build ID'
+        required: true
+      icons:
+        description: 'JSON array of custom icons: [{key,header,width,height,ext}]'
+        required: false
+        default: '[]'
+      firmwareRepo:
+        description: 'Firmware repo holding the canonical scripts'
+        required: false
+        default: 'crosspoint-reader/crosspoint-reader'
+      firmwareRef:
+        description: 'Firmware ref to check out (branch/tag/sha)'
+        required: false
+        default: 'feat-sd-themes'
+      webhookBaseUrl:
+        description: 'Base URL for webhook callbacks'
+        required: false
+        default: 'https://crosspointreader.com'
+
+concurrency:
+  group: theme-icon-build-${{ inputs.buildId }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_ID: ${{ inputs.buildId }}
+      ICONS_JSON: ${{ inputs.icons }}
+    steps:
+      - name: Resolve webhook base URL
+        env:
+          WEBHOOK_BASE_URL_RAW: ${{ inputs.webhookBaseUrl }}
+        run: |
+          BASE="${WEBHOOK_BASE_URL_RAW:-https://crosspointreader.com}"
+          echo "WEBHOOK_BASE_URL=${BASE%/}" >> "$GITHUB_ENV"
+          BUILD_ID_URLENC=$(jq -rn --arg value "$BUILD_ID" '$value | @uri')
+          echo "BUILD_ID_URLENC=$BUILD_ID_URLENC" >> "$GITHUB_ENV"
+
+      - name: Mark build as started
+        run: |
+          payload=$(jq -nc --arg buildId "$BUILD_ID" --arg status "building" \
+            '{buildId: $buildId, status: $status}')
+          curl -sf -X POST "${WEBHOOK_BASE_URL}/api/theme-build/status-update" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "$payload"
+
+      # The firmware repo IS the workspace — its scripts are the single source
+      # of truth for icon conversion, so nothing is vendored into this repo.
+      - name: Checkout firmware repo (canonical scripts)
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.firmwareRepo }}
+          ref: ${{ inputs.firmwareRef }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install icon conversion dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcairo2 libpango-1.0-0 libpangocairo-1.0-0
+          pip install --no-cache-dir pillow cairosvg
+
+      - name: Convert icons (convert_icon.py + generate-theme-icons.py)
+        run: |
+          set -euo pipefail
+          # 1. Apply any custom uploads first: convert_icon.py rewrites the
+          #    matching src/components/icons/<header>.h (no-op when count == 0).
+          mkdir -p /tmp/icon-in
+          count=$(echo "$ICONS_JSON" | jq 'length')
+          echo "Custom icons to apply: $count"
+          for i in $(seq 0 $((count - 1))); do
+            key=$(echo "$ICONS_JSON" | jq -r ".[$i].key")
+            header=$(echo "$ICONS_JSON" | jq -r ".[$i].header")
+            width=$(echo "$ICONS_JSON" | jq -r ".[$i].width")
+            height=$(echo "$ICONS_JSON" | jq -r ".[$i].height")
+            ext=$(echo "$ICONS_JSON" | jq -r ".[$i].ext")
+            key_urlenc=$(jq -rn --arg v "$key" '$v | @uri')
+            target="/tmp/icon-in/${key}.${ext}"
+            echo "Downloading custom icon '$key' ($ext) -> header $header.h (${width}x${height})"
+            curl -sf \
+              -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+              -o "$target" \
+              "${WEBHOOK_BASE_URL}/api/theme-build/files/${BUILD_ID_URLENC}/${key_urlenc}.${ext}"
+            # convert_icon.py writes src/components/icons/<header>.h (rotated CCW);
+            # generate-theme-icons.py rotates CW again, so it ends up upright.
+            python scripts/convert_icon.py "$target" "$header" "$width" "$height"
+          done
+
+          # 2. Emit the full BMP set. generate-theme-icons.py writes BMPs into
+          #    every <themes>/<dir>/icons/ that has a theme.json, so stage one
+          #    throwaway theme dir to collect them.
+          mkdir -p build/pkg/icons
+          echo '{"schema":1,"id":"pkg","name":"pkg","inherits":"lyra"}' > build/pkg/theme.json
+          python scripts/generate-theme-icons.py --icons src/components/icons --themes build 2>&1 | tee /tmp/build.log
+          echo "Generated BMPs:"
+          ls -la build/pkg/icons/
+
+      - name: Upload generated BMPs
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          count=0
+          for f in build/pkg/icons/*.bmp; do
+            name=$(basename "$f")
+            size=$(stat -c%s "$f")
+            echo "Uploading $name ($size bytes)"
+            curl -sf -X PUT \
+              -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+              -H "X-Build-Id: $BUILD_ID" \
+              -H "X-Filename: $name" \
+              -H "Content-Type: image/bmp" \
+              --data-binary "@$f" \
+              "${WEBHOOK_BASE_URL}/api/theme-build/upload-result"
+            count=$((count + 1))
+          done
+          if [ "$count" -eq 0 ]; then
+            echo "No BMPs produced" >&2
+            exit 1
+          fi
+          echo "Uploaded $count BMP(s)"
+
+      - name: Mark build success
+        run: |
+          LOG_TAIL=$(tail -c 4000 /tmp/build.log | jq -Rs .)
+          payload=$(jq -nc \
+            --arg buildId "$BUILD_ID" \
+            --arg status "success" \
+            --argjson log "$LOG_TAIL" \
+            '{buildId: $buildId, status: $status, log: $log}')
+          curl -sf -X POST "${WEBHOOK_BASE_URL}/api/theme-build/status-update" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "$payload"
+
+      - name: Mark build failed
+        if: failure()
+        run: |
+          LOG_TAIL=$(tail -c 4000 /tmp/build.log 2>/dev/null | jq -Rs . || echo '""')
+          payload=$(jq -nc \
+            --arg buildId "$BUILD_ID" \
+            --arg status "failed" \
+            --arg error "Build failed. See GitHub Actions logs." \
+            --argjson log "$LOG_TAIL" \
+            '{buildId: $buildId, status: $status, error: $error, log: $log}')
+          curl -sf -X POST "${WEBHOOK_BASE_URL}/api/theme-build/status-update" \
+            -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "$payload" || true
