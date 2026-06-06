@@ -1498,7 +1498,7 @@ async function collectUploadedFallbackRegular(formData: FormData, key: string): 
 }
 
 function isValidFontIntervals(intervals: string): boolean {
-  if (intervals.length < 1 || intervals.length > 200) return false;
+  if (intervals.length < 1 || intervals.length > 2000) return false;
 
   const preset = '[A-Za-z0-9_-]+';
   const range = '\\(0x[0-9A-Fa-f]+-0x[0-9A-Fa-f]+\\)';
@@ -1547,8 +1547,11 @@ async function handleFontBuildUpload(
   }
 
   const intervals = ((formData.get('intervals') as string | null)?.trim() || 'builtin');
+  if (intervals.length > 2000) {
+    return json({ error: 'Unicode coverage is too long (max 2000 characters). Use named presets (e.g. hangul, cjk) instead of many explicit ranges.' }, 400, headers);
+  }
   if (!isValidFontIntervals(intervals)) {
-    return json({ error: 'Invalid intervals' }, 400, headers);
+    return json({ error: 'Invalid Unicode coverage format. Use preset names or hex ranges like (0x4E00-0x9FFF), comma-separated.' }, 400, headers);
   }
 
   let uploadedStyles: FontBuildStyle[] = [];

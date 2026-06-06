@@ -186,7 +186,7 @@
         <!-- Options -->
         <div class="mt-6 flex flex-wrap items-end gap-6">
           <div class="w-full">
-            <label for="intervalPreset" class="flex items-center gap-1.5 text-sm/6 font-medium text-stone-700">
+            <label class="flex items-center gap-1.5 text-sm/6 font-medium text-stone-700">
               Unicode Coverage
               <span class="group relative">
                 <span class="flex size-4 cursor-help items-center justify-center rounded-full bg-stone-200 text-[10px] font-bold text-stone-500">?</span>
@@ -205,15 +205,32 @@
                 </span>
               </span>
             </label>
-            <select id="intervalPreset" class="mt-1.5 block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 shadow-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none">
-              <option value="reading" selected>Reading: fiction with symbols (recommended)</option>
-              <option value="builtin">Built-in: matches default fonts</option>
-              <option value="latin-ext">Latin Extended</option>
-              <option value="custom">Advanced custom ranges...</option>
-            </select>
-            <div id="customIntervalsWrap" class="mt-3 hidden">
-              <input type="text" id="customIntervals" value="reading,(0x2900-0x29FF),(0x2E00-0x2EFF),(0x3000-0x30FF)" class="block w-full rounded-lg border border-stone-300 px-3 py-2 font-mono text-sm text-stone-900 shadow-sm placeholder:text-stone-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none">
-              <p class="mt-1.5 max-w-[42rem] text-xs text-stone-400">Comma-separated presets and ranges. Example: <code class="rounded bg-stone-100 px-1 py-0.5 font-mono text-[11px] text-stone-700">reading,(0x2900-0x29FF),(0x2E00-0x2EFF)</code></p>
+            <p class="mt-1.5 text-xs text-stone-400">Check every script your readers need. Presets combine, and only glyphs your uploaded fonts actually contain are included.</p>
+            <!-- Preset values MUST match the INTERVAL_PRESETS keys in scripts/font-builder/fontconvert_sdcard.py (the script CI runs). -->
+            <div id="intervalPresets" class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="reading" checked class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Reading <span class="text-xs text-stone-400">(fiction)</span></label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="builtin" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Built-in <span class="text-xs text-stone-400">(default fonts)</span></label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="ascii" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> ASCII</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="latin1" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Latin-1</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="latin-ext" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Latin Extended</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="vietnamese" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Vietnamese</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="greek" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Greek</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="cyrillic" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Cyrillic</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="hebrew" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Hebrew</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="armenian" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Armenian</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="georgian" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Georgian</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="ethiopic" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Ethiopic</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="cherokee" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Cherokee</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="tifinagh" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Tifinagh</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="hangul" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Hangul <span class="text-xs text-stone-400">(Korean)</span></label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="cjk" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> CJK <span class="text-xs text-stone-400">(Chinese/Japanese)</span></label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="punctuation" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Punctuation</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="symbols" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Symbols &amp; Arrows</label>
+            </div>
+            <div class="mt-3">
+              <label for="customIntervals" class="block text-xs font-medium text-stone-600">Additional custom ranges <span class="font-normal text-stone-400">(optional)</span></label>
+              <input type="text" id="customIntervals" value="" placeholder="(0x2900-0x29FF),(0x2E00-0x2EFF)" class="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 font-mono text-sm text-stone-900 shadow-sm placeholder:text-stone-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none">
+              <p class="mt-1.5 max-w-[42rem] text-xs text-stone-400">Comma-separated hex ranges added on top of the checked presets. Example: <code class="rounded bg-stone-100 px-1 py-0.5 font-mono text-[11px] text-stone-700">(0x2900-0x29FF),(0x2E00-0x2EFF)</code></p>
             </div>
           </div>
         </div>
@@ -432,18 +449,13 @@
     }
 
     function intervalSelection() {
-      var preset = document.getElementById('intervalPreset').value;
-      if (preset !== 'custom') return preset;
-      return document.getElementById('customIntervals').value.trim();
+      var parts = [];
+      var boxes = document.querySelectorAll('input[name="intervalPreset"]:checked');
+      for (var i = 0; i < boxes.length; i++) parts.push(boxes[i].value);
+      var custom = document.getElementById('customIntervals').value.trim();
+      if (custom) parts.push(custom);
+      return parts.join(',');
     }
-
-    function toggleCustomIntervals() {
-      var isCustom = document.getElementById('intervalPreset').value === 'custom';
-      document.getElementById('customIntervalsWrap').classList.toggle('hidden', !isCustom);
-    }
-
-    document.getElementById('intervalPreset').addEventListener('change', toggleCustomIntervals);
-    toggleCustomIntervals();
 
     async function startBuild() {
       var regularFile = document.getElementById('fontRegular').files[0];
