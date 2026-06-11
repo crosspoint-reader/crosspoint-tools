@@ -121,8 +121,22 @@ jobs:
             --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansSymbols-Regular.ttf"
             --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansSymbols2-Regular.ttf"
             --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoEmoji-Regular.ttf"
-            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKsc-Regular.otf"
           )
+          if [[ ",${{ inputs.intervals }}," == *",cjk-jp,"* ]]; then
+            DEFAULT_FALLBACK_ARGS+=(
+              --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKjp-Regular.otf"
+              --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKsc-Regular.otf"
+            )
+          elif [[ ",${{ inputs.intervals }}," == *",cjk-sc,"* ]]; then
+            DEFAULT_FALLBACK_ARGS+=(
+              --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKsc-Regular.otf"
+              --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKjp-Regular.otf"
+            )
+          else
+            DEFAULT_FALLBACK_ARGS+=(
+              --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKjp-Regular.otf"
+            )
+          fi
           python scripts/font-builder/fontconvert_sdcard.py \
             "${STYLE_ARGS[@]}" \
             "${DEFAULT_FALLBACK_ARGS[@]}" \

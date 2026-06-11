@@ -15,7 +15,7 @@ Usage:
 
     # All 4 sizes at once
     python fontconvert_sdcard.py \\
-      --intervals cjk \\
+      --intervals cjk-sc \\
       --sizes 12,14,16,18 --style regular \\
       NotoSansCJKsc-Regular.otf \\
       --output-dir NotoSansCJK/
@@ -58,7 +58,9 @@ INTERVAL_PRESETS = {
     "armenian":    [(0x0530, 0x058F)],
     "ethiopic":    [(0x1200, 0x137F), (0x1380, 0x139F), (0x2D80, 0x2DDF)],
     "vietnamese":  [(0x01A0, 0x01B0), (0x1EA0, 0x1EF9)],
-    "cjk":         [(0x3000, 0x303F), (0x3040, 0x309F), (0x30A0, 0x30FF),
+    "cjk-sc":      [(0x3000, 0x303F), (0x4E00, 0x9FFF),
+                    (0xF900, 0xFAFF), (0xFF00, 0xFFEF)],
+    "cjk-jp":      [(0x3000, 0x303F), (0x3040, 0x309F), (0x30A0, 0x30FF),
                     (0x4E00, 0x9FFF), (0xF900, 0xFAFF), (0xFF00, 0xFFEF)],
     "hangul":      [(0xAC00, 0xD7AF), (0x1100, 0x11FF), (0x3130, 0x318F)],
     "cherokee":    [(0x13A0, 0x13FF), (0xAB70, 0xABBF)],
@@ -934,7 +936,7 @@ def main():
     parser.add_argument("fontfile", nargs="?", default=None,
                         help="Path to the font file (single-style mode).")
     parser.add_argument("--intervals", dest="intervals",
-                        help="Comma-separated additional interval presets (e.g., 'default,latin-ext,cjk'). Base coverage is always included.")
+                        help="Comma-separated additional interval presets (e.g., 'default,latin-ext,cjk-jp'). Base coverage is always included.")
     parser.add_argument("--size", type=int, dest="size",
                         help="Single font size to generate.")
     parser.add_argument("--sizes", dest="sizes",

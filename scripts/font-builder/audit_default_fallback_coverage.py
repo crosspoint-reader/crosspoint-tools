@@ -27,12 +27,14 @@ DEFAULT_FALLBACK_FILES = [
     "NotoSansSymbols-Regular.ttf",
     "NotoSansSymbols2-Regular.ttf",
     "NotoEmoji-Regular.ttf",
+    "NotoSansCJKjp-Regular.otf",
     "NotoSansCJKsc-Regular.otf",
 ]
 
 ALLOWED_MISSING_ASSIGNED = {
     "default": {(0x20C0, 0x20C0)},
-    "cjk": {(0x9FF0, 0x9FFF), (0xFA70, 0xFAFF)},
+    "cjk-jp": {(0x9FF0, 0x9FFF), (0xFA70, 0xFAFF)},
+    "cjk-sc": {(0x9FF0, 0x9FFF), (0xFA70, 0xFAFF)},
     "hebrew": {(0x05EF, 0x05EF)},
     "reading": {(0x20C0, 0x20C0), (0x2E53, 0x2E5D)},
     "symbols": {(0x20C0, 0x20C0)},
