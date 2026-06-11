@@ -4,3 +4,8 @@ dist/
 .dev.vars
 .DS_Store
 **/.DS_Store
+
+# Python cache artifacts from local font-builder runs
+__pycache__/
+*.py[cod]
+*$py.class

@@ -15,7 +15,7 @@ on:
       intervals:
         description: 'Codepoint interval presets'
         required: false
-        default: 'builtin'
+        default: 'base'
       webhookBaseUrl:
         description: 'Base URL for webhook callbacks'
         required: false
@@ -107,8 +107,25 @@ jobs:
         run: |
           mkdir -p out
           mapfile -t STYLE_ARGS < /tmp/style_args.txt
+          DEFAULT_FALLBACK_DIR="scripts/font-builder/default-fallback-fonts"
+          DEFAULT_FALLBACK_ARGS=(
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSans-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansHebrew-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansArmenian-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansGeorgian-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansEthiopic-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCherokee-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansTifinagh-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCoptic-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansMath-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansSymbols-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansSymbols2-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoEmoji-Regular.ttf"
+            --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKsc-Regular.otf"
+          )
           python scripts/font-builder/fontconvert_sdcard.py \
             "${STYLE_ARGS[@]}" \
+            "${DEFAULT_FALLBACK_ARGS[@]}" \
             --name "${{ inputs.family }}" \
             --intervals "${{ inputs.intervals }}" \
             --sizes "${{ inputs.sizes }}" \

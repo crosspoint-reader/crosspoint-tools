@@ -36,9 +36,19 @@ from cpfont_version import CPFONT_VERSION
 
 # --- Unicode interval presets ---
 
+BASE_INTERVALS = [(0x0000, 0x007F), (0x2000, 0x206F)]
+
+DEFAULT_INTERVALS = [(0x0080, 0x00FF), (0x0100, 0x017F),
+                     (0x01A0, 0x01A1), (0x01AF, 0x01B0), (0x01C4, 0x021F),
+                     (0x0300, 0x036F), (0x0400, 0x04FF), (0x1EA0, 0x1EF9),
+                     (0x20A0, 0x20CF), (0x2070, 0x209F), (0x2190, 0x21FF),
+                     (0x2200, 0x22FF), (0xFB00, 0xFB06)]
+
 INTERVAL_PRESETS = {
-    "ascii":       [(0x0020, 0x007E)],
-    "latin1":      [(0x0080, 0x00FF)],
+    # Minimum readable coverage. This is included in every generated .cpfont.
+    "base":        BASE_INTERVALS,
+    # Broad CrossPoint-style reading coverage. Users can add this on top of base.
+    "default":     DEFAULT_INTERVALS,
     "latin-ext":   [(0x0020, 0x007E), (0x0080, 0x00FF), (0x0100, 0x024F),
                     (0x1E00, 0x1EFF), (0x2000, 0x206F), (0xFB00, 0xFB06)],
     "greek":       [(0x0370, 0x03FF), (0x1F00, 0x1FFF)],
@@ -48,7 +58,6 @@ INTERVAL_PRESETS = {
     "armenian":    [(0x0530, 0x058F)],
     "ethiopic":    [(0x1200, 0x137F), (0x1380, 0x139F), (0x2D80, 0x2DDF)],
     "vietnamese":  [(0x01A0, 0x01B0), (0x1EA0, 0x1EF9)],
-    "punctuation": [(0x2000, 0x206F)],
     "cjk":         [(0x3000, 0x303F), (0x3040, 0x309F), (0x30A0, 0x30FF),
                     (0x4E00, 0x9FFF), (0xF900, 0xFAFF), (0xFF00, 0xFFEF)],
     "hangul":      [(0xAC00, 0xD7AF), (0x1100, 0x11FF), (0x3130, 0x318F)],
@@ -60,23 +69,20 @@ INTERVAL_PRESETS = {
                     (0x2190, 0x21FF), (0x2200, 0x22FF), (0x2500, 0x257F),
                     (0x25A0, 0x25FF), (0x2600, 0x26FF), (0x2700, 0x27BF)],
     # Composite preset for English-language literary fiction including scifi/popsci.
+    # Includes default coverage so selecting reading preserves the old behavior.
     # Greek for physics terms, math operators, geometric shapes, uncommon
     # dialogue punctuation, CJK quote marks, miscellaneous symbols (♪♫♬), dingbats.
-    "reading":     [(0x0020, 0x024F), (0x0300, 0x036F), (0x0370, 0x03FF),
-                    (0x0400, 0x04FF), (0x1E00, 0x1EFF), (0x2000, 0x206F),
-                    (0x2070, 0x209F), (0x20A0, 0x20CF), (0x2150, 0x218F),
-                    (0x2190, 0x21FF), (0x2200, 0x22FF), (0x2500, 0x257F),
+    "reading":     DEFAULT_INTERVALS + [
+                    (0x0180, 0x019F), (0x01A2, 0x01AE), (0x01B1, 0x01C3),
+                    (0x0220, 0x024F), (0x0370, 0x03FF), (0x1E00, 0x1E9F),
+                    (0x1EFA, 0x1EFF), (0x2150, 0x218F), (0x2500, 0x257F),
                     (0x25A0, 0x25FF), (0x2600, 0x26FF), (0x2700, 0x27BF),
-                    (0x2900, 0x29FF), (0x2E00, 0x2E7F), (0x3000, 0x303F),
-                    (0xFB00, 0xFB06)],
-    # Matches the built-in font intervals from fontconvert.py exactly
-    "builtin":     [(0x0000, 0x007F), (0x0080, 0x00FF), (0x0100, 0x017F),
-                    (0x01A0, 0x01A1), (0x01AF, 0x01B0), (0x01C4, 0x021F),
-                    (0x0300, 0x036F), (0x0400, 0x04FF),
-                    (0x1EA0, 0x1EF9), (0x2000, 0x206F), (0x20A0, 0x20CF),
-                    (0x2070, 0x209F), (0x2190, 0x21FF), (0x2200, 0x22FF),
-                    (0xFB00, 0xFB06)],
+                    (0x2900, 0x29FF), (0x2E00, 0x2E7F), (0x3000, 0x303F)],
 }
+
+# Every generated .cpfont gets this minimum first; user-selected presets and
+# custom ranges are additive.
+BASE_INTERVAL_PRESETS = ("base",)
 
 # Regex for parsing unnamed hex range intervals: (0xSTART-0xEND)
 _HEX_RANGE_PATTERN = re.compile(r'^\(0x([0-9a-fA-F]+)-0x([0-9a-fA-F]+)\)$')
@@ -98,15 +104,19 @@ def parse_hex_range(s: str) -> tuple[int, int] | None:
 def resolve_intervals(preset_str):
     """Resolve comma-separated preset names into a merged, sorted, deduplicated interval list."""
     all_intervals = []
-    for name in preset_str.split(","):
-        name = name.strip().lower()
+    parsed_tokens = [(name, None) for name in BASE_INTERVAL_PRESETS]
+
+    for name in [name.strip().lower() for name in preset_str.split(",") if name.strip()]:
         unnamed_interval = parse_hex_range(name)
         if name not in INTERVAL_PRESETS and unnamed_interval is None:
             print(f"Error: unknown interval preset '{name}'", file=sys.stderr)
             print(f"Available presets: {', '.join(sorted(INTERVAL_PRESETS.keys()))}", file=sys.stderr)
             print("You can also specify unnamed hex ranges like (0x2100-0x214F)", file=sys.stderr)
             sys.exit(1)
+        parsed_tokens.append((name, unnamed_interval))
 
+    for name, unnamed_interval in parsed_tokens:
+        name = name.strip().lower()
         if unnamed_interval is not None:
             all_intervals.append(unnamed_interval)
         else:
@@ -604,7 +614,8 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     print(f"  [{style_label}] Validated: {len(intervals)} intervals, {total_glyphs} glyphs", file=sys.stderr)
     coverage_parts = [f"{len(source_codepoints[0])} primary"]
     for idx in range(1, len(source_codepoints)):
-        coverage_parts.append(f"{len(source_codepoints[idx])} fallback{idx}")
+        fallback_name = os.path.basename(fallback_fontfiles[idx - 1]) if fallback_fontfiles else f"fallback{idx}"
+        coverage_parts.append(f"{len(source_codepoints[idx])} fallback{idx} ({fallback_name})")
     print(f"  [{style_label}] Coverage split: {', '.join(coverage_parts)}", file=sys.stderr)
 
     # Rasterize all glyphs
@@ -923,7 +934,7 @@ def main():
     parser.add_argument("fontfile", nargs="?", default=None,
                         help="Path to the font file (single-style mode).")
     parser.add_argument("--intervals", dest="intervals",
-                        help="Comma-separated interval presets (e.g., 'latin-ext,greek,cyrillic').")
+                        help="Comma-separated additional interval presets (e.g., 'default,latin-ext,cjk'). Base coverage is always included.")
     parser.add_argument("--size", type=int, dest="size",
                         help="Single font size to generate.")
     parser.add_argument("--sizes", dest="sizes",
@@ -961,6 +972,9 @@ def main():
                         help="Fallback font file for italic style.")
     parser.add_argument("--fallback-bolditalic", dest="fallback_font_bolditalic",
                         help="Fallback font file for bold-italic style.")
+    parser.add_argument("--default-fallback-font", dest="default_fallback_fonts",
+                        action="append", default=[],
+                        help="Bundled default fallback font file. Repeat to append multiple fonts after user fallbacks.")
 
     args = parser.parse_args()
 
@@ -993,15 +1007,16 @@ def main():
         fallback_style_fonts.setdefault(2, []).append(args.fallback_font_italic)
     if args.fallback_font_bolditalic:
         fallback_style_fonts.setdefault(3, []).append(args.fallback_font_bolditalic)
+    for default_fallback_font in args.default_fallback_fonts:
+        fallback_style_fonts.setdefault(0, []).append(default_fallback_font)
 
     is_multistyle = len(style_fonts) > 0
     fontfile = args.fontfile
 
-    # Require --intervals
+    # A font can be generated without choosing any extra presets; base coverage
+    # is still added inside resolve_intervals().
     if not args.intervals:
-        print("Error: --intervals is required (e.g., --intervals latin-ext,greek,cyrillic)", file=sys.stderr)
-        print(f"Available presets: {', '.join(sorted(INTERVAL_PRESETS.keys()))}", file=sys.stderr)
-        sys.exit(1)
+        args.intervals = "base"
 
     intervals = resolve_intervals(args.intervals)
 

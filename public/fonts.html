@@ -138,9 +138,9 @@
         <div class="mt-6 rounded-2xl border border-dashed border-stone-300 bg-stone-50/70 p-5">
           <div class="flex flex-wrap items-center gap-2">
             <h2 class="text-sm font-semibold text-stone-900">Fallback Font Families</h2>
-            <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-stone-500 ring-1 ring-inset ring-stone-200">Optional</span>
+            <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-stone-500 ring-1 ring-inset ring-stone-200">Optional uploads</span>
           </div>
-          <p class="mt-1.5 text-sm/6 text-stone-500">Add up to two regular-style fallback families to fill glyph gaps left by the main family. Coverage is resolved in order: primary, fallback 1, then fallback 2.</p>
+          <p class="mt-1.5 text-sm/6 text-stone-500">Add up to two regular-style fallback families to fill glyph gaps left by the main family. If those still miss a selected character, the builder uses a built-in safety-net font.</p>
 
           <div class="mt-4 rounded-xl border border-stone-200 bg-white p-4">
             <label for="fallbackFamilyName" class="block text-sm/6 font-medium text-stone-700">Fallback Family 1 Name</label>
@@ -187,31 +187,29 @@
         <div class="mt-6 flex flex-wrap items-end gap-6">
           <div class="w-full">
             <label class="flex items-center gap-1.5 text-sm/6 font-medium text-stone-700">
-              Unicode Coverage
+              Additional Unicode Coverage
               <span class="group relative">
                 <span class="flex size-4 cursor-help items-center justify-center rounded-full bg-stone-200 text-[10px] font-bold text-stone-500">?</span>
                 <span class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-[28rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg bg-stone-800 px-3 py-2.5 text-xs font-normal leading-relaxed text-stone-100 shadow-lg group-hover:block">
-                  Controls which Unicode ranges the builder is allowed to include in the output. More coverage = larger files.
+                  Choose extra Unicode ranges for books that need them. More coverage = larger files.
                   <br><br>
-                  Choosing a preset does <strong class="text-white">not</strong> create glyphs by itself. You still need to upload a primary font or fallback font that actually contains those characters, or they will be omitted from the generated <code class="rounded bg-stone-700/60 px-1 py-0.5 font-mono text-[11px] text-stone-100">.cpfont</code>.
+                  Every build includes Base coverage first: ASCII/basic Latin plus Unicode punctuation. This keeps normal letters, numbers, spaces, smart quotes, dashes, and ellipses available without adding broad language ranges.
                   <br><br>
-                  <strong class="text-white">Built-in</strong>: Enables the same general Unicode ranges as the default CrossPoint fonts: English, most European languages, Cyrillic (Russian, Ukrainian, etc.), combining diacritics, math operators, arrows, and common ligatures. Best for most users if your uploaded fonts already contain those glyphs.
+                  Your selections below are added on top of Base coverage. If you skip fallback fonts, or if they do not contain a selected character, the builder uses a built-in safety-net font. Some uncommon Unicode characters may still be omitted from the generated <code class="rounded bg-stone-700/60 px-1 py-0.5 font-mono text-[11px] text-stone-100">.cpfont</code>.
                   <br><br>
-                  <strong class="text-white">Latin Extended</strong>: Enables broader Latin ranges including Vietnamese, African languages, and additional diacritics. Smaller than Built-in (no Cyrillic). Use if you only need Latin scripts and your uploaded fonts include those glyphs.
+                  <strong class="text-white">Default</strong>: Enables the same general Unicode ranges as the default CrossPoint fonts: English, most European languages, Cyrillic (Russian, Ukrainian, etc.), combining diacritics, math operators, arrows, and common ligatures.
                   <br><br>
-                  <strong class="text-white">Reading (recommended for fiction)</strong>: Enables the extra ranges often needed by English-language literary fiction and scifi/popsci: Greek (physics terms like λ, φ), super/subscripts, currency, arrows, math operators, uncommon dialogue punctuation, CJK quote marks, and miscellaneous symbols including music notes (♪ ♫ ♬), stars (★), and dingbats (✓). Use this when your uploaded fonts or fallback fonts actually contain those glyphs.
+                  <strong class="text-white">Reading (recommended for fiction)</strong>: Includes Default coverage plus extra ranges often seen in English-language fiction and scifi/popsci: broader Latin, Greek terms like λ and φ, box/geometric symbols, supplemental arrows, uncommon dialogue punctuation, CJK quote marks, music notes (♪ ♫ ♬), stars (★), and dingbats (✓).
                   <br><br>
-                  <strong class="text-white">Note on Fallback Fonts</strong>: Optional fallback fonts only fill missing codepoints. The main family is always checked first, then fallback family 1, then fallback family 2. Fallback fonts do not replace glyphs the main family already has.
+                  <strong class="text-white">Note on Fallback Fonts</strong>: Fallback fonts only fill missing characters. The main family is always checked first, then your fallback family 1, your fallback family 2, and finally the builder's safety-net font. Fallback fonts do not replace characters the main family already has.
                 </span>
               </span>
             </label>
-            <p class="mt-1.5 text-xs text-stone-400">Check every script your readers need. Presets combine, and only glyphs your uploaded fonts actually contain are included.</p>
+            <p class="mt-1.5 text-xs text-stone-400">Base coverage is always included. Check extra scripts and symbols your readers need.</p>
             <!-- Preset values MUST match the INTERVAL_PRESETS keys in scripts/font-builder/fontconvert_sdcard.py (the script CI runs). -->
             <div id="intervalPresets" class="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="reading" checked class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Reading <span class="text-xs text-stone-400">(fiction)</span></label>
-              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="builtin" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Built-in <span class="text-xs text-stone-400">(default fonts)</span></label>
-              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="ascii" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> ASCII</label>
-              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="latin1" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Latin-1</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="default" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Default <span class="text-xs text-stone-400">(CrossPoint)</span></label>
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="latin-ext" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Latin Extended</label>
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="vietnamese" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Vietnamese</label>
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="greek" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Greek</label>
@@ -224,7 +222,6 @@
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="tifinagh" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Tifinagh</label>
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="hangul" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Hangul <span class="text-xs text-stone-400">(Korean)</span></label>
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="cjk" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> CJK <span class="text-xs text-stone-400">(Chinese/Japanese)</span></label>
-              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="punctuation" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Punctuation</label>
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="symbols" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Symbols &amp; Arrows</label>
             </div>
             <div class="mt-3">
@@ -454,7 +451,7 @@
       for (var i = 0; i < boxes.length; i++) parts.push(boxes[i].value);
       var custom = document.getElementById('customIntervals').value.trim();
       if (custom) parts.push(custom);
-      return parts.join(',');
+      return parts.length ? parts.join(',') : 'base';
     }
 
     async function startBuild() {
@@ -469,10 +466,6 @@
         return;
       }
       var intervals = intervalSelection();
-      if (!intervals) {
-        alert('Please enter Unicode coverage ranges.');
-        return;
-      }
       var fallbackFamilyRaw = document.getElementById('fallbackFamilyName').value.trim();
       var fallbackRegular = document.getElementById('fallbackFontRegular').files[0];
       var fallback2FamilyRaw = document.getElementById('fallback2FamilyName').value.trim();
