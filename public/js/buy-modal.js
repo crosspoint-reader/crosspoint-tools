@@ -20,14 +20,14 @@ const MODAL_HTML = `
       <div>
         <div class="text-sm font-semibold text-stone-900">Select your device</div>
         <div class="mt-3 grid grid-cols-2 gap-3">
-          <a href="https://www.xteink.com/products/xteink-x4" target="_blank" rel="noopener" class="group relative rounded-xl border border-stone-200 p-4 no-underline hover:border-brand-500 hover:bg-brand-50/40">
+          <a href="https://go.sjv.io/2RV5N7" target="_blank" rel="noopener" class="group relative rounded-xl border border-stone-200 p-4 no-underline hover:border-brand-500 hover:bg-brand-50/40">
             <div class="flex items-center justify-between gap-2">
               <div class="text-sm font-semibold text-stone-900">Xteink X4</div>
               <svg class="size-4 shrink-0 text-stone-300 group-hover:text-brand-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
             </div>
             <div class="mt-0.5 text-xs text-stone-400">480 &times; 800</div>
           </a>
-          <a href="https://www.xteink.com/products/xteink-x3" target="_blank" rel="noopener" class="group relative rounded-xl border border-stone-200 p-4 no-underline hover:border-brand-500 hover:bg-brand-50/40">
+          <a href="https://go.sjv.io/m4oEmM" target="_blank" rel="noopener" class="group relative rounded-xl border border-stone-200 p-4 no-underline hover:border-brand-500 hover:bg-brand-50/40">
             <div class="flex items-center justify-between gap-2">
               <div class="text-sm font-semibold text-stone-900">Xteink X3</div>
               <svg class="size-4 shrink-0 text-stone-300 group-hover:text-brand-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
