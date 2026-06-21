@@ -117,7 +117,7 @@
         </a>
         <a href="/roadmap" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">Roadmap</a>
         <a href="/docs.html" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-900 bg-stone-100 no-underline sm:text-sm/5">Docs</a>
-        <a href="#" data-open-download-modal class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
+        <a href="/" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
           <span class="sm:hidden">Download</span>
           <span class="hidden sm:inline">Download Firmware</span>
         </a>
@@ -167,11 +167,29 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
   <script>
   (function () {
 
-    // Rewrite image URLs so they load from the main GitHub repository instead of the local server
+    // Rewrite image URLs and generate heading IDs so they can be linked
     marked.use({
+      renderer: {
+        heading(token) {
+          // Support both marked.js v13+ (token object) and older versions (text, depth, raw)
+          const isObj = typeof token === 'object' && token !== null;
+          const text = isObj ? token.text : arguments[0];
+          const depth = isObj ? token.depth : arguments[1];
+          
+          let rawText = text || '';
+          rawText = rawText.replace(/<[^>]+>/g, ''); // strip HTML tags
+          const id = rawText.toLowerCase().trim()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/[\s_-]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+            
+          return `<h${depth} id="${id}">${text}</h${depth}>`;
+        }
+      },
       walkTokens(token) {
         if (token.type === 'image') {
           if (token.href && token.href.startsWith('/')) {
@@ -187,6 +205,50 @@
     const content = document.getElementById('docs-content');
     if (!sidebar || !content) return;
 
+    // Intercept clicks on links inside the docs content to handle routing
+    content.addEventListener('click', (e) => {
+      const a = e.target.closest('a');
+      if (!a) return;
+      
+      const href = a.getAttribute('href');
+      if (!href) return;
+      
+      // Handle in-page anchors
+      if (href.startsWith('#')) {
+        e.preventDefault();
+        const targetId = href.substring(1);
+        const targetElement = document.getElementById(targetId);
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+      }
+      
+      // Handle links to other markdown documents
+      if (href.endsWith('.md') || href.includes('.md#')) {
+        e.preventDefault();
+        let docPath = href;
+        let anchor = '';
+        if (docPath.includes('#')) {
+          const parts = docPath.split('#');
+          docPath = parts[0];
+          anchor = parts[1];
+        }
+        
+        // Extract just the filename without path
+        const parts = docPath.split('/');
+        let filename = parts[parts.length - 1];
+        filename = filename.replace(/\.md$/, '');
+        
+        // Store anchor so we can scroll after the new doc loads
+        if (anchor) {
+          window.sessionStorage.setItem('pendingDocAnchor', anchor);
+        }
+        
+        window.location.hash = '#' + filename;
+      }
+    });
+
     function toLabel(filename) {
       return filename
         .replace(/\.md$/, '')
@@ -196,13 +258,20 @@
 
     function getDeepLinkDoc() {
       const hash = window.location.hash; // e.g. "#contributing"
-      // Check if hash matches a specific doc directly, or if it's #docs?doc=...
-      const match = hash.match(/[?&]doc=([^&]+)/);
-      if (match) return decodeURIComponent(match[1]);
-      
-      // Allow direct hash linking on the docs page itself (e.g., /docs.html#contributing)
-      if (hash && hash.length > 1 && !hash.includes('?')) {
-        return decodeURIComponent(hash.substring(1));
+      try {
+        const match = hash.match(/[?&]doc=([^&]+)/);
+        if (match) return decodeURIComponent(match[1]);
+        
+        if (hash && hash.length > 1 && !hash.includes('?')) {
+          return decodeURIComponent(hash.substring(1));
+        }
+      } catch (e) {
+        // Fallback to unencoded strings if decoding fails
+        const match = hash.match(/[?&]doc=([^&]+)/);
+        if (match) return match[1];
+        if (hash && hash.length > 1 && !hash.includes('?')) {
+          return hash.substring(1);
+        }
       }
       return null;
     }
@@ -244,10 +313,23 @@
           return `<img${before}src="${newSrc}"`;
         });
 
-        content.innerHTML = marked.parse(md);
+        content.innerHTML = DOMPurify.sanitize(marked.parse(md), { ADD_ATTR: ['id', 'target'] });
         
-        // Scroll to top of content on mobile when a doc is loaded
-        if (window.innerWidth < 768) {
+        // Check if there is a pending anchor to scroll to
+        const pendingAnchor = window.sessionStorage.getItem('pendingDocAnchor');
+        if (pendingAnchor) {
+          window.sessionStorage.removeItem('pendingDocAnchor');
+          // Wait a tick for the DOM to update
+          setTimeout(() => {
+            const targetElement = document.getElementById(pendingAnchor);
+            if (targetElement) {
+              targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+              content.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 50);
+        } else if (window.innerWidth < 768) {
+          // Scroll to top of content on mobile when a doc is loaded
           content.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         
