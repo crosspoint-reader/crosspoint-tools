@@ -514,8 +514,17 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
     // not carry an sdkconfig override enabling HTTP OTA, so give INX an HTTPS
     // URL. Our cert is valid for unlocker.crosspointreader.com and that host is
     // DNS-spoofed to the local helper.
+    //
+    // crosspet (trilwu/crosspet, a CrossPoint fork) is in the same bucket: it
+    // builds on pioarduino/IDF 5.5 with no `CONFIG_OTA_ALLOW_HTTP` override, so
+    // its `esp_https_ota_begin()` rejects a plain-HTTP firmware URL and the OTA
+    // aborts before downloading a byte — the device gets our manifest fine but
+    // can never install. Its check leg already succeeds because it uses
+    // `esp_crt_bundle_attach` (chain-only validation, no hostname enforcement),
+    // so the only change it needs is an HTTPS download URL.
     let is_inx = repo.eq_ignore_ascii_case("inx");
-    let scheme = if is_inx { "https" } else { "http" };
+    let is_crosspet = repo.eq_ignore_ascii_case("crosspet");
+    let scheme = if is_inx || is_crosspet { "https" } else { "http" };
     let download_url = format!("{scheme}://unlocker.crosspointreader.com/firmware/firmware.bin");
 
     // `tag_name` stays unprefixed — CrossPoint's `sscanf("%d.%d.%d")` would
@@ -553,7 +562,7 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
     // Use a very high version so the device always considers it newer.
     // CrossPoint's version check uses sscanf("%d.%d.%d") so this parses
     // as 99.9.9 which is greater than any real version.
-    tracing::info!(%download_url, %tag, is_crossink, is_inx, "serving manifest");
+    tracing::info!(%download_url, %tag, is_crossink, is_inx, is_crosspet, "serving manifest");
 
     serde_json::json!({
         "tag_name": tag,
