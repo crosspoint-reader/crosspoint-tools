@@ -128,344 +128,7 @@
       pointer-events: none;
       opacity: 0.6;
       mix-blend-mode: multiply;
-    }
-
-    /* ----- Lyra theme primitives: pixel-exact port from src/components/themes/lyra/LyraTheme.cpp -----
-       All values come from LyraMetrics::values and the drawing routines. Canvas is 480×800. */
-
-    /* Header: 84px for non-home screens; home override reduces to 56px (homeTopPadding).
-       Battery is drawn top-right (y=10 from screen top). Title (if set) renders near
-       bottom-left of header, with a 3px rule line at the very bottom. */
-    .eink-header {
-      height: calc(84px * var(--eink-scale));               /* headerHeight */
-      position: relative;
-      z-index: 1;
-    }
-    .eink-header::after {
-      content: '';
-      position: absolute;
-      left: 0; right: 0;
-      bottom: calc(3px * var(--eink-scale));
-      height: calc(3px * var(--eink-scale));
-      background: var(--eink-ink);
-    }
-    .is-home .eink-header { height: calc(56px * var(--eink-scale)); }
-    .is-home .eink-header::after,
-    .is-home .eink-header-title,
-    .is-home .eink-header-sub { display: none; }
-
-    .eink-header-title {
-      position: absolute;
-      left: calc(20px * var(--eink-scale));                  /* contentSidePadding */
-      top: calc(48px * var(--eink-scale));                   /* rect.y=5 + batteryBarHeight=40 + 3 */
-      font-family: 'Noto Sans', sans-serif;
-      font-size: calc(16px * var(--eink-scale));             /* UI_12 bold */
-      font-weight: 700;
-      line-height: 1;
-    }
-    .eink-header-sub {
-      position: absolute;
-      right: calc(20px * var(--eink-scale));
-      top: calc(55px * var(--eink-scale));                   /* rect.y=5 + 50 */
-      font-family: 'Noto Sans', sans-serif;
-      font-size: calc(13px * var(--eink-scale));             /* SMALL_FONT */
-      line-height: 1;
-    }
-    .eink-header-rule {
-      position: absolute;
-      left: 0; right: 0;
-      bottom: calc(3px * var(--eink-scale));
-      height: calc(3px * var(--eink-scale));
-      background: var(--eink-ink);
-    }
-
-    /* Battery: 16×12 outline per LyraMetrics. Positioned top-right of header. */
-    .eink-battery {
-      position: absolute;
-      top: calc(10px * var(--eink-scale));                   /* rect.y=5 + 5 */
-      right: calc(12px * var(--eink-scale));
-      display: flex;
-      align-items: center;
-      gap: calc(4px * var(--eink-scale));
-      font-size: calc(13px * var(--eink-scale));
-      font-family: 'Noto Sans', sans-serif;
-      font-variant-numeric: tabular-nums;
-    }
-    /* Battery icon rendered via SVG symbol (firmware-accurate 17×12 native). */
-    .eink-battery svg {
-      width: calc(17px * var(--eink-scale));
-      height: calc(12px * var(--eink-scale));
-      flex-shrink: 0;
-    }
-
-    /* Home recent-book cover tile: flows right after header (home header = 56px) */
-    .eink-home-cover {
-      margin: 0 calc(20px * var(--eink-scale));            /* contentSidePadding */
-      height: calc(242px * var(--eink-scale));             /* homeCoverTileHeight */
-      padding: calc(8px * var(--eink-scale));              /* hPaddingInSelection */
-      display: flex;
-      align-items: stretch;
-      border-radius: calc(6px * var(--eink-scale));
-      position: relative;
-      z-index: 1;
-    }
-    .eink-home-cover.selected { background: var(--eink-sel); }
-    .eink-home-cover .cover {
-      width: calc(135px * var(--eink-scale));              /* homeCoverHeight * 0.6 */
-      height: calc(226px * var(--eink-scale));             /* homeCoverHeight */
-      border: calc(1px * var(--eink-scale)) solid var(--eink-ink);
-      background: #ede9df;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: calc(14px * var(--eink-scale));
-      text-align: center;
-      flex-shrink: 0;
-    }
-    /* Cover with actual image: e-ink grayscale look, whites tinted to paper color */
-    .eink-home-cover .cover.cover-image {
-      padding: 0;
-      background-size: cover;
-      background-position: center;
-      background-color: var(--eink-paper);
-      background-blend-mode: multiply;
-      filter: grayscale(1) contrast(1.05);
-      image-rendering: crisp-edges;
-    }
-    .eink-cover-title {
-      font-family: 'Noto Serif', serif;
-      font-size: calc(13px * var(--eink-scale));
-      font-weight: 700;
-      line-height: 1.2;
-    }
-    .eink-cover-rule {
-      width: calc(20px * var(--eink-scale));
-      height: calc(1px * var(--eink-scale));
-      background: var(--eink-ink);
-      margin: calc(8px * var(--eink-scale)) 0;
-    }
-    .eink-cover-by {
-      font-size: calc(10px * var(--eink-scale));
-      font-family: 'Noto Serif', serif;
-      font-style: italic;
-    }
-    .eink-home-cover .meta {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding: 0 calc(16px * var(--eink-scale));           /* verticalSpacing */
-      min-width: 0;
-    }
-    .eink-home-cover .meta-title {
-      font-family: 'Noto Sans', sans-serif;
-      font-size: calc(20px * var(--eink-scale));
-      font-weight: 700;
-      line-height: 1.2;
-    }
-    .eink-home-cover .meta-author {
-      font-family: 'Noto Sans', sans-serif;
-      font-size: calc(18px * var(--eink-scale));
-      margin-top: calc(12px * var(--eink-scale));
-      color: var(--eink-ink);
-    }
-
-    /* Main menu: 16px gap below cover tile (verticalSpacing) */
-    .eink-menu {
-      margin: calc(16px * var(--eink-scale)) calc(20px * var(--eink-scale)) 0;
-      position: relative;
-      z-index: 1;
-    }
-    .eink-menu-row {
-      height: calc(64px * var(--eink-scale));              /* menuRowHeight */
-      margin-bottom: calc(8px * var(--eink-scale));         /* menuSpacing */
-      display: flex;
-      align-items: center;
-      padding: 0 calc(16px * var(--eink-scale));           /* textX offset from tile */
-      border-radius: calc(6px * var(--eink-scale));         /* cornerRadius */
-      font-family: 'Noto Sans', sans-serif;
-      font-size: calc(16px * var(--eink-scale));            /* UI_12 */
-      font-weight: 400;
-      gap: calc(10px * var(--eink-scale));                  /* hPaddingInSelection + 2 */
-    }
-    .eink-menu-row.selected { background: var(--eink-sel); }
-    .eink-menu-row svg {
-      width: calc(32px * var(--eink-scale));                /* mainMenuIconSize */
-      height: calc(32px * var(--eink-scale));
-      flex-shrink: 0;
-    }
-
-    /* Button hints: rendered exactly per drawButtonHints:
-       x positions [58, 146, 254, 342], width 80, height 40 (empty = 15) */
-    .eink-hints {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: calc(480px * var(--eink-scale));
-      height: calc(40px * var(--eink-scale));               /* buttonHintsHeight */
-    }
-    .eink-hint {
-      position: absolute;
-      bottom: calc(-12px * var(--eink-scale));              /* push bottom of pill off-screen */
-      width: calc(80px * var(--eink-scale));
-      height: calc(40px * var(--eink-scale));
-      background: var(--eink-paper);
-      /* Firmware draws top + left + right only (no bottom stroke); pill blends into screen edge */
-      border-top: calc(1px * var(--eink-scale)) solid var(--eink-ink);
-      border-left: calc(1px * var(--eink-scale)) solid var(--eink-ink);
-      border-right: calc(1px * var(--eink-scale)) solid var(--eink-ink);
-      border-radius: calc(6px * var(--eink-scale)) calc(6px * var(--eink-scale)) 0 0;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      padding-top: calc(7px * var(--eink-scale));           /* textYOffset from drawButtonHints */
-      font-family: 'Noto Sans', sans-serif;
-      font-size: calc(12px * var(--eink-scale));            /* SMALL_FONT */
-      color: var(--eink-ink);
-    }
-    .eink-hint:nth-child(1) { left: calc(58px * var(--eink-scale)); }
-    .eink-hint:nth-child(2) { left: calc(146px * var(--eink-scale)); }
-    .eink-hint:nth-child(3) { left: calc(254px * var(--eink-scale)); }
-    .eink-hint:nth-child(4) { left: calc(342px * var(--eink-scale)); }
-    .eink-hint-empty { height: calc(15px * var(--eink-scale)); }
-
-    /* List rows (file browser, settings) */
-    .eink-list {
-      padding: calc(8px * var(--eink-scale)) calc(20px * var(--eink-scale));
-      position: relative;
-      z-index: 1;
-    }
-    .eink-list-row {
-      display: flex;
-      align-items: center;
-      gap: calc(14px * var(--eink-scale));
-      height: calc(40px * var(--eink-scale));               /* listRowHeight */
-      padding: 0 calc(12px * var(--eink-scale));
-      border-radius: calc(6px * var(--eink-scale));
-      font-family: 'Noto Sans', sans-serif;
-      font-size: calc(14px * var(--eink-scale));            /* UI_10 */
-    }
-    .eink-list-row.selected { background: var(--eink-sel); }
-    .eink-list-row svg {
-      width: calc(24px * var(--eink-scale));
-      height: calc(24px * var(--eink-scale));
-      flex-shrink: 0;
-    }
-    .eink-list-row-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .eink-list-row-value { color: var(--eink-ink); font-size: calc(14px * var(--eink-scale)); }
-    /* Selected row's value rendered as black pill with inverted text (firmware highlightValue) */
-    .eink-list-row.selected .eink-list-row-value {
-      background: var(--eink-ink);
-      color: var(--eink-paper);
-      padding: calc(3px * var(--eink-scale)) calc(10px * var(--eink-scale));
-      border-radius: calc(6px * var(--eink-scale));
-    }
-
-    /* Tab bar: drawTabBar (tab-bar-focused state):
-       whole bar has dithered light-gray bg, selected tab is a black pill with inverted text. */
-    .eink-tabs {
-      display: flex;
-      gap: calc(8px * var(--eink-scale));                   /* tabSpacing */
-      padding: calc(4px * var(--eink-scale)) calc(20px * var(--eink-scale));
-      height: calc(34px * var(--eink-scale));               /* shortened from firmware 40 */
-      align-items: stretch;
-      position: relative;
-      background: var(--eink-sel);                          /* full-bar focused highlight */
-      border-bottom: calc(1px * var(--eink-scale)) solid var(--eink-ink);
-      z-index: 1;
-    }
-    .eink-tab {
-      position: relative;
-      padding: 0 calc(10px * var(--eink-scale));            /* hPaddingInSelection */
-      display: flex;
-      align-items: center;
-      font-family: 'Noto Sans', sans-serif;
-      font-size: calc(15px * var(--eink-scale));            /* slightly bigger */
-      font-weight: 600;                                      /* slightly bolder */
-    }
-    .eink-tab.selected {
-      background: var(--eink-ink);
-      color: var(--eink-paper);
-      border-radius: calc(6px * var(--eink-scale));
-    }
-
-    /* Reader page */
-    .eink-reader-body {
-      padding: calc(40px * var(--eink-scale)) calc(40px * var(--eink-scale)) calc(80px * var(--eink-scale));
-      font-family: 'Noto Serif', serif;
-      font-size: calc(20px * var(--eink-scale));
-      line-height: 1.55;
-      text-align: justify;
-      hyphens: auto;
-      position: relative;
-      z-index: 1;
-      height: 100%;
-      overflow: hidden;
-    }
-    .eink-reader-body h3 {
-      font-size: calc(28px * var(--eink-scale));
-      font-weight: 700;
-      text-align: center;
-      margin: calc(12px * var(--eink-scale)) 0 calc(28px * var(--eink-scale));
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-    .eink-reader-body h3 + p::first-letter {
-      font-size: calc(52px * var(--eink-scale));
-      font-weight: 700;
-      float: left;
-      line-height: 0.9;
-      padding: calc(4px * var(--eink-scale)) calc(6px * var(--eink-scale)) 0 0;
-    }
-    .eink-reader-body p { margin: 0 0 calc(14px * var(--eink-scale)); }
-    .eink-reader-status {
-      position: absolute;
-      bottom: calc(14px * var(--eink-scale));
-      left: calc(40px * var(--eink-scale));
-      right: calc(40px * var(--eink-scale));
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-family: 'Noto Sans', sans-serif;
-      font-size: calc(13px * var(--eink-scale));
-      color: var(--eink-dim);
-      z-index: 2;
-    }
-    .eink-reader-progress-track {
-      position: absolute;
-      left: calc(40px * var(--eink-scale));
-      right: calc(40px * var(--eink-scale));
-      bottom: calc(34px * var(--eink-scale));
-      height: calc(2px * var(--eink-scale));
-      background: rgba(0,0,0,0.15);
-    }
-    .eink-reader-progress-track > div {
-      height: 100%;
-      background: var(--eink-ink);
-    }
-
-    /* RTL reader page: right-to-left layout for Hebrew, Arabic, etc. */
-    .eink-reader-body.rtl {
-      direction: rtl;
-      text-align: justify;
-      font-family: 'Noto Serif Hebrew', 'Noto Serif', serif;
-    }
-    .eink-reader-body.rtl h3 + p::first-letter {
-      float: right;
-      padding: calc(4px * var(--eink-scale)) 0 0 calc(6px * var(--eink-scale));
-    }
-
-
-    /* Theme compare: 3 mini devices side-by-side */
-    .eink-theme-classic { --eink-sel: transparent; }
-    .eink-theme-classic .eink-menu-row.selected { outline: calc(2px * var(--eink-scale)) solid var(--eink-ink); outline-offset: calc(-2px * var(--eink-scale)); border-radius: 0; }
-    .eink-theme-classic .eink-menu-row { border-radius: 0; }
-
-    /* Dithered "gray" fill using a CSS gradient; fallback for areas meant to look dithered */
-    .eink-dither {
-      background-image:
-        repeating-linear-gradient(45deg, var(--eink-ink) 0 1px, transparent 1px 3px);
+      z-index: 10;
     }
 
     /* Community photo marquee: seamless horizontal auto-scroll */
@@ -522,23 +185,6 @@
 <body class="min-h-dvh bg-stone-50 font-sans">
   <!-- impact.com site verification -->
   <p style="display:none" aria-hidden="true">Impact-Site-Verification: 8ec41e75-2735-415b-8643-fc0b10a943a5</p>
-  <!-- Firmware icon sprite: bitmaps extracted directly from /src/components/icons/ -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <defs>
-      <symbol id="icon-folder" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="4" y="3" width="9" height="1"/><rect x="2" y="4" width="12" height="1"/><rect x="2" y="5" width="2" height="1"/><rect x="11" y="5" width="3" height="1"/><rect x="2" y="6" width="2" height="1"/><rect x="12" y="6" width="3" height="1"/><rect x="2" y="7" width="2" height="1"/><rect x="13" y="7" width="16" height="1"/><rect x="2" y="8" width="2" height="1"/><rect x="14" y="8" width="16" height="1"/><rect x="2" y="9" width="2" height="1"/><rect x="27" y="9" width="3" height="1"/><rect x="2" y="10" width="2" height="1"/><rect x="28" y="10" width="2" height="1"/><rect x="2" y="11" width="2" height="1"/><rect x="28" y="11" width="2" height="1"/><rect x="2" y="12" width="2" height="1"/><rect x="28" y="12" width="2" height="1"/><rect x="2" y="13" width="2" height="1"/><rect x="28" y="13" width="2" height="1"/><rect x="2" y="14" width="2" height="1"/><rect x="28" y="14" width="2" height="1"/><rect x="2" y="15" width="2" height="1"/><rect x="28" y="15" width="2" height="1"/><rect x="2" y="16" width="2" height="1"/><rect x="28" y="16" width="2" height="1"/><rect x="2" y="17" width="2" height="1"/><rect x="28" y="17" width="2" height="1"/><rect x="2" y="18" width="2" height="1"/><rect x="28" y="18" width="2" height="1"/><rect x="2" y="19" width="2" height="1"/><rect x="28" y="19" width="2" height="1"/><rect x="2" y="20" width="2" height="1"/><rect x="28" y="20" width="2" height="1"/><rect x="2" y="21" width="2" height="1"/><rect x="28" y="21" width="2" height="1"/><rect x="2" y="22" width="2" height="1"/><rect x="28" y="22" width="2" height="1"/><rect x="2" y="23" width="2" height="1"/><rect x="28" y="23" width="2" height="1"/><rect x="2" y="24" width="2" height="1"/><rect x="28" y="24" width="2" height="1"/><rect x="2" y="25" width="4" height="1"/><rect x="27" y="25" width="3" height="1"/><rect x="3" y="26" width="27" height="1"/><rect x="4" y="27" width="23" height="1"/></g></symbol>
-      <symbol id="icon-recent" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="6" y="2" width="21" height="1"/><rect x="5" y="3" width="22" height="1"/><rect x="5" y="4" width="2" height="1"/><rect x="12" y="4" width="2" height="1"/><rect x="20" y="4" width="2" height="1"/><rect x="26" y="4" width="2" height="1"/><rect x="4" y="5" width="3" height="1"/><rect x="12" y="5" width="2" height="1"/><rect x="20" y="5" width="2" height="1"/><rect x="26" y="5" width="2" height="1"/><rect x="4" y="6" width="2" height="1"/><rect x="12" y="6" width="2" height="1"/><rect x="20" y="6" width="2" height="1"/><rect x="26" y="6" width="2" height="1"/><rect x="4" y="7" width="2" height="1"/><rect x="12" y="7" width="2" height="1"/><rect x="20" y="7" width="2" height="1"/><rect x="26" y="7" width="2" height="1"/><rect x="4" y="8" width="2" height="1"/><rect x="12" y="8" width="2" height="1"/><rect x="17" y="8" width="1" height="1"/><rect x="20" y="8" width="2" height="1"/><rect x="26" y="8" width="2" height="1"/><rect x="4" y="9" width="2" height="1"/><rect x="12" y="9" width="2" height="1"/><rect x="15" y="9" width="4" height="1"/><rect x="20" y="9" width="2" height="1"/><rect x="26" y="9" width="2" height="1"/><rect x="4" y="10" width="2" height="1"/><rect x="12" y="10" width="10" height="1"/><rect x="26" y="10" width="2" height="1"/><rect x="4" y="11" width="2" height="1"/><rect x="12" y="11" width="5" height="1"/><rect x="18" y="11" width="4" height="1"/><rect x="26" y="11" width="2" height="1"/><rect x="4" y="12" width="2" height="1"/><rect x="12" y="12" width="4" height="1"/><rect x="19" y="12" width="3" height="1"/><rect x="26" y="12" width="2" height="1"/><rect x="4" y="13" width="2" height="1"/><rect x="12" y="13" width="3" height="1"/><rect x="20" y="13" width="2" height="1"/><rect x="26" y="13" width="2" height="1"/><rect x="4" y="14" width="2" height="1"/><rect x="26" y="14" width="2" height="1"/><rect x="4" y="15" width="2" height="1"/><rect x="26" y="15" width="2" height="1"/><rect x="4" y="16" width="2" height="1"/><rect x="26" y="16" width="2" height="1"/><rect x="4" y="17" width="2" height="1"/><rect x="26" y="17" width="2" height="1"/><rect x="4" y="18" width="2" height="1"/><rect x="26" y="18" width="2" height="1"/><rect x="4" y="19" width="2" height="1"/><rect x="26" y="19" width="2" height="1"/><rect x="4" y="20" width="2" height="1"/><rect x="26" y="20" width="2" height="1"/><rect x="4" y="21" width="2" height="1"/><rect x="25" y="21" width="3" height="1"/><rect x="4" y="22" width="24" height="1"/><rect x="4" y="23" width="24" height="1"/><rect x="4" y="24" width="3" height="1"/><rect x="26" y="24" width="2" height="1"/><rect x="4" y="25" width="3" height="1"/><rect x="26" y="25" width="2" height="1"/><rect x="4" y="26" width="2" height="1"/><rect x="26" y="26" width="2" height="1"/><rect x="5" y="27" width="2" height="1"/><rect x="26" y="27" width="2" height="1"/><rect x="5" y="28" width="23" height="1"/><rect x="6" y="29" width="21" height="1"/></g></symbol>
-      <symbol id="icon-transfer" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="4" y="3" width="3" height="1"/><rect x="3" y="4" width="6" height="1"/><rect x="3" y="5" width="8" height="1"/><rect x="4" y="6" width="2" height="1"/><rect x="7" y="6" width="6" height="1"/><rect x="4" y="7" width="2" height="1"/><rect x="9" y="7" width="6" height="1"/><rect x="4" y="8" width="2" height="1"/><rect x="11" y="8" width="6" height="1"/><rect x="5" y="9" width="2" height="1"/><rect x="13" y="9" width="6" height="1"/><rect x="5" y="10" width="2" height="1"/><rect x="16" y="10" width="6" height="1"/><rect x="5" y="11" width="3" height="1"/><rect x="18" y="11" width="6" height="1"/><rect x="6" y="12" width="2" height="1"/><rect x="20" y="12" width="6" height="1"/><rect x="6" y="13" width="2" height="1"/><rect x="22" y="13" width="6" height="1"/><rect x="7" y="14" width="2" height="1"/><rect x="24" y="14" width="5" height="1"/><rect x="7" y="15" width="23" height="1"/><rect x="7" y="16" width="23" height="1"/><rect x="6" y="17" width="3" height="1"/><rect x="25" y="17" width="5" height="1"/><rect x="6" y="18" width="3" height="1"/><rect x="22" y="18" width="5" height="1"/><rect x="6" y="19" width="2" height="1"/><rect x="20" y="19" width="5" height="1"/><rect x="5" y="20" width="3" height="1"/><rect x="18" y="20" width="5" height="1"/><rect x="5" y="21" width="2" height="1"/><rect x="16" y="21" width="5" height="1"/><rect x="4" y="22" width="3" height="1"/><rect x="14" y="22" width="5" height="1"/><rect x="4" y="23" width="3" height="1"/><rect x="12" y="23" width="5" height="1"/><rect x="4" y="24" width="2" height="1"/><rect x="10" y="24" width="5" height="1"/><rect x="3" y="25" width="3" height="1"/><rect x="8" y="25" width="5" height="1"/><rect x="3" y="26" width="7" height="1"/><rect x="3" y="27" width="5" height="1"/><rect x="4" y="28" width="2" height="1"/></g></symbol>
-      <symbol id="icon-settings2" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="8" y="4" width="3" height="1"/><rect x="6" y="5" width="7" height="1"/><rect x="5" y="6" width="3" height="1"/><rect x="10" y="6" width="3" height="1"/><rect x="5" y="7" width="2" height="1"/><rect x="12" y="7" width="2" height="1"/><rect x="4" y="8" width="2" height="1"/><rect x="12" y="8" width="14" height="1"/><rect x="4" y="9" width="2" height="1"/><rect x="12" y="9" width="14" height="1"/><rect x="4" y="10" width="3" height="1"/><rect x="12" y="10" width="2" height="1"/><rect x="5" y="11" width="2" height="1"/><rect x="11" y="11" width="3" height="1"/><rect x="5" y="12" width="8" height="1"/><rect x="7" y="13" width="5" height="1"/><rect x="20" y="18" width="5" height="1"/><rect x="19" y="19" width="8" height="1"/><rect x="18" y="20" width="3" height="1"/><rect x="25" y="20" width="2" height="1"/><rect x="18" y="21" width="2" height="1"/><rect x="25" y="21" width="3" height="1"/><rect x="6" y="22" width="14" height="1"/><rect x="26" y="22" width="2" height="1"/><rect x="6" y="23" width="14" height="1"/><rect x="26" y="23" width="2" height="1"/><rect x="18" y="24" width="2" height="1"/><rect x="25" y="24" width="2" height="1"/><rect x="19" y="25" width="3" height="1"/><rect x="24" y="25" width="3" height="1"/><rect x="19" y="26" width="7" height="1"/><rect x="21" y="27" width="3" height="1"/></g></symbol>
-      <symbol id="icon-cog" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="15" y="2" width="2" height="1"/><rect x="9" y="3" width="1" height="1"/><rect x="15" y="3" width="2" height="1"/><rect x="22" y="3" width="1" height="1"/><rect x="8" y="4" width="3" height="1"/><rect x="14" y="4" width="4" height="1"/><rect x="21" y="4" width="3" height="1"/><rect x="9" y="5" width="14" height="1"/><rect x="9" y="6" width="5" height="1"/><rect x="18" y="6" width="5" height="1"/><rect x="8" y="7" width="4" height="1"/><rect x="20" y="7" width="4" height="1"/><rect x="4" y="8" width="1" height="1"/><rect x="7" y="8" width="6" height="1"/><rect x="22" y="8" width="3" height="1"/><rect x="27" y="8" width="1" height="1"/><rect x="3" y="9" width="6" height="1"/><rect x="11" y="9" width="2" height="1"/><rect x="23" y="9" width="6" height="1"/><rect x="4" y="10" width="4" height="1"/><rect x="12" y="10" width="2" height="1"/><rect x="24" y="10" width="4" height="1"/><rect x="5" y="11" width="3" height="1"/><rect x="12" y="11" width="3" height="1"/><rect x="24" y="11" width="3" height="1"/><rect x="5" y="12" width="2" height="1"/><rect x="13" y="12" width="4" height="1"/><rect x="25" y="12" width="2" height="1"/><rect x="5" y="13" width="2" height="1"/><rect x="13" y="13" width="6" height="1"/><rect x="25" y="13" width="2" height="1"/><rect x="4" y="14" width="2" height="1"/><rect x="13" y="14" width="3" height="1"/><rect x="17" y="14" width="2" height="1"/><rect x="26" y="14" width="2" height="1"/><rect x="2" y="15" width="4" height="1"/><rect x="12" y="15" width="2" height="1"/><rect x="17" y="15" width="13" height="1"/><rect x="2" y="16" width="4" height="1"/><rect x="12" y="16" width="2" height="1"/><rect x="17" y="16" width="13" height="1"/><rect x="4" y="17" width="2" height="1"/><rect x="13" y="17" width="3" height="1"/><rect x="17" y="17" width="2" height="1"/><rect x="26" y="17" width="2" height="1"/><rect x="5" y="18" width="2" height="1"/><rect x="13" y="18" width="6" height="1"/><rect x="25" y="18" width="2" height="1"/><rect x="5" y="19" width="2" height="1"/><rect x="13" y="19" width="4" height="1"/><rect x="25" y="19" width="2" height="1"/><rect x="5" y="20" width="3" height="1"/><rect x="12" y="20" width="3" height="1"/><rect x="24" y="20" width="3" height="1"/><rect x="4" y="21" width="4" height="1"/><rect x="12" y="21" width="2" height="1"/><rect x="24" y="21" width="4" height="1"/><rect x="3" y="22" width="6" height="1"/><rect x="11" y="22" width="2" height="1"/><rect x="23" y="22" width="6" height="1"/><rect x="4" y="23" width="1" height="1"/><rect x="7" y="23" width="6" height="1"/><rect x="22" y="23" width="3" height="1"/><rect x="27" y="23" width="1" height="1"/><rect x="8" y="24" width="4" height="1"/><rect x="20" y="24" width="4" height="1"/><rect x="9" y="25" width="5" height="1"/><rect x="18" y="25" width="5" height="1"/><rect x="9" y="26" width="14" height="1"/><rect x="8" y="27" width="3" height="1"/><rect x="14" y="27" width="4" height="1"/><rect x="21" y="27" width="3" height="1"/><rect x="9" y="28" width="1" height="1"/><rect x="15" y="28" width="2" height="1"/><rect x="22" y="28" width="1" height="1"/><rect x="15" y="29" width="2" height="1"/></g></symbol>
-      <symbol id="icon-library" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="4" y="3" width="11" height="1"/><rect x="17" y="3" width="3" height="1"/><rect x="3" y="4" width="18" height="1"/><rect x="3" y="5" width="2" height="1"/><rect x="8" y="5" width="2" height="1"/><rect x="14" y="5" width="3" height="1"/><rect x="19" y="5" width="2" height="1"/><rect x="3" y="6" width="2" height="1"/><rect x="8" y="6" width="2" height="1"/><rect x="14" y="6" width="2" height="1"/><rect x="19" y="6" width="3" height="1"/><rect x="3" y="7" width="2" height="1"/><rect x="8" y="7" width="2" height="1"/><rect x="14" y="7" width="2" height="1"/><rect x="20" y="7" width="2" height="1"/><rect x="3" y="8" width="2" height="1"/><rect x="8" y="8" width="2" height="1"/><rect x="14" y="8" width="2" height="1"/><rect x="20" y="8" width="2" height="1"/><rect x="3" y="9" width="2" height="1"/><rect x="8" y="9" width="2" height="1"/><rect x="14" y="9" width="3" height="1"/><rect x="20" y="9" width="3" height="1"/><rect x="3" y="10" width="2" height="1"/><rect x="8" y="10" width="2" height="1"/><rect x="14" y="10" width="3" height="1"/><rect x="21" y="10" width="2" height="1"/><rect x="3" y="11" width="2" height="1"/><rect x="8" y="11" width="2" height="1"/><rect x="14" y="11" width="4" height="1"/><rect x="21" y="11" width="2" height="1"/><rect x="3" y="12" width="2" height="1"/><rect x="8" y="12" width="2" height="1"/><rect x="14" y="12" width="4" height="1"/><rect x="22" y="12" width="2" height="1"/><rect x="3" y="13" width="2" height="1"/><rect x="8" y="13" width="2" height="1"/><rect x="14" y="13" width="4" height="1"/><rect x="22" y="13" width="2" height="1"/><rect x="3" y="14" width="2" height="1"/><rect x="8" y="14" width="2" height="1"/><rect x="14" y="14" width="2" height="1"/><rect x="17" y="14" width="2" height="1"/><rect x="22" y="14" width="2" height="1"/><rect x="3" y="15" width="2" height="1"/><rect x="8" y="15" width="2" height="1"/><rect x="14" y="15" width="2" height="1"/><rect x="17" y="15" width="2" height="1"/><rect x="23" y="15" width="2" height="1"/><rect x="3" y="16" width="2" height="1"/><rect x="8" y="16" width="2" height="1"/><rect x="14" y="16" width="2" height="1"/><rect x="17" y="16" width="2" height="1"/><rect x="23" y="16" width="2" height="1"/><rect x="3" y="17" width="2" height="1"/><rect x="8" y="17" width="2" height="1"/><rect x="14" y="17" width="2" height="1"/><rect x="18" y="17" width="2" height="1"/><rect x="23" y="17" width="2" height="1"/><rect x="3" y="18" width="2" height="1"/><rect x="8" y="18" width="2" height="1"/><rect x="14" y="18" width="2" height="1"/><rect x="18" y="18" width="2" height="1"/><rect x="24" y="18" width="2" height="1"/><rect x="3" y="19" width="2" height="1"/><rect x="8" y="19" width="2" height="1"/><rect x="14" y="19" width="2" height="1"/><rect x="18" y="19" width="2" height="1"/><rect x="24" y="19" width="2" height="1"/><rect x="3" y="20" width="2" height="1"/><rect x="8" y="20" width="2" height="1"/><rect x="14" y="20" width="2" height="1"/><rect x="19" y="20" width="2" height="1"/><rect x="24" y="20" width="3" height="1"/><rect x="3" y="21" width="2" height="1"/><rect x="8" y="21" width="2" height="1"/><rect x="14" y="21" width="2" height="1"/><rect x="19" y="21" width="2" height="1"/><rect x="25" y="21" width="2" height="1"/><rect x="3" y="22" width="2" height="1"/><rect x="8" y="22" width="2" height="1"/><rect x="14" y="22" width="2" height="1"/><rect x="19" y="22" width="3" height="1"/><rect x="25" y="22" width="2" height="1"/><rect x="3" y="23" width="2" height="1"/><rect x="8" y="23" width="2" height="1"/><rect x="14" y="23" width="2" height="1"/><rect x="20" y="23" width="2" height="1"/><rect x="26" y="23" width="2" height="1"/><rect x="3" y="24" width="2" height="1"/><rect x="8" y="24" width="2" height="1"/><rect x="14" y="24" width="2" height="1"/><rect x="20" y="24" width="2" height="1"/><rect x="26" y="24" width="2" height="1"/><rect x="3" y="25" width="2" height="1"/><rect x="8" y="25" width="2" height="1"/><rect x="14" y="25" width="2" height="1"/><rect x="20" y="25" width="3" height="1"/><rect x="26" y="25" width="2" height="1"/><rect x="3" y="26" width="2" height="1"/><rect x="8" y="26" width="2" height="1"/><rect x="14" y="26" width="2" height="1"/><rect x="21" y="26" width="2" height="1"/><rect x="25" y="26" width="3" height="1"/><rect x="3" y="27" width="12" height="1"/><rect x="21" y="27" width="6" height="1"/><rect x="4" y="28" width="11" height="1"/><rect x="22" y="28" width="3" height="1"/></g></symbol>
-      <symbol id="icon-wifi" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="10" y="6" width="12" height="1"/><rect x="8" y="7" width="17" height="1"/><rect x="5" y="8" width="6" height="1"/><rect x="20" y="8" width="7" height="1"/><rect x="4" y="9" width="4" height="1"/><rect x="23" y="9" width="5" height="1"/><rect x="3" y="10" width="3" height="1"/><rect x="25" y="10" width="5" height="1"/><rect x="2" y="11" width="3" height="1"/><rect x="27" y="11" width="3" height="1"/><rect x="2" y="12" width="1" height="1"/><rect x="14" y="12" width="5" height="1"/><rect x="28" y="12" width="2" height="1"/><rect x="11" y="13" width="11" height="1"/><rect x="8" y="14" width="7" height="1"/><rect x="16" y="14" width="8" height="1"/><rect x="7" y="15" width="4" height="1"/><rect x="20" y="15" width="5" height="1"/><rect x="6" y="16" width="3" height="1"/><rect x="22" y="16" width="4" height="1"/><rect x="6" y="17" width="2" height="1"/><rect x="24" y="17" width="2" height="1"/><rect x="13" y="19" width="6" height="1"/><rect x="11" y="20" width="10" height="1"/><rect x="10" y="21" width="4" height="1"/><rect x="17" y="21" width="4" height="1"/><rect x="11" y="22" width="1" height="1"/><rect x="19" y="22" width="3" height="1"/><rect x="15" y="26" width="2" height="1"/></g></symbol>
-      <symbol id="icon-hotspot" viewBox="0 0 32 32"><g fill="currentColor" shape-rendering="crispEdges"><rect x="5" y="6" width="3" height="1"/><rect x="24" y="6" width="3" height="1"/><rect x="4" y="7" width="3" height="1"/><rect x="25" y="7" width="3" height="1"/><rect x="4" y="8" width="3" height="1"/><rect x="26" y="8" width="2" height="1"/><rect x="3" y="9" width="3" height="1"/><rect x="10" y="9" width="1" height="1"/><rect x="26" y="9" width="3" height="1"/><rect x="3" y="10" width="2" height="1"/><rect x="9" y="10" width="2" height="1"/><rect x="21" y="10" width="2" height="1"/><rect x="27" y="10" width="2" height="1"/><rect x="2" y="11" width="3" height="1"/><rect x="8" y="11" width="3" height="1"/><rect x="21" y="11" width="3" height="1"/><rect x="27" y="11" width="3" height="1"/><rect x="2" y="12" width="2" height="1"/><rect x="8" y="12" width="2" height="1"/><rect x="15" y="12" width="2" height="1"/><rect x="22" y="12" width="2" height="1"/><rect x="28" y="12" width="2" height="1"/><rect x="2" y="13" width="2" height="1"/><rect x="7" y="13" width="3" height="1"/><rect x="13" y="13" width="6" height="1"/><rect x="22" y="13" width="3" height="1"/><rect x="28" y="13" width="2" height="1"/><rect x="2" y="14" width="2" height="1"/><rect x="7" y="14" width="2" height="1"/><rect x="13" y="14" width="2" height="1"/><rect x="17" y="14" width="2" height="1"/><rect x="23" y="14" width="2" height="1"/><rect x="28" y="14" width="2" height="1"/><rect x="2" y="15" width="2" height="1"/><rect x="7" y="15" width="2" height="1"/><rect x="12" y="15" width="2" height="1"/><rect x="18" y="15" width="2" height="1"/><rect x="23" y="15" width="2" height="1"/><rect x="28" y="15" width="2" height="1"/><rect x="2" y="16" width="2" height="1"/><rect x="7" y="16" width="2" height="1"/><rect x="12" y="16" width="2" height="1"/><rect x="18" y="16" width="2" height="1"/><rect x="23" y="16" width="2" height="1"/><rect x="28" y="16" width="2" height="1"/><rect x="2" y="17" width="2" height="1"/><rect x="7" y="17" width="2" height="1"/><rect x="13" y="17" width="2" height="1"/><rect x="17" y="17" width="2" height="1"/><rect x="23" y="17" width="2" height="1"/><rect x="28" y="17" width="2" height="1"/><rect x="2" y="18" width="2" height="1"/><rect x="7" y="18" width="3" height="1"/><rect x="13" y="18" width="6" height="1"/><rect x="22" y="18" width="3" height="1"/><rect x="28" y="18" width="2" height="1"/><rect x="2" y="19" width="2" height="1"/><rect x="8" y="19" width="2" height="1"/><rect x="15" y="19" width="2" height="1"/><rect x="22" y="19" width="2" height="1"/><rect x="28" y="19" width="2" height="1"/><rect x="2" y="20" width="3" height="1"/><rect x="8" y="20" width="3" height="1"/><rect x="21" y="20" width="3" height="1"/><rect x="27" y="20" width="3" height="1"/><rect x="3" y="21" width="2" height="1"/><rect x="9" y="21" width="2" height="1"/><rect x="21" y="21" width="2" height="1"/><rect x="27" y="21" width="2" height="1"/><rect x="3" y="22" width="3" height="1"/><rect x="21" y="22" width="1" height="1"/><rect x="26" y="22" width="3" height="1"/><rect x="4" y="23" width="2" height="1"/><rect x="25" y="23" width="3" height="1"/><rect x="4" y="24" width="3" height="1"/><rect x="25" y="24" width="3" height="1"/><rect x="5" y="25" width="3" height="1"/><rect x="24" y="25" width="3" height="1"/></g></symbol>
-      <!-- Battery: pixel-exact port of BaseTheme::drawBatteryOutline + Lyra bar fills. -->
-      <symbol id="icon-battery-3" viewBox="0 0 17 12"><g fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="0" width="13" height="1"/><rect x="1" y="11" width="13" height="1"/><rect x="0" y="1" width="1" height="10"/><rect x="14" y="1" width="1" height="10"/><rect x="15" y="3" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="16" y="4" width="1" height="4"/><rect x="2" y="2" width="3" height="8"/><rect x="6" y="2" width="3" height="8"/><rect x="10" y="2" width="3" height="8"/></g></symbol>
-      <symbol id="icon-battery-2" viewBox="0 0 17 12"><g fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="0" width="13" height="1"/><rect x="1" y="11" width="13" height="1"/><rect x="0" y="1" width="1" height="10"/><rect x="14" y="1" width="1" height="10"/><rect x="15" y="3" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="16" y="4" width="1" height="4"/><rect x="2" y="2" width="3" height="8"/><rect x="6" y="2" width="3" height="8"/></g></symbol>
-      <symbol id="icon-battery-1" viewBox="0 0 17 12"><g fill="currentColor" shape-rendering="crispEdges"><rect x="1" y="0" width="13" height="1"/><rect x="1" y="11" width="13" height="1"/><rect x="0" y="1" width="1" height="10"/><rect x="14" y="1" width="1" height="10"/><rect x="15" y="3" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="16" y="4" width="1" height="4"/><rect x="2" y="2" width="3" height="8"/></g></symbol>
-    </defs>
-  </svg>
   <nav class="border-b border-stone-200 bg-white">
     <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-3 px-4 py-3 sm:flex-nowrap sm:px-6">
       <a href="/" class="order-1 flex min-w-0 shrink-0 items-center gap-2 text-stone-900 no-underline" aria-label="Homepage">
@@ -616,14 +262,7 @@
         <div class="pointer-events-none absolute -top-8 -left-16 hidden rotate-[-6deg] lg:block">
           <div class="eink eink-s-35">
             <div class="eink-bare shadow-[0_20px_40px_-12px_rgba(0,0,0,0.25)]">
-              <div class="eink-reader-body">
-                <h3>Chapter I</h3>
-                <p>It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.</p>
-                <p>However little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families, that he is considered as the rightful property of some one or other of their daughters.</p>
-                <p>&ldquo;My dear Mr. Bennet,&rdquo; said his lady to him one day, &ldquo;have you heard that Netherfield Park is let at last?&rdquo;</p>
-              </div>
-              <div class="eink-reader-progress-track"><div style="width:23%"></div></div>
-              <div class="eink-reader-status"><span>Pride and Prejudice</span><span>23%</span></div>
+              <img src="/screenshots/hero-reader.png" alt="" class="absolute inset-0 w-full h-full object-cover">
             </div>
           </div>
         </div>
@@ -632,32 +271,7 @@
         <div class="pointer-events-none absolute -right-14 bottom-0 hidden rotate-[5deg] lg:block">
           <div class="eink eink-s-35">
             <div class="eink-bare shadow-[0_20px_40px_-12px_rgba(0,0,0,0.25)]">
-              <div class="eink-header">
-                <div class="eink-header-title">Settings</div>
-                <div class="eink-header-sub">1.2.0</div>
-                <div class="eink-battery"><span>87%</span><svg><use href="#icon-battery-3"/></svg></div>
-              </div>
-              <div class="eink-tabs">
-                <div class="eink-tab selected">Display</div>
-                <div class="eink-tab">Reader</div>
-                <div class="eink-tab">Controls</div>
-                <div class="eink-tab">System</div>
-              </div>
-              <div class="eink-list">
-                <div class="eink-list-row"><span class="eink-list-row-label">Sleep Screen</span><span class="eink-list-row-value">Cover</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Sleep Screen Cover Mode</span><span class="eink-list-row-value">Fit</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Sleep Screen Cover Filter</span><span class="eink-list-row-value">None</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Hide Battery %</span><span class="eink-list-row-value">Never</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Refresh Frequency</span><span class="eink-list-row-value">10 pages</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">UI Theme</span><span class="eink-list-row-value">Lyra</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Sunlight Fading Fix</span><span class="eink-list-row-value">OFF</span></div>
-              </div>
-              <div class="eink-hints">
-                <div class="eink-hint">Back</div>
-                <div class="eink-hint">Reader</div>
-                <div class="eink-hint">Up</div>
-                <div class="eink-hint">Down</div>
-              </div>
+              <img src="/screenshots/hero-settings.png" alt="" class="absolute inset-0 w-full h-full object-cover">
             </div>
           </div>
         </div>
@@ -666,51 +280,7 @@
         <div class="eink eink-s-55 sm:eink-s-60 relative">
           <div class="eink-device">
             <div class="eink-screen is-home">
-              <!-- Header: home draws this with title=null, only battery visible -->
-              <div class="eink-header">
-                <span></span>
-                <div class="eink-battery">
-                  <span>87%</span>
-                  <svg><use href="#icon-battery-3"/></svg>
-                </div>
-              </div>
-
-              <!-- Recent book cover tile (selected state, selectorIndex=0) -->
-              <div class="eink-home-cover selected">
-                <div class="cover cover-image" style="background-image:url(/wayofkings.png)"></div>
-                <div class="meta">
-                  <div class="meta-title">The Way of Kings</div>
-                  <div class="meta-author">Brandon Sanderson</div>
-                </div>
-              </div>
-
-              <!-- Main menu -->
-              <div class="eink-menu">
-                <div class="eink-menu-row">
-                  <svg><use href="#icon-folder"/></svg>
-                  Browse Files
-                </div>
-                <div class="eink-menu-row">
-                  <svg><use href="#icon-recent"/></svg>
-                  Recent Books
-                </div>
-                <div class="eink-menu-row">
-                  <svg><use href="#icon-transfer"/></svg>
-                  File Transfer
-                </div>
-                <div class="eink-menu-row">
-                  <svg><use href="#icon-settings2"/></svg>
-                  Settings
-                </div>
-              </div>
-
-              <!-- Button hints: ["", SELECT, ↑, ↓] per HomeActivity -->
-              <div class="eink-hints">
-                <div class="eink-hint eink-hint-empty"></div>
-                <div class="eink-hint">Select</div>
-                <div class="eink-hint">Up</div>
-                <div class="eink-hint">Down</div>
-              </div>
+              <img src="/screenshots/hero-home.png" alt="" class="absolute inset-0 w-full h-full object-cover">
             </div>
           </div>
         </div>
@@ -750,17 +320,7 @@
           <!-- Reader cutout: static page of body text -->
           <div class="eink eink-s-55 sm:eink-s-60">
             <div class="eink-bare shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]">
-              <div class="eink-reader-body">
-                <p>It is a truth universally acknowledged, that a single man in possession of a good fortune, must be in want of a wife.</p>
-                <p>However little known the feelings or views of such a man may be on his first entering a neighbourhood, this truth is so well fixed in the minds of the surrounding families, that he is considered as the rightful property of some one or other of their daughters.</p>
-                <p>&ldquo;My dear Mr. Bennet,&rdquo; said his lady to him one day, &ldquo;have you heard that Netherfield Park is let at last?&rdquo;</p>
-                <p>Mr. Bennet replied that he had not.</p>
-                <p>&ldquo;But it is,&rdquo; returned she; &ldquo;for Mrs. Long has just been here, and she told me all about it.&rdquo; Mr. Bennet made no answer.</p>
-                <p>&ldquo;Do not you want to know who has taken it?&rdquo; cried his wife impatiently.</p>
-                <p>&ldquo;Why, my dear, you must know, Mrs. Long</p>
-              </div>
-              <div class="eink-reader-progress-track"><div style="width:23%"></div></div>
-              <div class="eink-reader-status"><span>Pride and Prejudice</span><span>23%</span></div>
+              <img src="/screenshots/feature-reader.png" alt="" class="absolute inset-0 w-full h-full object-cover">
             </div>
           </div>
         </div>
@@ -771,45 +331,7 @@
         <div class="relative order-last mx-auto lg:order-first">
           <div class="eink eink-s-55 sm:eink-s-60">
             <div class="eink-bare shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]">
-              <!-- Header: title "Settings", subtitle = firmware version -->
-              <div class="eink-header">
-                <div class="eink-header-title">Settings</div>
-                <div class="eink-header-sub">1.2.0</div>
-                <div class="eink-battery"><span>87%</span><svg><use href="#icon-battery-3"/></svg></div>
-              </div>
-
-              <!-- Tab bar: 4 categories, Reader selected but not focused (row is focused) -->
-              <div class="eink-tabs">
-                <div class="eink-tab">Display</div>
-                <div class="eink-tab selected">Reader</div>
-                <div class="eink-tab">Controls</div>
-                <div class="eink-tab">System</div>
-              </div>
-
-              <!-- Reader category settings (firmware labels from english.yaml, order from SettingsList.h) -->
-              <div class="eink-list">
-                <div class="eink-list-row"><span class="eink-list-row-label">Reader Font Family</span><span class="eink-list-row-value">Noto Serif</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Download Fonts</span><span class="eink-list-row-value"></span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Reader Font Size</span><span class="eink-list-row-value">Medium</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Reader Line Spacing</span><span class="eink-list-row-value">Normal</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Reader Screen Margin</span><span class="eink-list-row-value">20</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Reader Paragraph Alignment</span><span class="eink-list-row-value">Justify</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Embedded Style</span><span class="eink-list-row-value">ON</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Hyphenation</span><span class="eink-list-row-value">ON</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Reading Orientation</span><span class="eink-list-row-value">Portrait</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Extra Paragraph Spacing</span><span class="eink-list-row-value">OFF</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Text Anti-Aliasing</span><span class="eink-list-row-value">ON</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Images</span><span class="eink-list-row-value">Display</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">Customise Status Bar</span><span class="eink-list-row-value"></span></div>
-              </div>
-
-              <!-- Hints when tab bar is focused: Back | <next category> | Up | Down -->
-              <div class="eink-hints">
-                <div class="eink-hint">Back</div>
-                <div class="eink-hint">Controls</div>
-                <div class="eink-hint">Up</div>
-                <div class="eink-hint">Down</div>
-              </div>
+              <img src="/screenshots/feature-settings.png" alt="" class="absolute inset-0 w-full h-full object-cover">
             </div>
           </div>
         </div>
@@ -858,43 +380,7 @@
         <div class="relative mx-auto">
           <div class="eink eink-s-55 sm:eink-s-60">
             <div class="eink-bare shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]">
-              <div class="eink-header">
-                <div>
-                  <div class="eink-header-title">File Transfer</div>
-                  <div class="eink-header-sub">Server running</div>
-                </div>
-                <div class="eink-battery"><span>87%</span><svg><use href="#icon-battery-3"/></svg></div>
-              </div>
-
-              <!-- QR code + network info -->
-              <div style="padding:calc(28px * var(--eink-scale)) calc(20px * var(--eink-scale)) 0;display:flex;flex-direction:column;align-items:center;gap:calc(18px * var(--eink-scale))">
-                <!-- QR code: links to https://www.youtube.com/watch?v=dQw4w9WgXcQ -->
-                <div style="width:calc(240px * var(--eink-scale));height:calc(240px * var(--eink-scale));background:#fff;padding:calc(10px * var(--eink-scale));outline:calc(2px * var(--eink-scale)) solid #1a1a1a">
-                  <svg viewBox="0 0 33 33" shape-rendering="crispEdges" style="width:100%;height:100%;image-rendering:pixelated"><rect width="33" height="33" fill="#fff"/><g fill="#1a1a1a"><rect x="0" y="0" width="7" height="1"/><rect x="8" y="0" width="1" height="1"/><rect x="11" y="0" width="3" height="1"/><rect x="15" y="0" width="1" height="1"/><rect x="18" y="0" width="1" height="1"/><rect x="23" y="0" width="1" height="1"/><rect x="26" y="0" width="7" height="1"/><rect x="0" y="1" width="1" height="1"/><rect x="6" y="1" width="1" height="1"/><rect x="9" y="1" width="6" height="1"/><rect x="18" y="1" width="2" height="1"/><rect x="26" y="1" width="1" height="1"/><rect x="32" y="1" width="1" height="1"/><rect x="0" y="2" width="1" height="1"/><rect x="2" y="2" width="3" height="1"/><rect x="6" y="2" width="1" height="1"/><rect x="10" y="2" width="1" height="1"/><rect x="12" y="2" width="1" height="1"/><rect x="14" y="2" width="6" height="1"/><rect x="21" y="2" width="1" height="1"/><rect x="23" y="2" width="1" height="1"/><rect x="26" y="2" width="1" height="1"/><rect x="28" y="2" width="3" height="1"/><rect x="32" y="2" width="1" height="1"/><rect x="0" y="3" width="1" height="1"/><rect x="2" y="3" width="3" height="1"/><rect x="6" y="3" width="1" height="1"/><rect x="8" y="3" width="2" height="1"/><rect x="11" y="3" width="2" height="1"/><rect x="16" y="3" width="2" height="1"/><rect x="21" y="3" width="2" height="1"/><rect x="26" y="3" width="1" height="1"/><rect x="28" y="3" width="3" height="1"/><rect x="32" y="3" width="1" height="1"/><rect x="0" y="4" width="1" height="1"/><rect x="2" y="4" width="3" height="1"/><rect x="6" y="4" width="1" height="1"/><rect x="8" y="4" width="2" height="1"/><rect x="16" y="4" width="2" height="1"/><rect x="19" y="4" width="1" height="1"/><rect x="21" y="4" width="2" height="1"/><rect x="26" y="4" width="1" height="1"/><rect x="28" y="4" width="3" height="1"/><rect x="32" y="4" width="1" height="1"/><rect x="0" y="5" width="1" height="1"/><rect x="6" y="5" width="1" height="1"/><rect x="8" y="5" width="3" height="1"/><rect x="12" y="5" width="1" height="1"/><rect x="15" y="5" width="1" height="1"/><rect x="17" y="5" width="1" height="1"/><rect x="20" y="5" width="5" height="1"/><rect x="26" y="5" width="1" height="1"/><rect x="32" y="5" width="1" height="1"/><rect x="0" y="6" width="7" height="1"/><rect x="8" y="6" width="1" height="1"/><rect x="10" y="6" width="1" height="1"/><rect x="12" y="6" width="1" height="1"/><rect x="14" y="6" width="1" height="1"/><rect x="16" y="6" width="1" height="1"/><rect x="18" y="6" width="1" height="1"/><rect x="20" y="6" width="1" height="1"/><rect x="22" y="6" width="1" height="1"/><rect x="24" y="6" width="1" height="1"/><rect x="26" y="6" width="7" height="1"/><rect x="8" y="7" width="1" height="1"/><rect x="11" y="7" width="1" height="1"/><rect x="14" y="7" width="1" height="1"/><rect x="17" y="7" width="5" height="1"/><rect x="24" y="7" width="1" height="1"/><rect x="0" y="8" width="1" height="1"/><rect x="4" y="8" width="1" height="1"/><rect x="6" y="8" width="3" height="1"/><rect x="10" y="8" width="1" height="1"/><rect x="12" y="8" width="1" height="1"/><rect x="15" y="8" width="1" height="1"/><rect x="17" y="8" width="1" height="1"/><rect x="20" y="8" width="4" height="1"/><rect x="25" y="8" width="5" height="1"/><rect x="32" y="8" width="1" height="1"/><rect x="1" y="9" width="1" height="1"/><rect x="5" y="9" width="1" height="1"/><rect x="7" y="9" width="1" height="1"/><rect x="10" y="9" width="2" height="1"/><rect x="15" y="9" width="4" height="1"/><rect x="21" y="9" width="3" height="1"/><rect x="25" y="9" width="1" height="1"/><rect x="29" y="9" width="2" height="1"/><rect x="32" y="9" width="1" height="1"/><rect x="0" y="10" width="1" height="1"/><rect x="2" y="10" width="1" height="1"/><rect x="4" y="10" width="5" height="1"/><rect x="13" y="10" width="3" height="1"/><rect x="18" y="10" width="1" height="1"/><rect x="23" y="10" width="1" height="1"/><rect x="25" y="10" width="1" height="1"/><rect x="29" y="10" width="1" height="1"/><rect x="31" y="10" width="1" height="1"/><rect x="2" y="11" width="1" height="1"/><rect x="4" y="11" width="1" height="1"/><rect x="7" y="11" width="1" height="1"/><rect x="10" y="11" width="1" height="1"/><rect x="12" y="11" width="2" height="1"/><rect x="16" y="11" width="1" height="1"/><rect x="19" y="11" width="2" height="1"/><rect x="22" y="11" width="1" height="1"/><rect x="24" y="11" width="3" height="1"/><rect x="0" y="12" width="1" height="1"/><rect x="2" y="12" width="2" height="1"/><rect x="6" y="12" width="1" height="1"/><rect x="8" y="12" width="1" height="1"/><rect x="10" y="12" width="1" height="1"/><rect x="12" y="12" width="2" height="1"/><rect x="16" y="12" width="1" height="1"/><rect x="22" y="12" width="3" height="1"/><rect x="26" y="12" width="2" height="1"/><rect x="29" y="12" width="1" height="1"/><rect x="32" y="12" width="1" height="1"/><rect x="0" y="13" width="1" height="1"/><rect x="2" y="13" width="4" height="1"/><rect x="7" y="13" width="1" height="1"/><rect x="10" y="13" width="2" height="1"/><rect x="14" y="13" width="1" height="1"/><rect x="17" y="13" width="4" height="1"/><rect x="24" y="13" width="2" height="1"/><rect x="27" y="13" width="1" height="1"/><rect x="30" y="13" width="1" height="1"/><rect x="2" y="14" width="1" height="1"/><rect x="4" y="14" width="3" height="1"/><rect x="10" y="14" width="3" height="1"/><rect x="14" y="14" width="2" height="1"/><rect x="17" y="14" width="2" height="1"/><rect x="20" y="14" width="2" height="1"/><rect x="23" y="14" width="4" height="1"/><rect x="28" y="14" width="1" height="1"/><rect x="31" y="14" width="1" height="1"/><rect x="0" y="15" width="5" height="1"/><rect x="7" y="15" width="1" height="1"/><rect x="10" y="15" width="2" height="1"/><rect x="13" y="15" width="6" height="1"/><rect x="21" y="15" width="1" height="1"/><rect x="23" y="15" width="1" height="1"/><rect x="25" y="15" width="3" height="1"/><rect x="0" y="16" width="2" height="1"/><rect x="3" y="16" width="4" height="1"/><rect x="8" y="16" width="2" height="1"/><rect x="12" y="16" width="1" height="1"/><rect x="17" y="16" width="6" height="1"/><rect x="24" y="16" width="1" height="1"/><rect x="26" y="16" width="1" height="1"/><rect x="28" y="16" width="2" height="1"/><rect x="31" y="16" width="1" height="1"/><rect x="0" y="17" width="2" height="1"/><rect x="4" y="17" width="2" height="1"/><rect x="7" y="17" width="4" height="1"/><rect x="15" y="17" width="2" height="1"/><rect x="18" y="17" width="1" height="1"/><rect x="20" y="17" width="1" height="1"/><rect x="22" y="17" width="3" height="1"/><rect x="29" y="17" width="3" height="1"/><rect x="0" y="18" width="1" height="1"/><rect x="2" y="18" width="3" height="1"/><rect x="6" y="18" width="2" height="1"/><rect x="10" y="18" width="1" height="1"/><rect x="12" y="18" width="2" height="1"/><rect x="15" y="18" width="3" height="1"/><rect x="20" y="18" width="6" height="1"/><rect x="27" y="18" width="1" height="1"/><rect x="29" y="18" width="1" height="1"/><rect x="31" y="18" width="1" height="1"/><rect x="1" y="19" width="2" height="1"/><rect x="4" y="19" width="1" height="1"/><rect x="7" y="19" width="1" height="1"/><rect x="10" y="19" width="1" height="1"/><rect x="12" y="19" width="2" height="1"/><rect x="15" y="19" width="1" height="1"/><rect x="17" y="19" width="2" height="1"/><rect x="20" y="19" width="2" height="1"/><rect x="24" y="19" width="4" height="1"/><rect x="31" y="19" width="1" height="1"/><rect x="0" y="20" width="1" height="1"/><rect x="2" y="20" width="1" height="1"/><rect x="5" y="20" width="3" height="1"/><rect x="9" y="20" width="1" height="1"/><rect x="11" y="20" width="1" height="1"/><rect x="13" y="20" width="2" height="1"/><rect x="18" y="20" width="3" height="1"/><rect x="26" y="20" width="4" height="1"/><rect x="0" y="21" width="1" height="1"/><rect x="3" y="21" width="1" height="1"/><rect x="5" y="21" width="1" height="1"/><rect x="12" y="21" width="1" height="1"/><rect x="16" y="21" width="2" height="1"/><rect x="19" y="21" width="1" height="1"/><rect x="22" y="21" width="1" height="1"/><rect x="26" y="21" width="1" height="1"/><rect x="29" y="21" width="3" height="1"/><rect x="4" y="22" width="4" height="1"/><rect x="11" y="22" width="2" height="1"/><rect x="14" y="22" width="1" height="1"/><rect x="16" y="22" width="1" height="1"/><rect x="18" y="22" width="2" height="1"/><rect x="21" y="22" width="1" height="1"/><rect x="23" y="22" width="3" height="1"/><rect x="30" y="22" width="2" height="1"/><rect x="3" y="23" width="3" height="1"/><rect x="7" y="23" width="2" height="1"/><rect x="10" y="23" width="1" height="1"/><rect x="13" y="23" width="1" height="1"/><rect x="17" y="23" width="6" height="1"/><rect x="25" y="23" width="2" height="1"/><rect x="28" y="23" width="2" height="1"/><rect x="31" y="23" width="2" height="1"/><rect x="0" y="24" width="3" height="1"/><rect x="4" y="24" width="1" height="1"/><rect x="6" y="24" width="2" height="1"/><rect x="10" y="24" width="2" height="1"/><rect x="13" y="24" width="5" height="1"/><rect x="20" y="24" width="3" height="1"/><rect x="24" y="24" width="6" height="1"/><rect x="31" y="24" width="1" height="1"/><rect x="8" y="25" width="1" height="1"/><rect x="10" y="25" width="2" height="1"/><rect x="13" y="25" width="5" height="1"/><rect x="21" y="25" width="4" height="1"/><rect x="28" y="25" width="1" height="1"/><rect x="30" y="25" width="1" height="1"/><rect x="0" y="26" width="7" height="1"/><rect x="8" y="26" width="3" height="1"/><rect x="14" y="26" width="2" height="1"/><rect x="18" y="26" width="1" height="1"/><rect x="24" y="26" width="1" height="1"/><rect x="26" y="26" width="1" height="1"/><rect x="28" y="26" width="2" height="1"/><rect x="0" y="27" width="1" height="1"/><rect x="6" y="27" width="1" height="1"/><rect x="11" y="27" width="1" height="1"/><rect x="14" y="27" width="3" height="1"/><rect x="19" y="27" width="1" height="1"/><rect x="22" y="27" width="1" height="1"/><rect x="24" y="27" width="1" height="1"/><rect x="28" y="27" width="1" height="1"/><rect x="32" y="27" width="1" height="1"/><rect x="0" y="28" width="1" height="1"/><rect x="2" y="28" width="3" height="1"/><rect x="6" y="28" width="1" height="1"/><rect x="8" y="28" width="1" height="1"/><rect x="11" y="28" width="4" height="1"/><rect x="16" y="28" width="1" height="1"/><rect x="19" y="28" width="1" height="1"/><rect x="22" y="28" width="1" height="1"/><rect x="24" y="28" width="6" height="1"/><rect x="32" y="28" width="1" height="1"/><rect x="0" y="29" width="1" height="1"/><rect x="2" y="29" width="3" height="1"/><rect x="6" y="29" width="1" height="1"/><rect x="9" y="29" width="2" height="1"/><rect x="12" y="29" width="2" height="1"/><rect x="18" y="29" width="3" height="1"/><rect x="23" y="29" width="1" height="1"/><rect x="26" y="29" width="6" height="1"/><rect x="0" y="30" width="1" height="1"/><rect x="2" y="30" width="3" height="1"/><rect x="6" y="30" width="1" height="1"/><rect x="9" y="30" width="1" height="1"/><rect x="12" y="30" width="1" height="1"/><rect x="14" y="30" width="2" height="1"/><rect x="18" y="30" width="1" height="1"/><rect x="20" y="30" width="2" height="1"/><rect x="25" y="30" width="5" height="1"/><rect x="0" y="31" width="1" height="1"/><rect x="6" y="31" width="1" height="1"/><rect x="11" y="31" width="3" height="1"/><rect x="15" y="31" width="4" height="1"/><rect x="21" y="31" width="1" height="1"/><rect x="23" y="31" width="2" height="1"/><rect x="26" y="31" width="1" height="1"/><rect x="0" y="32" width="7" height="1"/><rect x="8" y="32" width="1" height="1"/><rect x="10" y="32" width="1" height="1"/><rect x="17" y="32" width="1" height="1"/><rect x="19" y="32" width="8" height="1"/><rect x="29" y="32" width="1" height="1"/><rect x="32" y="32" width="1" height="1"/></g></svg>
-                </div>
-                <div style="text-align:center;font-family:'Noto Sans',sans-serif">
-                  <div style="font-size:calc(22px * var(--eink-scale));font-weight:700">http://crosspoint.local</div>
-                  <div style="font-size:calc(16px * var(--eink-scale));color:#8a8782;margin-top:calc(4px * var(--eink-scale))">Connected to home-wifi · 192.168.1.42</div>
-                </div>
-
-                <!-- Progress -->
-                <div style="width:100%;margin-top:calc(12px * var(--eink-scale))">
-                  <div style="display:flex;justify-content:space-between;font-family:'Noto Sans',sans-serif;font-size:calc(15px * var(--eink-scale));margin-bottom:calc(8px * var(--eink-scale))">
-                    <span>Uploading <em style="font-style:italic">moby-dick.epub</em></span>
-                    <span style="font-variant-numeric:tabular-nums">68%</span>
-                  </div>
-                  <div style="height:calc(6px * var(--eink-scale));background:rgba(0,0,0,0.12);border-radius:999px;overflow:hidden">
-                    <div style="height:100%;width:68%;background:#1a1a1a"></div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="eink-hints">
-                <div class="eink-hint eink-hint-empty"></div>
-                <div class="eink-hint">STOP</div>
-                <div class="eink-hint eink-hint-empty"></div>
-                <div class="eink-hint">BACK</div>
-              </div>
+              <img src="/screenshots/feature-transfer.png" alt="" class="absolute inset-0 w-full h-full object-cover">
             </div>
           </div>
         </div>
@@ -905,29 +391,7 @@
         <div class="relative order-last mx-auto lg:order-first">
           <div class="eink eink-s-55 sm:eink-s-60">
             <div class="eink-bare shadow-[0_30px_60px_-20px_rgba(0,0,0,0.25)]">
-              <div class="eink-header">
-                <div class="eink-header-title">Bookmarks</div>
-                <div class="eink-header-sub">Pride and Prejudice</div>
-                <div class="eink-battery"><span>87%</span><svg><use href="#icon-battery-3"/></svg></div>
-              </div>
-
-              <!-- Each saved bookmark keeps its page + reading percentage (per #2188) -->
-              <div class="eink-list">
-                <div class="eink-list-row selected"><span class="eink-list-row-label">&ldquo;…must be in want of a wife.&rdquo;</span><span class="eink-list-row-value">4%</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">&ldquo;Netherfield Park is let at last&rdquo;</span><span class="eink-list-row-value">6%</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">&ldquo;A single man of large fortune&rdquo;</span><span class="eink-list-row-value">9%</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">&ldquo;They attacked him in various ways&rdquo;</span><span class="eink-list-row-value">12%</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">&ldquo;I see no occasion for that.&rdquo;</span><span class="eink-list-row-value">14%</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">&ldquo;You take delight in vexing me.&rdquo;</span><span class="eink-list-row-value">17%</span></div>
-                <div class="eink-list-row"><span class="eink-list-row-label">&ldquo;An invitation to dinner&rdquo;</span><span class="eink-list-row-value">21%</span></div>
-              </div>
-
-              <div class="eink-hints">
-                <div class="eink-hint">Back</div>
-                <div class="eink-hint">Delete</div>
-                <div class="eink-hint">Up</div>
-                <div class="eink-hint">Down</div>
-              </div>
+              <img src="/screenshots/feature-bookmarks.png" alt="" class="absolute inset-0 w-full h-full object-cover">
             </div>
           </div>
         </div>
@@ -962,27 +426,14 @@
           <!-- Back frame: Focus Reading (bolded word stems) -->
           <div class="eink eink-s-50 absolute left-0 top-1" style="transform:rotate(-5deg)">
             <div class="eink-bare shadow-[0_24px_50px_-18px_rgba(0,0,0,0.28)]">
-              <div class="eink-reader-body">
-                <p><b>Ca</b>ll <b>me</b> <b>Ishma</b>el. <b>So</b>me <b>yea</b>rs <b>a</b>go, <b>ne</b>ver <b>mi</b>nd <b>ho</b>w <b>lo</b>ng <b>precis</b>ely, <b>hav</b>ing <b>li</b>ttle <b>or</b> <b>no</b> <b>mo</b>ney <b>in</b> <b>my</b> <b>pur</b>se, <b>a</b>nd <b>noth</b>ing <b>partic</b>ular <b>to</b> <b>inter</b>est <b>me</b> <b>on</b> <b>sho</b>re, <b>I</b> <b>thou</b>ght <b>I</b> <b>wou</b>ld <b>sa</b>il <b>abo</b>ut <b>a</b> <b>li</b>ttle <b>a</b>nd <b>se</b>e <b>th</b>e <b>wat</b>ery <b>pa</b>rt <b>of</b> <b>th</b>e <b>wor</b>ld.</p>
-                <p><b>It</b> <b>is</b> <b>a</b> <b>w</b>ay <b>I</b> <b>ha</b>ve <b>of</b> <b>driv</b>ing <b>of</b>f <b>th</b>e <b>spl</b>een <b>a</b>nd <b>regula</b>ting <b>th</b>e <b>circula</b>tion. <b>Whe</b>never <b>I</b> <b>fi</b>nd <b>mys</b>elf <b>grow</b>ing <b>gr</b>im <b>abo</b>ut <b>th</b>e <b>mou</b>th; <b>when</b>ever <b>it</b> <b>is</b> <b>a</b> <b>da</b>mp, <b>driz</b>zly <b>Nove</b>mber <b>in</b> <b>my</b> <b>so</b>ul; <b>th</b>en <b>I</b> <b>acco</b>unt <b>it</b> <b>hi</b>gh <b>ti</b>me <b>to</b> <b>g</b>et <b>to</b> <b>se</b>a <b>a</b>s <b>so</b>on <b>a</b>s <b>I</b> <b>ca</b>n.</p>
-                <p><b>The</b>re <b>is</b> <b>noth</b>ing <b>surpri</b>sing <b>in</b> <b>th</b>is. <b>If</b> <b>th</b>ey <b>b</b>ut <b>kn</b>ew <b>it</b>, <b>almo</b>st <b>a</b>ll <b>m</b>en <b>in</b> <b>th</b>eir <b>degr</b>ee, <b>so</b>me <b>ti</b>me <b>or</b> <b>oth</b>er, <b>cher</b>ish <b>ve</b>ry <b>nea</b>rly <b>th</b>e <b>sa</b>me <b>feel</b>ings <b>towa</b>rds <b>th</b>e <b>oce</b>an <b>wi</b>th <b>me</b>.</p>
-              </div>
-              <div class="eink-reader-progress-track"><div style="width:11%"></div></div>
-              <div class="eink-reader-status"><span>Moby-Dick</span><span>11%</span></div>
+              <img src="/screenshots/feature-focus-reading.png" alt="" class="absolute inset-0 w-full h-full object-cover">
             </div>
           </div>
 
           <!-- Front frame: right-to-left reader -->
           <div class="eink eink-s-55 absolute right-0 bottom-0" style="transform:rotate(4deg);z-index:2">
             <div class="eink-bare shadow-[0_30px_60px_-20px_rgba(0,0,0,0.3)]">
-              <div class="eink-reader-body rtl">
-                <p>בְּרֵאשִׁית בָּרָא אֱלֹהִים אֵת הַשָּׁמַיִם וְאֵת הָאָרֶץ. וְהָאָרֶץ הָיְתָה תֹהוּ וָבֹהוּ, וְחֹשֶׁךְ עַל־פְּנֵי תְהוֹם, וְרוּחַ אֱלֹהִים מְרַחֶפֶת עַל־פְּנֵי הַמָּיִם.</p>
-                <p>וַיֹּאמֶר אֱלֹהִים: יְהִי אוֹר. וַיְהִי אוֹר. וַיַּרְא אֱלֹהִים אֶת־הָאוֹר כִּי־טוֹב, וַיַּבְדֵּל אֱלֹהִים בֵּין הָאוֹר וּבֵין הַחֹשֶׁךְ.</p>
-                <p>וַיִּקְרָא אֱלֹהִים לָאוֹר יוֹם, וְלַחֹשֶׁךְ קָרָא לָיְלָה. וַיְהִי עֶרֶב וַיְהִי בֹקֶר, יוֹם אֶחָד.</p>
-                <p>וַיֹּאמֶר אֱלֹהִים: יְהִי רָקִיעַ בְּתוֹךְ הַמָּיִם, וִיהִי מַבְדִּיל בֵּין מַיִם לָמָיִם. וַיַּעַשׂ אֱלֹהִים אֶת־הָרָקִיעַ, וַיַּבְדֵּל בֵּין הַמַּיִם אֲשֶׁר מִתַּחַת לָרָקִיעַ וּבֵין הַמַּיִם אֲשֶׁר מֵעַל לָרָקִיעַ.</p>
-              </div>
-              <div class="eink-reader-progress-track"><div style="width:4%"></div></div>
-              <div class="eink-reader-status"><span>בְּרֵאשִׁית</span><span>4%</span></div>
+              <img src="/screenshots/feature-rtl.png" alt="" class="absolute inset-0 w-full h-full object-cover">
             </div>
           </div>
         </div>
