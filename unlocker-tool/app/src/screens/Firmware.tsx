@@ -79,6 +79,7 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
   const showPrereleaseFirmware = useSettingsStore(
     (state) => state.showPrereleaseFirmware,
   );
+  const crosspetHttpOta = useSettingsStore((state) => state.crosspetHttpOta);
 
   useEffect(() => {
     api.fetchCatalog().then(setCatalog).catch((e) => setError(String(e)));
@@ -132,7 +133,7 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
   async function install(release: CrossPointRelease) {
     setPendingId(release.id);
     try {
-      await api.selectFirmware(model, locale, release.id);
+      await api.selectFirmware(model, locale, release.id, crosspetHttpOta);
     } catch (e) {
       setPendingId(null);
       setError(String(e));
@@ -150,7 +151,7 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
         setPendingId(null);
         return;
       }
-      await api.selectLocalFirmware(model, locale, picked);
+      await api.selectLocalFirmware(model, locale, picked, crosspetHttpOta);
     } catch (e) {
       setPendingId(null);
       setError(String(e));

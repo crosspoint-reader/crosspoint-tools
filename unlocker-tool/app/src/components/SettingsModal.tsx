@@ -42,6 +42,10 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const setShowPrereleaseFirmware = useSettingsStore(
     (state) => state.setShowPrereleaseFirmware,
   );
+  const crosspetHttpOta = useSettingsStore((state) => state.crosspetHttpOta);
+  const setCrosspetHttpOta = useSettingsStore(
+    (state) => state.setCrosspetHttpOta,
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -160,6 +164,25 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               </span>
               <span className="block text-stone-600">
                 Enables selecting a local .bin file during firmware selection.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-3 text-sm text-stone-700">
+            <input
+              type="checkbox"
+              checked={crosspetHttpOta}
+              onChange={(e) => setCrosspetHttpOta(e.target.checked)}
+              className="mt-0.5 size-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span>
+              <span className="block font-medium text-stone-900">
+                Serve crosspet firmware over HTTP
+              </span>
+              <span className="block text-stone-600">
+                For devices currently running crosspet firmware: download the
+                replacement firmware over plain HTTP instead of HTTPS. Leave off
+                unless an install repeatedly stalls or drops partway — some
+                crosspet devices can't complete the encrypted download.
               </span>
             </span>
           </label>

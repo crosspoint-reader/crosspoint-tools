@@ -27,12 +27,22 @@ export const api = {
     invoke<void>("accept_consent", { general, recovery }),
   selectDevice: (model: Model, locale: Locale) =>
     invoke<void>("select_device", { model, locale }),
-  selectFirmware: (model: Model, locale: Locale, releaseId: string) =>
+  selectFirmware: (
+    model: Model,
+    locale: Locale,
+    releaseId: string,
+    crosspetHttp: boolean,
+  ) =>
     invoke<void>("select_firmware", {
       selection: { model, locale, release_id: releaseId },
+      crosspetHttp,
     }),
-  selectLocalFirmware: (model: Model, locale: Locale, path: string) =>
-    invoke<void>("select_local_firmware", { model, locale, path }),
+  selectLocalFirmware: (
+    model: Model,
+    locale: Locale,
+    path: string,
+    crosspetHttp: boolean,
+  ) => invoke<void>("select_local_firmware", { model, locale, path, crosspetHttp }),
   checkHelper: () => invoke<boolean>("check_helper"),
   cleanupAfterInstall: () => invoke<void>("cleanup_after_install"),
   uninstallHelper: () => invoke<void>("uninstall_helper"),

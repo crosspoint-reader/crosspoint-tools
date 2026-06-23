@@ -641,7 +641,11 @@ async fn select_device(
 }
 
 #[tauri::command]
-async fn select_firmware(state: State<'_, AppState>, selection: Selection) -> Result<(), String> {
+async fn select_firmware(
+    state: State<'_, AppState>,
+    selection: Selection,
+    crosspet_http: bool,
+) -> Result<(), String> {
     state.orch.set_selection(selection.clone()).await;
     state
         .orch
@@ -655,7 +659,9 @@ async fn select_firmware(state: State<'_, AppState>, selection: Selection) -> Re
     let helper = state.helper.clone();
 
     tokio::spawn(async move {
-        if let Err(e) = run_install(orch.clone(), log, http, runtime, helper, selection).await {
+        if let Err(e) =
+            run_install(orch.clone(), log, http, runtime, helper, selection, crosspet_http).await
+        {
             orch.fail(format!("{e:#}")).await;
         }
     });
@@ -669,6 +675,7 @@ async fn select_local_firmware(
     model: Model,
     locale: Locale,
     path: String,
+    crosspet_http: bool,
 ) -> Result<(), String> {
     let path = std::path::PathBuf::from(path);
     if !path.is_file() {
@@ -702,7 +709,9 @@ async fn select_local_firmware(
     let helper = state.helper.clone();
 
     tokio::spawn(async move {
-        if let Err(e) = run_local_install(orch.clone(), log, runtime, helper, path).await {
+        if let Err(e) =
+            run_local_install(orch.clone(), log, runtime, helper, path, crosspet_http).await
+        {
             orch.fail(format!("{e:#}")).await;
         }
     });
@@ -725,6 +734,7 @@ async fn run_install(
     runtime: Arc<Runtime>,
     helper: Arc<Helper>,
     selection: Selection,
+    crosspet_http: bool,
 ) -> anyhow::Result<()> {
     // ── Locate + cache + download firmware ──
     let cat = catalog::fetch_catalog(&http)
@@ -761,7 +771,7 @@ async fn run_install(
         change_log: render_changelog(&release),
     };
 
-    run_prepared_install(orch, log, runtime, helper, firmware).await
+    run_prepared_install(orch, log, runtime, helper, firmware, crosspet_http).await
 }
 
 async fn run_local_install(
@@ -770,6 +780,7 @@ async fn run_local_install(
     runtime: Arc<Runtime>,
     helper: Arc<Helper>,
     path: std::path::PathBuf,
+    crosspet_http: bool,
 ) -> anyhow::Result<()> {
     let sha = catalog::hash_file(&path)?;
     let size = std::fs::metadata(&path)?.len();
@@ -826,7 +837,7 @@ async fn run_local_install(
         change_log: format!("Installing local firmware file: {display_name}"),
     };
 
-    run_prepared_install(orch, log, runtime, helper, firmware).await
+    run_prepared_install(orch, log, runtime, helper, firmware, crosspet_http).await
 }
 
 async fn run_prepared_install(
@@ -835,6 +846,7 @@ async fn run_prepared_install(
     runtime: Arc<Runtime>,
     helper: Arc<Helper>,
     firmware: PreparedFirmware,
+    crosspet_http: bool,
 ) -> anyhow::Result<()> {
     orch.set_firmware(firmware.path.to_string_lossy().into(), firmware.sha.clone())
         .await;
@@ -907,6 +919,7 @@ async fn run_prepared_install(
         firmware_sha256: firmware.sha,
         crosspoint_version: firmware.version,
         change_log: firmware.change_log,
+        crosspet_http,
     };
     runtime.arm(&helper, arm_cfg).await?;
     log.push("info", "DNS + HTTP + HTTPS servers armed", None)

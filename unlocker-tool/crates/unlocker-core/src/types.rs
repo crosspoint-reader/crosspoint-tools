@@ -172,4 +172,11 @@ pub struct ArmServerSpec {
     pub crosspoint_version: String,
     pub change_log: String,
     pub dns_internal_port: u16,
+    /// When true, serve crosspet devices a plain-HTTP firmware download URL
+    /// instead of HTTPS. crosspet's `esp_https_ota` over TLS has been observed
+    /// to abort the OTA early on memory-constrained devices; HTTP sidesteps the
+    /// mbedTLS heap pressure. User-controlled via a Settings toggle. Defaults
+    /// to false (HTTPS) until HTTP OTA support is confirmed on the hardware.
+    #[serde(default)]
+    pub crosspet_http: bool,
 }

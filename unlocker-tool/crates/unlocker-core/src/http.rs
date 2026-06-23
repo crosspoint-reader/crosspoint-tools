@@ -179,6 +179,9 @@ pub struct ServerConfig {
     pub firmware_sha256: String,
     pub crosspoint_version: String,
     pub change_log: String,
+    /// When true, crosspet devices get a plain-HTTP firmware URL instead of
+    /// HTTPS (see `ArmServerSpec::crosspet_http`). User-controlled toggle.
+    pub crosspet_http: bool,
     /// Notified on every manifest request. Orchestrator awaits the first
     /// notification to advance from AwaitingDeviceRequest.
     pub on_manifest_request: Arc<tokio::sync::Notify>,
@@ -515,16 +518,25 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
     // URL. Our cert is valid for unlocker.crosspointreader.com and that host is
     // DNS-spoofed to the local helper.
     //
-    // crosspet (trilwu/crosspet, a CrossPoint fork) is in the same bucket: it
-    // builds on pioarduino/IDF 5.5 with no `CONFIG_OTA_ALLOW_HTTP` override, so
-    // its `esp_https_ota_begin()` rejects a plain-HTTP firmware URL and the OTA
-    // aborts before downloading a byte — the device gets our manifest fine but
-    // can never install. Its check leg already succeeds because it uses
-    // `esp_crt_bundle_attach` (chain-only validation, no hostname enforcement),
-    // so the only change it needs is an HTTPS download URL.
+    // crosspet (trilwu/crosspet, a CrossPoint fork) defaults to HTTPS like INX,
+    // on the belief that its `esp_https_ota` rejects a plain-HTTP firmware URL
+    // (no `CONFIG_OTA_ALLOW_HTTP` in the repo). But HTTPS has been observed to
+    // abort the OTA early on these memory-constrained devices — the device gets
+    // the manifest and begins the TLS download, then tears the connection down
+    // at the first chunk (mbedTLS heap pressure). The `crosspet_http` toggle
+    // (Settings UI → ServerConfig) lets the user serve crosspet over plain HTTP
+    // instead, matching CrossPoint/CrossInk and sidestepping the TLS memory cost.
+    // Its check leg already succeeds regardless because crosspet uses
+    // `esp_crt_bundle_attach` (chain-only validation, no hostname enforcement).
     let is_inx = repo.eq_ignore_ascii_case("inx");
     let is_crosspet = repo.eq_ignore_ascii_case("crosspet");
-    let scheme = if is_inx || is_crosspet { "https" } else { "http" };
+
+    let crosspet_http = is_crosspet && cfg.crosspet_http;
+    let scheme = if (is_inx || is_crosspet) && !crosspet_http {
+        "https"
+    } else {
+        "http"
+    };
     let download_url = format!("{scheme}://unlocker.crosspointreader.com/firmware/firmware.bin");
 
     // `tag_name` stays unprefixed — CrossPoint's `sscanf("%d.%d.%d")` would
@@ -562,7 +574,7 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
     // Use a very high version so the device always considers it newer.
     // CrossPoint's version check uses sscanf("%d.%d.%d") so this parses
     // as 99.9.9 which is greater than any real version.
-    tracing::info!(%download_url, %tag, is_crossink, is_inx, is_crosspet, "serving manifest");
+    tracing::info!(%download_url, %tag, is_crossink, is_inx, is_crosspet, crosspet_http, "serving manifest");
 
     serde_json::json!({
         "tag_name": tag,
