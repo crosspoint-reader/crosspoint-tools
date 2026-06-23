@@ -43,6 +43,10 @@ export const api = {
     path: string,
     crosspetHttp: boolean,
   ) => invoke<void>("select_local_firmware", { model, locale, path, crosspetHttp }),
+  // Download a catalog firmware and write it to `dest` on this computer, so the
+  // user can copy it to the device's SD card and flash it from Escape Hatch.
+  exportFirmware: (releaseId: string, dest: string) =>
+    invoke<void>("export_firmware", { releaseId, dest }),
   checkHelper: () => invoke<boolean>("check_helper"),
   cleanupAfterInstall: () => invoke<void>("cleanup_after_install"),
   uninstallHelper: () => invoke<void>("uninstall_helper"),

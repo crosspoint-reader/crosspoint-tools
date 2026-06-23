@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
+import {
+  open as openFileDialog,
+  save as saveFileDialog,
+} from "@tauri-apps/plugin-dialog";
 import { api } from "../api";
 import { useSettingsStore } from "../stores/settingsStore";
 import {
   Callout,
   Eyebrow,
   Heading,
+  PrimaryButton,
 } from "../components/ui";
 import {
   SOURCE_LABELS,
@@ -64,13 +68,22 @@ const HIDDEN_RELEASES: Record<string, Model[]> = {
   "xteink:stable-1.2.0": ["x4"],
 };
 
-const FIRMWARE_PATCHES_URL =
-  "https://github.com/crosspoint-reader/crosspoint-tools/tree/master/unlocker-tool/firmware-patches";
+// Namespaced catalog id of the Escape Hatch recovery firmware (xteink source).
+// It's served from the catalog like any other release so the normal OTA install
+// pipeline can flash it, but it must NOT appear in the normal channel cards —
+// it's a recovery bridge, not a firmware users should pick casually. We filter
+// any `…:recovery-*` id out of the channel grouping and surface this one only
+// from the "OTA failing?" recovery panel below.
+const ESCAPE_HATCH_ID = "xteink:recovery-escape-hatch";
+const isRecoveryRelease = (r: CrossPointRelease) =>
+  r.id.includes(":recovery-") || r.id.startsWith("recovery-");
 
 export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [selectedSource, setSelectedSource] = useState<Source | null>(null);
   const showCustomFirmwareOption = useSettingsStore(
@@ -96,7 +109,11 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
     const isHiddenChannel = (r: CrossPointRelease) =>
       !showPrereleaseFirmware && (r.channel === "beta" || r.channel === "insider");
     const eligible = catalog.releases.filter(
-      (r) => supportsModel(r) && !isHidden(r) && !isHiddenChannel(r),
+      (r) =>
+        supportsModel(r) &&
+        !isHidden(r) &&
+        !isHiddenChannel(r) &&
+        !isRecoveryRelease(r),
     );
     const present = new Set<Source>();
     for (const r of eligible) present.add(r.source ?? "xteink");
@@ -140,6 +157,35 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
     }
   }
 
+  // Save a firmware .bin to the user's computer so they can copy it to the
+  // device's SD card and flash it from Escape Hatch (no OTA).
+  async function saveToFile(release: CrossPointRelease) {
+    const suggested = `${releaseLabel(release)
+      .replace(/[^a-zA-Z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "")}.bin`;
+    let dest: string | null;
+    try {
+      dest = await saveFileDialog({
+        defaultPath: suggested,
+        filters: [{ name: "Firmware image", extensions: ["bin"] }],
+      });
+    } catch (e) {
+      setSaveNotice(`Couldn't open save dialog: ${String(e)}`);
+      return;
+    }
+    if (!dest) return; // user cancelled
+    setSavingId(release.id);
+    setSaveNotice(null);
+    try {
+      await api.exportFirmware(release.id, dest);
+      setSaveNotice(`Saved ${releaseLabel(release)} to ${dest}`);
+    } catch (e) {
+      setSaveNotice(`Save failed: ${String(e)}`);
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   async function installLocal() {
     setPendingId("local");
     try {
@@ -168,6 +214,18 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
 
   const activeSource = selectedSource ?? bySource.sources[0]!;
   const groups = bySource.groups.get(activeSource)!;
+
+  // The Escape Hatch recovery firmware, if the catalog is serving it and it
+  // supports this model. Surfaced only from the recovery panel below, never in
+  // the channel cards (filtered out of `eligible` by `isRecoveryRelease`).
+  const escapeHatch =
+    catalog.releases.find(
+      (r) =>
+        r.id === ESCAPE_HATCH_ID &&
+        (!r.supported_devices ||
+          r.supported_devices.length === 0 ||
+          r.supported_devices.includes(model)),
+    ) ?? null;
 
   return (
     <div className="space-y-5">
@@ -222,28 +280,38 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
             <span className="inline-block w-4 text-stone-400 transition-transform group-open:rotate-90">
               ›
             </span>
-            Stuck on CrossPoint 1.2.0 and OTA isn't working?
+            Is your OTA update failing to complete?
           </summary>
-          <div className="px-4 pb-3 pl-8">
-            A bug in CrossPoint stable 1.2.0 prevents OTA updates from
-            completing. To recover: enable “Show custom firmware option” in
-            Settings, then try one of the patched files in our{" "}
-            <a
-              href={FIRMWARE_PATCHES_URL}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="font-medium text-brand-700 underline"
-            >
-              firmware-patches folder
-            </a>{" "}
-            under the new “Local firmware” option that appears in this tool.{" "}
-            <strong>
-              While flashing from 1.2.0, the device's progress bar will stay
-              at 0% the whole time. That's expected for this bug. Don't
-              cancel; just wait for the update complete screen.
-            </strong>{" "}
-            Once your device is on a patched build, OTA updates to other
-            firmware or newer CrossPoint releases will work normally.
+          <div className="space-y-3 px-4 pb-4 pl-8">
+            <p>
+              Some firmware (such as crosspet 1.8.3+) forces an encrypted OTA
+              download that these devices can't reliably finish — the update
+              starts, then stalls or drops partway. If a normal install keeps
+              failing, flash the <strong>Escape Hatch</strong> firmware instead,
+              then flash your real firmware directly from the SD card.
+            </p>
+            {escapeHatch ? (
+              <>
+                <PrimaryButton
+                  onClick={() => install(escapeHatch)}
+                  disabled={!!pendingId}
+                >
+                  {pendingId === escapeHatch.id
+                    ? "Flashing Escape Hatch…"
+                    : "Flash Escape Hatch firmware"}
+                </PrimaryButton>
+                <p className="text-stone-600">
+                  Once the device is on Escape Hatch, copy your firmware{" "}
+                  <code>.bin</code> to the SD card and flash it from the device's
+                  on-screen menu — no OTA required.
+                </p>
+              </>
+            ) : (
+              <p className="text-stone-600">
+                The Escape Hatch firmware isn't available from the catalog right
+                now. Check your internet connection and try again shortly.
+              </p>
+            )}
           </div>
         </details>
       )}
@@ -261,12 +329,23 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
               open={openKey === key}
               onToggle={() => setOpenKey((v) => (v === key ? null : key))}
               onPick={install}
+              onSave={saveToFile}
               pendingId={pendingId}
+              savingId={savingId}
               alwaysExpanded={channel === "stable"}
             />
           );
         })}
       </div>
+
+      <p className="text-xs text-stone-500">
+        Tip: use <strong>Save for SD</strong> on any release to write its{" "}
+        <code>.bin</code> to this computer. Copy it to the device's SD card, then
+        flash it from Escape Hatch — handy when an OTA install won't complete.
+      </p>
+      {saveNotice && (
+        <p className="text-xs text-stone-600">{saveNotice}</p>
+      )}
 
       {showCustomFirmwareOption && (
         <div className="rounded-xl border border-stone-300 bg-white p-4 shadow-sm">
@@ -319,7 +398,9 @@ function ChannelCard({
   open,
   onToggle,
   onPick,
+  onSave,
   pendingId,
+  savingId,
   alwaysExpanded,
 }: {
   channel: Channel;
@@ -327,7 +408,9 @@ function ChannelCard({
   open: boolean;
   onToggle: () => void;
   onPick: (r: CrossPointRelease) => void;
+  onSave: (r: CrossPointRelease) => void;
   pendingId: string | null;
+  savingId: string | null;
   alwaysExpanded?: boolean;
 }) {
   const meta = CHANNEL_META[channel];
@@ -339,13 +422,15 @@ function ChannelCard({
       {releases.map((r) => {
         const isPending = pendingId === r.id;
         const otherPending = !!pendingId && !isPending;
+        const isSaving = savingId === r.id;
+        const busy = !!pendingId || !!savingId;
         return (
-          <li key={r.id}>
+          <li key={r.id} className="flex items-stretch">
             <button
               type="button"
               onClick={() => onPick(r)}
-              disabled={otherPending}
-              className="flex w-full items-start justify-between gap-4 px-4 py-3 text-left transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={otherPending || !!savingId}
+              className="flex flex-1 items-start justify-between gap-4 px-4 py-3 text-left transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div>
                 <div className="text-sm font-medium text-stone-900">
@@ -369,6 +454,15 @@ function ChannelCard({
               >
                 {isPending ? "Downloading…" : "Download"}
               </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSave(r)}
+              disabled={busy}
+              title="Save this firmware .bin to your computer, then copy it to the SD card to flash from Escape Hatch"
+              className="shrink-0 border-l border-stone-200 px-3 text-xs font-medium text-stone-600 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSaving ? "Saving…" : "Save for SD"}
             </button>
           </li>
         );

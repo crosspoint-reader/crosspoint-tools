@@ -136,6 +136,9 @@ async function handleApi(
       case '/api/release/firmware':
         return handleReleaseFirmware(env, corsHeaders);
 
+      case '/api/recovery/escape-hatch/firmware':
+        return handleEscapeHatchFirmware(env, corsHeaders);
+
       case '/api/firmware/stock':
         return handleStockFirmware(url, env, corsHeaders);
 
@@ -714,6 +717,34 @@ async function handleReleaseFirmware(
       ...headers,
       'Content-Type': 'application/octet-stream',
       'Content-Disposition': 'attachment; filename="firmware.bin"',
+    },
+  });
+}
+
+// --- Escape Hatch (recovery bridge firmware) ---
+
+// R2 key for the Escape Hatch firmware. It's a small (~410 KB) bridge build:
+// users flash it over OTA when a normal install can't complete (e.g. crosspet's
+// forced-SSL OTA that stalls on these devices), then use it to flash a full
+// firmware straight from the SD card. Upload with:
+//   wrangler r2 object put crosspoint-firmware/recovery/escape-hatch/firmware.bin \
+//     --file=/path/to/escape-hatch/.pio/build/default/firmware.bin
+const ESCAPE_HATCH_R2_KEY = 'recovery/escape-hatch/firmware.bin';
+
+async function handleEscapeHatchFirmware(
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const object = await env.FIRMWARE_BUCKET.get(ESCAPE_HATCH_R2_KEY);
+  if (!object) {
+    return json({ error: 'Escape Hatch firmware not available' }, 404, headers);
+  }
+  return new Response(object.body, {
+    headers: {
+      ...headers,
+      'Content-Type': 'application/octet-stream',
+      'Content-Disposition': 'attachment; filename="escape-hatch.bin"',
+      'Content-Length': String(object.size),
     },
   });
 }
@@ -2608,20 +2639,48 @@ async function fetchBetasForCatalog(env: Env): Promise<CatalogRelease[]> {
   return out;
 }
 
+// The Escape Hatch recovery firmware, exposed as a catalog release so the
+// Unlocker's normal download pipeline can flash it. Its id is prefixed
+// `recovery-` so the Unlocker UI keeps it out of the normal channel cards and
+// surfaces it only from the "OTA failing?" recovery panel. Channel is set to
+// `stable` purely to satisfy the schema; the id prefix is what gates the UI.
+// Returns null (entry omitted) until the .bin is uploaded to R2.
+async function fetchEscapeHatchForCatalog(env: Env): Promise<CatalogRelease | null> {
+  const result = await getOrComputeR2Sha(
+    env,
+    'sha256:recovery:escape-hatch',
+    ESCAPE_HATCH_R2_KEY
+  );
+  if (!result) return null;
+  return {
+    id: 'recovery-escape-hatch',
+    channel: 'stable',
+    name: 'Escape Hatch (recovery)',
+    version: 'escape-hatch',
+    released_at: '2026-06-23T00:00:00Z',
+    firmware_url: `${ORIGIN}/api/recovery/escape-hatch/firmware`,
+    firmware_sha256: result.sha,
+    size: result.size,
+    supported_devices: ['x3', 'x4'],
+  };
+}
+
 async function handleCatalog(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const [stable, insider, betas] = await Promise.all([
+  const [stable, insider, betas, escapeHatch] = await Promise.all([
     fetchStableForCatalog(env),
     fetchInsiderForCatalog(env),
     fetchBetasForCatalog(env),
+    fetchEscapeHatchForCatalog(env),
   ]);
 
   const releases: CatalogRelease[] = [];
   if (stable) releases.push(stable);
   if (insider) releases.push(insider);
   for (const b of betas) releases.push(b);
+  if (escapeHatch) releases.push(escapeHatch);
 
   return json({
     schema_version: 1,
