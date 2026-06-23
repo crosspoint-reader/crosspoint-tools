@@ -425,45 +425,46 @@ function ChannelCard({
         const isSaving = savingId === r.id;
         const busy = !!pendingId || !!savingId;
         return (
-          <li key={r.id} className="flex items-stretch">
-            <button
-              type="button"
-              onClick={() => onPick(r)}
-              disabled={otherPending || !!savingId}
-              className="flex flex-1 items-start justify-between gap-4 px-4 py-3 text-left transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <div>
-                <div className="text-sm font-medium text-stone-900">
-                  {releaseLabel(r)}
-                </div>
-                {r.notes && (
-                  <div className="mt-1 line-clamp-2 whitespace-pre-line text-xs text-stone-500">
-                    {r.notes}
-                  </div>
-                )}
-                <div className="mt-1 font-mono text-[11px] text-stone-400">
-                  {r.version} · {new Date(r.released_at).toLocaleDateString()}
-                </div>
+          <li
+            key={r.id}
+            className="flex items-start justify-between gap-4 px-4 py-3"
+          >
+            <div>
+              <div className="text-sm font-medium text-stone-900">
+                {releaseLabel(r)}
               </div>
-              <span
-                className={`shrink-0 rounded-md border px-3 py-1 text-xs font-semibold shadow-sm ${
+              {r.notes && (
+                <div className="mt-1 line-clamp-2 whitespace-pre-line text-xs text-stone-500">
+                  {r.notes}
+                </div>
+              )}
+              <div className="mt-1 font-mono text-[11px] text-stone-400">
+                {r.version} · {new Date(r.released_at).toLocaleDateString()}
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => onPick(r)}
+                disabled={otherPending || !!savingId}
+                className={`rounded-md border px-3 py-1 text-xs font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
                   isPending
                     ? "border-brand-500 bg-brand-500 text-white"
-                    : "border-stone-300 bg-stone-50 text-stone-700"
+                    : "border-stone-300 bg-stone-50 text-stone-700 hover:bg-stone-100"
                 }`}
               >
-                {isPending ? "Downloading…" : "Download"}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onSave(r)}
-              disabled={busy}
-              title="Save this firmware .bin to your computer, then copy it to the SD card to flash from Escape Hatch"
-              className="shrink-0 border-l border-stone-200 px-3 text-xs font-medium text-stone-600 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSaving ? "Saving…" : "Save for SD"}
-            </button>
+                {isPending ? "Flashing…" : "OTA Flash"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onSave(r)}
+                disabled={busy}
+                title="Save this firmware .bin to your computer, then copy it to the SD card to flash from Escape Hatch"
+                className="rounded-md border border-stone-300 bg-stone-50 px-3 py-1 text-xs font-semibold text-stone-700 shadow-sm transition hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isSaving ? "Saving…" : "Save for SD"}
+              </button>
+            </div>
           </li>
         );
       })}
@@ -535,12 +536,12 @@ function ChannelCard({
           }`}
         >
           {installingThisCard
-            ? "Downloading…"
+            ? "Flashing…"
             : tapBehavior === "expand"
               ? open
                 ? "Hide"
                 : "Choose"
-              : "Download"}
+              : "OTA Flash"}
         </span>
       </button>
 
