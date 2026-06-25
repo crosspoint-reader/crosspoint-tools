@@ -1,0 +1,566 @@
+{
+  "schema": 1,
+  "version": 6,
+  "id": "tabbed-dashboard",
+  "name": "Tabbed Dashboard",
+  "description": "A compact dashboard-style theme inspired by tabbed e-reader home screens, with dense cover rows and room for reading-stat cards in compatible apps.",
+  "inherits": "lyra",
+  "requires": {
+    "crosspoint": {
+      "schema": 1,
+      "modules": [
+        "cover-strip"
+      ]
+    },
+    "freeinkui": {
+      "schema": 1,
+      "components": [
+        "header",
+        "tab-bar",
+        "status-bar",
+        "cover-carousel",
+        "book-card",
+        "metric-card",
+        "list"
+      ]
+    }
+  },
+  "metrics": {
+    "headerHeight": 32,
+    "tabBarHeight": 34,
+    "topPadding": 2,
+    "verticalSpacing": 6,
+    "contentSidePadding": 10,
+    "homeTopPadding": 10,
+    "homeCoverHeight": 260,
+    "homeCoverTileHeight": 276,
+    "homeRecentBooksCount": 3,
+    "homeContinueReadingInMenu": false,
+    "homeShowContinueReadingHeader": true,
+    "homeMenuTopOffset": 4,
+    "menuRowHeight": 44,
+    "menuSpacing": 4,
+    "listRowHeight": 34,
+    "listWithSubtitleRowHeight": 56,
+    "buttonHintsHeight": 30,
+    "sideButtonHintsWidth": 24,
+    "progressBarHeight": 10,
+    "progressBarMarginTop": 1,
+    "batteryWidth": 14,
+    "batteryHeight": 9,
+    "batteryBarHeight": 16
+  },
+  "components": {
+    "homeRecents": {
+      "type": "cover-strip",
+      "maxBooks": 3,
+      "wrap": true,
+      "drawPanel": true,
+      "panelCornerRadius": 5,
+      "panelInsetX": 0,
+      "selectionLineWidth": 2,
+      "inactiveSelectionLineWidth": 0,
+      "selectionCornerRadius": 4,
+      "slots": [
+        {
+          "book": "selected",
+          "x": "padding",
+          "y": "top",
+          "height": 168,
+          "widthPercent": 46,
+          "xOffset": 0,
+          "yOffset": 0,
+          "selected": true,
+          "title": {
+            "enabled": true,
+            "font": "large",
+            "style": "bold",
+            "maxLines": 2,
+            "offsetY": 8
+          }
+        },
+        {
+          "book": "previous",
+          "x": "center",
+          "y": "center",
+          "height": 150,
+          "widthPercent": 35,
+          "xOffset": -8,
+          "yOffset": 74,
+          "title": {
+            "enabled": true,
+            "font": "medium",
+            "style": "regular",
+            "maxLines": 1,
+            "offsetY": 6
+          }
+        },
+        {
+          "book": "next",
+          "x": "right-padding",
+          "y": "center",
+          "height": 150,
+          "widthPercent": 35,
+          "yOffset": 74,
+          "title": {
+            "enabled": true,
+            "font": "medium",
+            "style": "regular",
+            "maxLines": 1,
+            "offsetY": 6
+          }
+        }
+      ]
+    },
+    "homeMenu": {
+      "font": "medium",
+      "style": "bold",
+      "centeredText": false,
+      "centerVertically": true,
+      "showIcons": true,
+      "drawPanel": false,
+      "panelWidth": 0,
+      "panelCornerRadius": 4,
+      "selectionStyle": "pill",
+      "selectionCornerRadius": 4,
+      "selectionInset": 8,
+      "selectedTextInverted": true,
+      "selectionFillBlack": true,
+      "rowPaddingX": 12,
+      "textInsetX": 10
+    },
+    "list": {
+      "font": "medium",
+      "style": "regular",
+      "subtitleFontId": 0,
+      "valueFontId": 0,
+      "showIcons": true,
+      "iconSize": 24,
+      "textGap": 8,
+      "selectionStyle": "pill",
+      "selectionCornerRadius": 4,
+      "selectionFill": true,
+      "selectionOutline": false,
+      "selectedTextInverted": true,
+      "rowBackgrounds": false,
+      "centerSingleLineRows": true,
+      "subtitleRowAutoHeight": true,
+      "centerValueVertically": true,
+      "rowSidePadding": 8,
+      "rowGap": 5,
+      "textInsetX": 9,
+      "selectionInsetX": 2,
+      "selectionInsetY": 1,
+      "titleOffsetY": 6,
+      "subtitleOffsetY": 25,
+      "valueOffsetY": 6,
+      "subtitleValueOffsetY": 15,
+      "iconOffsetY": 0
+    },
+    "header": {
+      "font": "medium",
+      "style": "regular",
+      "centeredTitle": false,
+      "showDivider": false,
+      "titleOffsetY": 0,
+      "batteryOffsetY": 2
+    },
+    "tabBar": {
+      "font": "medium",
+      "style": "bold",
+      "equalWidth": true,
+      "selectionStyle": "fill",
+      "selectedCornerRadius": 4,
+      "selectedTextInverted": true,
+      "drawDivider": false,
+      "horizontalInset": 1
+    },
+    "buttonHints": {
+      "font": "small",
+      "style": "regular",
+      "buttonWidth": 70,
+      "smallButtonHeight": 13,
+      "cornerRadius": 4,
+      "fill": true,
+      "outline": false,
+      "drawEmpty": false,
+      "layout": "icons",
+      "shapeSize": 24,
+      "textOffsetY": 6
+    }
+  },
+  "freeInkUI": {
+    "components": [
+      "header",
+      "status-bar",
+      "tab-bar",
+      "book-card",
+      "cover-carousel",
+      "metric-card",
+      "list",
+      "button-hints"
+    ]
+  },
+  "screens": {
+    "home": {
+      "layout": {
+        "type": "rows",
+        "padding": {
+          "x": 36,
+          "top": 6
+        },
+        "gap": 0,
+        "children": [
+          {
+            "type": "columns",
+            "h": 38,
+            "gap": 0,
+            "children": [
+              {
+                "type": "box",
+                "outline": false,
+                "fill": false
+              },
+              {
+                "type": "tab-bar",
+                "w": 324,
+                "labels": [
+                  "reading",
+                  "library",
+                  "network",
+                  "settings"
+                ],
+                "icons": [
+                  "book-open",
+                  "library",
+                  "wifi",
+                  "sliders-horizontal"
+                ],
+                "selectedIndex": 0,
+                "font": "small",
+                "style": "bold",
+                "gap": 4,
+                "radius": 4,
+                "outline": false
+              },
+              {
+                "type": "box",
+                "outline": false,
+                "fill": false
+              }
+            ]
+          },
+          {
+            "type": "box",
+            "h": 34,
+            "outline": false,
+            "fill": false
+          },
+          {
+            "type": "label",
+            "h": 18,
+            "text": "currently reading",
+            "font": "medium",
+            "style": "bold"
+          },
+          {
+            "type": "box",
+            "h": 32,
+            "outline": false,
+            "fill": false
+          },
+          {
+            "type": "book-card",
+            "h": 150,
+            "coverWidth": 86,
+            "coverHeight": 122,
+            "padding": 10,
+            "radius": 4,
+            "font": "medium",
+            "outline": false,
+            "fill": false
+          },
+          {
+            "type": "box",
+            "h": 18,
+            "outline": false,
+            "fill": false
+          },
+          {
+            "type": "cover-grid",
+            "h": 222,
+            "columns": 3,
+            "count": 3,
+            "coverHeight": 189,
+            "showTitle": false,
+            "gap": 14,
+            "font": "small",
+            "radius": 0,
+            "outline": false,
+            "fill": false,
+            "coverWidth": "fill"
+          },
+          {
+            "type": "box",
+            "h": 24,
+            "outline": false,
+            "fill": false
+          },
+          {
+            "type": "label",
+            "h": 18,
+            "text": "reading stats",
+            "font": "medium",
+            "style": "bold"
+          },
+          {
+            "type": "box",
+            "h": 30,
+            "outline": false,
+            "fill": false
+          },
+          {
+            "type": "metric-cards",
+            "h": 118,
+            "count": 3,
+            "labels": [
+              "last read",
+              "total read",
+              "completed"
+            ],
+            "gap": 8,
+            "font": "small",
+            "radius": 4,
+            "outline": true,
+            "fill": false
+          }
+        ]
+      }
+    },
+    "settings": {
+      "metrics": {
+        "topPadding": 5,
+        "headerHeight": 84,
+        "tabBarHeight": 40,
+        "verticalSpacing": 16,
+        "contentSidePadding": 20,
+        "listRowHeight": 40,
+        "listWithSubtitleRowHeight": 60,
+        "buttonHintsHeight": 40
+      },
+      "components": {
+        "header": {
+          "font": "large",
+          "style": "bold",
+          "centeredTitle": false,
+          "showDivider": true,
+          "titleOffsetY": 0,
+          "batteryOffsetY": 5
+        },
+        "tabBar": {
+          "font": "medium",
+          "style": "regular",
+          "equalWidth": true,
+          "selectionStyle": "fill",
+          "selectedCornerRadius": 6,
+          "selectedTextInverted": true,
+          "drawDivider": true,
+          "horizontalInset": 2
+        },
+        "list": {
+          "font": "medium",
+          "style": "regular",
+          "showIcons": true,
+          "textGap": 8,
+          "selectionStyle": "fill",
+          "selectionCornerRadius": 6,
+          "selectionFill": true,
+          "selectionOutline": false,
+          "selectedTextInverted": false,
+          "rowBackgrounds": false,
+          "centerSingleLineRows": false,
+          "subtitleRowAutoHeight": false,
+          "centerValueVertically": false,
+          "rowSidePadding": 0,
+          "rowGap": 0,
+          "textInsetX": 8,
+          "selectionInsetX": 0,
+          "selectionInsetY": 0,
+          "titleOffsetY": 7,
+          "subtitleOffsetY": 30,
+          "valueOffsetY": 6,
+          "subtitleValueOffsetY": 16,
+          "iconOffsetY": 0
+        },
+        "buttonHints": {
+          "font": "small",
+          "style": "regular",
+          "buttonWidth": 80,
+          "smallButtonHeight": 15,
+          "cornerRadius": 6,
+          "fill": true,
+          "outline": true,
+          "drawEmpty": true,
+          "layout": "buttons",
+          "textOffsetY": 7
+        }
+      }
+    },
+    "readerMenu": {
+      "metrics": {
+        "topPadding": 5,
+        "headerHeight": 84,
+        "tabBarHeight": 40,
+        "verticalSpacing": 16,
+        "contentSidePadding": 20,
+        "listRowHeight": 40,
+        "listWithSubtitleRowHeight": 60,
+        "buttonHintsHeight": 40
+      },
+      "components": {
+        "header": {
+          "font": "large",
+          "style": "bold",
+          "centeredTitle": false,
+          "showDivider": true,
+          "titleOffsetY": 0,
+          "batteryOffsetY": 5
+        },
+        "list": {
+          "font": "medium",
+          "style": "regular",
+          "showIcons": true,
+          "textGap": 8,
+          "selectionStyle": "fill",
+          "selectionCornerRadius": 6,
+          "selectionFill": true,
+          "selectionOutline": false,
+          "selectedTextInverted": false,
+          "rowBackgrounds": false,
+          "centerSingleLineRows": false,
+          "subtitleRowAutoHeight": false,
+          "centerValueVertically": false,
+          "rowSidePadding": 0,
+          "rowGap": 0,
+          "textInsetX": 8,
+          "selectionInsetX": 0,
+          "selectionInsetY": 0,
+          "titleOffsetY": 7,
+          "subtitleOffsetY": 30,
+          "valueOffsetY": 6,
+          "subtitleValueOffsetY": 16,
+          "iconOffsetY": 0
+        },
+        "buttonHints": {
+          "font": "small",
+          "style": "regular",
+          "buttonWidth": 80,
+          "smallButtonHeight": 15,
+          "cornerRadius": 6,
+          "fill": true,
+          "outline": true,
+          "drawEmpty": true,
+          "layout": "buttons",
+          "textOffsetY": 7
+        }
+      }
+    }
+  },
+  "assets": {
+    "freeInkIcons": {
+      "book": "book-open",
+      "recent": "clock-3",
+      "settings": "sliders-horizontal",
+      "transfer": "download",
+      "library": "library",
+      "folder": "folder",
+      "wifi": "wifi",
+      "hotspot": "router",
+      "bookmark": "bookmark",
+      "hintMenu": "menu",
+      "hintBack": "arrow-left",
+      "hintOpen": "folder-open",
+      "hintSelect": "check",
+      "hintSave": "save",
+      "hintUp": "arrow-up",
+      "hintDown": "arrow-down",
+      "hintCancel": "x",
+      "hintOk": "check",
+      "hintEnter": "corner-down-left",
+      "hintLeft": "arrow-left",
+      "hintRight": "arrow-right"
+    },
+    "icons": {
+      "book": "icons/book.bmp",
+      "bookmark": "icons/bookmark.bmp",
+      "folder": "icons/folder.bmp",
+      "hintBack": "icons/hintBack.bmp",
+      "hintCancel": "icons/hintCancel.bmp",
+      "hintDown": "icons/hintDown.bmp",
+      "hintEnter": "icons/hintEnter.bmp",
+      "hintLeft": "icons/hintLeft.bmp",
+      "hintMenu": "icons/hintMenu.bmp",
+      "hintOk": "icons/hintOk.bmp",
+      "hintOpen": "icons/hintOpen.bmp",
+      "hintRight": "icons/hintRight.bmp",
+      "hintSave": "icons/hintSave.bmp",
+      "hintSelect": "icons/hintSelect.bmp",
+      "hintUp": "icons/hintUp.bmp",
+      "hotspot": "icons/hotspot.bmp",
+      "library": "icons/library.bmp",
+      "recent": "icons/recent.bmp",
+      "settings": "icons/settings.bmp",
+      "transfer": "icons/transfer.bmp",
+      "wifi": "icons/wifi.bmp"
+    }
+  },
+  "devices": {
+    "x3": {
+      "constraints": {
+        "screenWidth": 480,
+        "screenHeight": 800,
+        "frontButtons": 4,
+        "sideButtons": "up-down"
+      }
+    },
+    "x4": {
+      "constraints": {
+        "screenWidth": 480,
+        "screenHeight": 800,
+        "frontButtons": 0,
+        "sideButtons": "up-down"
+      }
+    }
+  },
+  "extensions": {
+    "crossink": {
+      "dashboard": {
+        "enabled": true,
+        "topTabs": [
+          "reading",
+          "library",
+          "network",
+          "settings"
+        ],
+        "currentReadingCard": true,
+        "statsCards": [
+          {
+            "id": "last-read",
+            "label": "Last read",
+            "format": "minutes"
+          },
+          {
+            "id": "total-read",
+            "label": "Total read",
+            "format": "hours"
+          },
+          {
+            "id": "completed",
+            "label": "Completed",
+            "format": "books"
+          }
+        ]
+      }
+    }
+  }
+}

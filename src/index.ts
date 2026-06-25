@@ -26,58 +26,32 @@ export default {
       });
     }
 
-    // Proxy /themes/* to the SD themes directory in the firmware repo.
-    // Covers the manifest (/themes/themes.json) and every asset it references
-    // (e.g. /themes/carousel/icons/book.bmp). The upstream content-type is
-    // passed through so binary assets aren't mislabeled as JSON.
+    // Serve hosted SD themes from public/themes. We keep this Worker path in
+    // front of static assets so device downloads get Content-Length and
+    // no-transform headers instead of compressed/chunked responses.
     if (url.pathname === '/themes' || url.pathname === '/themes.json') {
       return Response.redirect(new URL('/themes/themes.json', url.origin).toString(), 302);
     }
     if (url.pathname.startsWith('/themes/')) {
       const rel = url.pathname.slice('/themes/'.length);
-      const res = await fetch(
-        `https://raw.githubusercontent.com/crosspoint-reader/crosspoint-reader/feat-sd-themes/sd-themes/${rel}`,
-        { headers: { 'User-Agent': 'CrossPoint-Tools' } }
-      );
-      // Buffer the (small) theme files so we can send an explicit Content-Length.
-      // Streaming res.body through would make Cloudflare use chunked transfer
-      // encoding with no Content-Length, which hangs keep-alive HTTP clients
-      // that wait for a zero-length read (the device downloader).
-      let body = await res.arrayBuffer();
-      // The firmware builds asset URLs as `baseUrl + file.url`, with no
-      // separator, so the manifest's baseUrl must keep the /themes/ path
-      // boundary by ending in a trailing slash. Upstream ships it without one
-      // (".../themes"), which concatenates to ".../themesroundedraff/...".
-      // Rewrite the served manifest to guarantee the trailing slash.
-      if (rel === 'themes.json' && res.ok) {
-        try {
-          const manifest = JSON.parse(new TextDecoder().decode(body));
-          if (typeof manifest.baseUrl === 'string' && !manifest.baseUrl.endsWith('/')) {
-            manifest.baseUrl += '/';
-          }
-          body = new TextEncoder().encode(JSON.stringify(manifest)).buffer as ArrayBuffer;
-        } catch {
-          // Malformed upstream JSON — pass it through untouched.
-        }
+      if (rel.includes('..') || rel.includes('\\')) {
+        return new Response('Not found', { status: 404 });
       }
-      // no-transform stops Cloudflare from re-compressing the response at the
-      // edge. Without it, a client advertising `Accept-Encoding: gzip` (the
-      // device's esp_http_client) gets a gzipped, Transfer-Encoding: chunked
-      // response with NO Content-Length — which hangs/breaks the downloader.
+
+      const assetResponse = await env.ASSETS.fetch(request);
+      const body = await assetResponse.arrayBuffer();
       const headers = new Headers({
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=3600, no-transform',
         'Content-Length': String(body.byteLength),
       });
-      // GitHub raw serves .json as text/plain; label it correctly, otherwise
-      // pass the upstream type through (so .bmp stays image/bmp, etc.).
       if (rel.endsWith('.json')) {
         headers.set('Content-Type', 'application/json');
       } else {
-        const upstreamType = res.headers.get('Content-Type');
-        if (upstreamType) headers.set('Content-Type', upstreamType);
+        const contentType = assetResponse.headers.get('Content-Type');
+        if (contentType) headers.set('Content-Type', contentType);
       }
-      return new Response(body, { status: res.status, headers });
+      return new Response(body, { status: assetResponse.status, headers });
     }
 
     // Gate insider builds behind Royalty.dev subscription
@@ -1923,9 +1897,9 @@ function getThemeFirmwareRepo(env: Env): string {
   return (env.FIRMWARE_THEME_REPO || 'crosspoint-reader/crosspoint-reader').trim() || 'crosspoint-reader/crosspoint-reader';
 }
 function getThemeFirmwareRef(env: Env): string {
-  // The theme/icon Python scripts currently live on the feat-sd-themes branch.
+  // The theme/icon Python scripts currently live on the theme-system branch.
   // Override with the FIRMWARE_THEME_REF var (set it to "master" once merged).
-  return (env.FIRMWARE_THEME_REF || 'feat-sd-themes').trim() || 'feat-sd-themes';
+  return (env.FIRMWARE_THEME_REF || 'feat-sd-theme-system').trim() || 'feat-sd-theme-system';
 }
 
 // POST /api/theme-build/icons — multipart form. Each file field is named by its
