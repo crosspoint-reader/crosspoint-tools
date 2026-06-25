@@ -1,0 +1,339 @@
+{
+  "version": 1,
+  "baseUrl": "https://crosspointreader.com/themes",
+  "themes": [
+    {
+      "id": "carousel",
+      "version": 1,
+      "name": "Carousel",
+      "description": "A cover-focused home screen with a centered book, side previews, and a thicker outline while browsing covers.",
+      "files": [
+        {
+          "path": "icons/book.bmp",
+          "url": "carousel/icons/book.bmp",
+          "size": 190,
+          "crc32": 2183780640,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/book24.bmp",
+          "url": "carousel/icons/book24.bmp",
+          "size": 158,
+          "crc32": 1134165891,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/bookmark.bmp",
+          "url": "carousel/icons/bookmark.bmp",
+          "size": 190,
+          "crc32": 3107711995,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/cover.bmp",
+          "url": "carousel/icons/cover.bmp",
+          "size": 190,
+          "crc32": 2183780640,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/file24.bmp",
+          "url": "carousel/icons/file24.bmp",
+          "size": 158,
+          "crc32": 3313444295,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/folder.bmp",
+          "url": "carousel/icons/folder.bmp",
+          "size": 190,
+          "crc32": 2224264884,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/folder24.bmp",
+          "url": "carousel/icons/folder24.bmp",
+          "size": 158,
+          "crc32": 2246268354,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hotspot.bmp",
+          "url": "carousel/icons/hotspot.bmp",
+          "size": 190,
+          "crc32": 3317405217,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/image24.bmp",
+          "url": "carousel/icons/image24.bmp",
+          "size": 158,
+          "crc32": 2640957975,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/library.bmp",
+          "url": "carousel/icons/library.bmp",
+          "size": 190,
+          "crc32": 4221921702,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/recent.bmp",
+          "url": "carousel/icons/recent.bmp",
+          "size": 190,
+          "crc32": 4287281112,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/settings.bmp",
+          "url": "carousel/icons/settings.bmp",
+          "size": 190,
+          "crc32": 901321762,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/text24.bmp",
+          "url": "carousel/icons/text24.bmp",
+          "size": 158,
+          "crc32": 1333363742,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/transfer.bmp",
+          "url": "carousel/icons/transfer.bmp",
+          "size": 190,
+          "crc32": 248068601,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/wifi.bmp",
+          "url": "carousel/icons/wifi.bmp",
+          "size": 190,
+          "crc32": 3700686678,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "theme.json",
+          "url": "carousel/theme.json",
+          "size": 4788,
+          "crc32": 489345766
+        }
+      ],
+      "totalSize": 7478
+    },
+    {
+      "id": "super-minimal",
+      "version": 1,
+      "name": "Super Minimal",
+      "description": "A quiet text-only theme with no cover area, centered home options, underline selection, and icon-only hints.",
+      "files": [
+        {
+          "path": "theme.json",
+          "url": "super-minimal/theme.json",
+          "size": 3260,
+          "crc32": 600211718
+        }
+      ],
+      "totalSize": 3260
+    },
+    {
+      "id": "tabbed-dashboard",
+      "version": 6,
+      "name": "Tabbed Dashboard",
+      "description": "A compact dashboard-style theme inspired by tabbed e-reader home screens, with dense cover rows and room for reading-stat cards in compatible apps.",
+      "files": [
+        {
+          "path": "icons/book.bmp",
+          "url": "tabbed-dashboard/icons/book.bmp",
+          "size": 190,
+          "crc32": 2183780640,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/bookmark.bmp",
+          "url": "tabbed-dashboard/icons/bookmark.bmp",
+          "size": 190,
+          "crc32": 3107711995,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/folder.bmp",
+          "url": "tabbed-dashboard/icons/folder.bmp",
+          "size": 190,
+          "crc32": 2224264884,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintBack.bmp",
+          "url": "tabbed-dashboard/icons/hintBack.bmp",
+          "size": 158,
+          "crc32": 1237781894,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintCancel.bmp",
+          "url": "tabbed-dashboard/icons/hintCancel.bmp",
+          "size": 158,
+          "crc32": 4103437608,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintDown.bmp",
+          "url": "tabbed-dashboard/icons/hintDown.bmp",
+          "size": 158,
+          "crc32": 2364033735,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintEnter.bmp",
+          "url": "tabbed-dashboard/icons/hintEnter.bmp",
+          "size": 158,
+          "crc32": 3314712011,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintLeft.bmp",
+          "url": "tabbed-dashboard/icons/hintLeft.bmp",
+          "size": 158,
+          "crc32": 1237781894,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintMenu.bmp",
+          "url": "tabbed-dashboard/icons/hintMenu.bmp",
+          "size": 158,
+          "crc32": 841820268,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintOk.bmp",
+          "url": "tabbed-dashboard/icons/hintOk.bmp",
+          "size": 158,
+          "crc32": 1142288979,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintOpen.bmp",
+          "url": "tabbed-dashboard/icons/hintOpen.bmp",
+          "size": 158,
+          "crc32": 3941048265,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintRight.bmp",
+          "url": "tabbed-dashboard/icons/hintRight.bmp",
+          "size": 158,
+          "crc32": 1522766365,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintSave.bmp",
+          "url": "tabbed-dashboard/icons/hintSave.bmp",
+          "size": 158,
+          "crc32": 3872711072,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintSelect.bmp",
+          "url": "tabbed-dashboard/icons/hintSelect.bmp",
+          "size": 158,
+          "crc32": 1142288979,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hintUp.bmp",
+          "url": "tabbed-dashboard/icons/hintUp.bmp",
+          "size": 158,
+          "crc32": 2453402185,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/hotspot.bmp",
+          "url": "tabbed-dashboard/icons/hotspot.bmp",
+          "size": 190,
+          "crc32": 3317405217,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/library.bmp",
+          "url": "tabbed-dashboard/icons/library.bmp",
+          "size": 190,
+          "crc32": 4221921702,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/recent.bmp",
+          "url": "tabbed-dashboard/icons/recent.bmp",
+          "size": 190,
+          "crc32": 4287281112,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/settings.bmp",
+          "url": "tabbed-dashboard/icons/settings.bmp",
+          "size": 190,
+          "crc32": 901321762,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/transfer.bmp",
+          "url": "tabbed-dashboard/icons/transfer.bmp",
+          "size": 190,
+          "crc32": 248068601,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "icons/wifi.bmp",
+          "url": "tabbed-dashboard/icons/wifi.bmp",
+          "size": 190,
+          "crc32": 3700686678,
+          "optional": true,
+          "role": "freeInkIconFallback"
+        },
+        {
+          "path": "theme.json",
+          "url": "tabbed-dashboard/theme.json",
+          "size": 14209,
+          "crc32": 1582878394
+        }
+      ],
+      "totalSize": 17815
+    }
+  ]
+}

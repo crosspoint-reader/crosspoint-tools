@@ -11,7 +11,7 @@ export interface Env {
   GITHUB_ACTIONS_REF?: string;
   // Firmware repo + ref the theme-icon build workflow checks out to run the
   // canonical generate-theme-icons.py / convert_icon.py scripts. Defaults to
-  // crosspoint-reader/crosspoint-reader @ feat-sd-themes (the branch that
+  // crosspoint-reader/crosspoint-reader @ feat-sd-theme-system (the branch that
   // currently holds the scripts); set FIRMWARE_THEME_REF=master once merged.
   FIRMWARE_THEME_REPO?: string;
   FIRMWARE_THEME_REF?: string;

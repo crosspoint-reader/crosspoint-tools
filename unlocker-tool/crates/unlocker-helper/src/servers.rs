@@ -81,6 +81,7 @@ impl ServerHolder {
             firmware_sha256: spec.firmware_sha256,
             crosspoint_version: spec.crosspoint_version,
             change_log: spec.change_log,
+            crosspet_http: spec.crosspet_http,
             on_manifest_request: on_manifest.clone(),
             on_firmware_streamed: on_firmware.clone(),
         });

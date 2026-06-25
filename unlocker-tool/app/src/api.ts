@@ -27,12 +27,26 @@ export const api = {
     invoke<void>("accept_consent", { general, recovery }),
   selectDevice: (model: Model, locale: Locale) =>
     invoke<void>("select_device", { model, locale }),
-  selectFirmware: (model: Model, locale: Locale, releaseId: string) =>
+  selectFirmware: (
+    model: Model,
+    locale: Locale,
+    releaseId: string,
+    crosspetHttp: boolean,
+  ) =>
     invoke<void>("select_firmware", {
       selection: { model, locale, release_id: releaseId },
+      crosspetHttp,
     }),
-  selectLocalFirmware: (model: Model, locale: Locale, path: string) =>
-    invoke<void>("select_local_firmware", { model, locale, path }),
+  selectLocalFirmware: (
+    model: Model,
+    locale: Locale,
+    path: string,
+    crosspetHttp: boolean,
+  ) => invoke<void>("select_local_firmware", { model, locale, path, crosspetHttp }),
+  // Download a catalog firmware and write it to `dest` on this computer, so the
+  // user can copy it to the device's SD card and flash it from Escape Hatch.
+  exportFirmware: (releaseId: string, dest: string) =>
+    invoke<void>("export_firmware", { releaseId, dest }),
   checkHelper: () => invoke<boolean>("check_helper"),
   cleanupAfterInstall: () => invoke<void>("cleanup_after_install"),
   uninstallHelper: () => invoke<void>("uninstall_helper"),

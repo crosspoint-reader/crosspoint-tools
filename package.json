@@ -7,7 +7,9 @@
     "dev": "wrangler dev",
     "tunnel": "node scripts/tunnel.js",
     "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "themes:manifest": "python3 scripts/generate-theme-manifest.py",
+    "themes:icons": "python3 scripts/generate-theme-icons.py --from-freeink-sdk"
   },
   "dependencies": {
     "@cloudflare/sandbox": "^0.7.0"

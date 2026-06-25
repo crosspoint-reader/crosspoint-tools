@@ -641,7 +641,11 @@ async fn select_device(
 }
 
 #[tauri::command]
-async fn select_firmware(state: State<'_, AppState>, selection: Selection) -> Result<(), String> {
+async fn select_firmware(
+    state: State<'_, AppState>,
+    selection: Selection,
+    crosspet_http: bool,
+) -> Result<(), String> {
     state.orch.set_selection(selection.clone()).await;
     state
         .orch
@@ -655,7 +659,9 @@ async fn select_firmware(state: State<'_, AppState>, selection: Selection) -> Re
     let helper = state.helper.clone();
 
     tokio::spawn(async move {
-        if let Err(e) = run_install(orch.clone(), log, http, runtime, helper, selection).await {
+        if let Err(e) =
+            run_install(orch.clone(), log, http, runtime, helper, selection, crosspet_http).await
+        {
             orch.fail(format!("{e:#}")).await;
         }
     });
@@ -669,6 +675,7 @@ async fn select_local_firmware(
     model: Model,
     locale: Locale,
     path: String,
+    crosspet_http: bool,
 ) -> Result<(), String> {
     let path = std::path::PathBuf::from(path);
     if !path.is_file() {
@@ -702,11 +709,44 @@ async fn select_local_firmware(
     let helper = state.helper.clone();
 
     tokio::spawn(async move {
-        if let Err(e) = run_local_install(orch.clone(), log, runtime, helper, path).await {
+        if let Err(e) =
+            run_local_install(orch.clone(), log, runtime, helper, path, crosspet_http).await
+        {
             orch.fail(format!("{e:#}")).await;
         }
     });
 
+    Ok(())
+}
+
+/// Download a catalog firmware and copy it to a user-chosen path so they can
+/// put it on the device's SD card. The SD-card recovery flow: flash the small
+/// Escape Hatch firmware over OTA, then use it to flash a full firmware `.bin`
+/// straight from the SD card — no OTA, which is what unblocks devices whose OTA
+/// can't complete (e.g. crosspet's forced-SSL builds).
+#[tauri::command]
+async fn export_firmware(
+    state: State<'_, AppState>,
+    release_id: String,
+    dest: String,
+) -> Result<(), String> {
+    let http = state.http.clone();
+    let cat = catalog::fetch_catalog(&http)
+        .await
+        .unwrap_or_else(|_| catalog::stub_catalog());
+    let release = cat
+        .releases
+        .into_iter()
+        .find(|r| r.id == release_id)
+        .ok_or_else(|| format!("release not found: {release_id}"))?;
+
+    let (path, _sha) = ensure_firmware_cached(&http, None, &release)
+        .await
+        .map_err(|e| format!("failed to fetch firmware: {e:#}"))?;
+
+    tokio::fs::copy(&path, &dest)
+        .await
+        .map_err(|e| format!("failed to write firmware to {dest}: {e}"))?;
     Ok(())
 }
 
@@ -718,6 +758,28 @@ struct PreparedFirmware {
     change_log: String,
 }
 
+/// Ensure the firmware for a release is present in the local cache, returning
+/// its on-disk path and sha256. Uses the cached copy when its hash verifies,
+/// otherwise downloads it. Shared by the OTA install flow and the
+/// `export_firmware` command (the SD-card recovery path).
+async fn ensure_firmware_cached(
+    http: &reqwest::Client,
+    log: Option<&SessionLog>,
+    release: &CrossPointRelease,
+) -> anyhow::Result<(std::path::PathBuf, String)> {
+    if let Some(sha) = release.firmware_sha256.as_deref() {
+        if let Some(p) = catalog::cached_path(sha)? {
+            if catalog::verify_file(&p, sha).unwrap_or(false) {
+                if let Some(log) = log {
+                    log.push("info", "firmware cache hit", None).await;
+                }
+                return Ok((p, sha.to_string()));
+            }
+        }
+    }
+    catalog::download_firmware(http, release, |_, _| {}).await
+}
+
 async fn run_install(
     orch: Arc<Orchestrator>,
     log: Arc<SessionLog>,
@@ -725,6 +787,7 @@ async fn run_install(
     runtime: Arc<Runtime>,
     helper: Arc<Helper>,
     selection: Selection,
+    crosspet_http: bool,
 ) -> anyhow::Result<()> {
     // ── Locate + cache + download firmware ──
     let cat = catalog::fetch_catalog(&http)
@@ -736,20 +799,7 @@ async fn run_install(
         .find(|r| r.id == selection.release_id)
         .ok_or_else(|| anyhow::anyhow!("selected release not found"))?;
 
-    let (path, sha) = if let Some(sha) = release.firmware_sha256.as_deref() {
-        if let Some(p) = catalog::cached_path(sha)? {
-            if catalog::verify_file(&p, sha).unwrap_or(false) {
-                log.push("info", "firmware cache hit", None).await;
-                (p, sha.to_string())
-            } else {
-                catalog::download_firmware(&http, &release, |_, _| {}).await?
-            }
-        } else {
-            catalog::download_firmware(&http, &release, |_, _| {}).await?
-        }
-    } else {
-        catalog::download_firmware(&http, &release, |_, _| {}).await?
-    };
+    let (path, sha) = ensure_firmware_cached(&http, Some(log.as_ref()), &release).await?;
     let size = std::fs::metadata(&path)
         .map(|m| m.len())
         .unwrap_or(release.size);
@@ -761,7 +811,7 @@ async fn run_install(
         change_log: render_changelog(&release),
     };
 
-    run_prepared_install(orch, log, runtime, helper, firmware).await
+    run_prepared_install(orch, log, runtime, helper, firmware, crosspet_http).await
 }
 
 async fn run_local_install(
@@ -770,6 +820,7 @@ async fn run_local_install(
     runtime: Arc<Runtime>,
     helper: Arc<Helper>,
     path: std::path::PathBuf,
+    crosspet_http: bool,
 ) -> anyhow::Result<()> {
     let sha = catalog::hash_file(&path)?;
     let size = std::fs::metadata(&path)?.len();
@@ -826,7 +877,7 @@ async fn run_local_install(
         change_log: format!("Installing local firmware file: {display_name}"),
     };
 
-    run_prepared_install(orch, log, runtime, helper, firmware).await
+    run_prepared_install(orch, log, runtime, helper, firmware, crosspet_http).await
 }
 
 async fn run_prepared_install(
@@ -835,6 +886,7 @@ async fn run_prepared_install(
     runtime: Arc<Runtime>,
     helper: Arc<Helper>,
     firmware: PreparedFirmware,
+    crosspet_http: bool,
 ) -> anyhow::Result<()> {
     orch.set_firmware(firmware.path.to_string_lossy().into(), firmware.sha.clone())
         .await;
@@ -907,6 +959,7 @@ async fn run_prepared_install(
         firmware_sha256: firmware.sha,
         crosspoint_version: firmware.version,
         change_log: firmware.change_log,
+        crosspet_http,
     };
     runtime.arm(&helper, arm_cfg).await?;
     log.push("info", "DNS + HTTP + HTTPS servers armed", None)
@@ -1185,6 +1238,7 @@ pub fn run() {
             select_device,
             select_firmware,
             select_local_firmware,
+            export_firmware,
             confirm_running,
             cleanup_after_install,
             cancel,

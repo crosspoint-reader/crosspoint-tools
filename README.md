@@ -11,6 +11,7 @@ Web-based firmware flasher, build system, and font builder for [CrossPoint Reade
 - **Beta builds** — Curated test builds exposed alongside stable, sourced from either an admin-uploaded `.bin` or a tagged GitHub release on the firmware repo
 - **Custom font firmware** — Replace built-in fonts in the firmware with user-supplied TTF/OTF files via a CI build
 - **SD-card font builder** — Convert TTF/OTF files into `.cpfont` files for SD-card font loading on the device, using the firmware repo's own conversion script (no client-side reimplementation)
+- **Hosted SD themes** — Serve downloadable theme packages and `themes.json` from `/themes`
 - **Stock firmware** — Restore original Xteink firmware (English or Chinese) for both X3 and X4
 - **Admin dashboard** — Manually trigger builds, manage beta entries, and monitor build status
 
@@ -21,7 +22,7 @@ The project runs on [Cloudflare Workers](https://workers.cloudflare.com/) with [
 - **Worker** (`src/index.ts`) — API routes, firmware proxying, beta/font orchestration, static asset serving
 - **R2 (`crosspoint-firmware`)** — Compiled firmware binaries and font build artifacts
 - **KV (`BUILD_META`)** — Build metadata, sha caches, font build state
-- **Static assets** (`public/`) — HTML pages, the WebSerial flasher module, the admin dashboard, and bundled X3 firmware
+- **Static assets** (`public/`) — HTML pages, the WebSerial flasher module, the admin dashboard, bundled X3 firmware, and hosted SD themes
 - **GitHub Actions workflows** in `.github/workflows/` — long-running build jobs the Worker can dispatch
 
 ## Build pipelines
@@ -59,6 +60,27 @@ Converts arbitrary TTF/OTF files into `.cpfont` files for SD-card loading **with
 The current generator started as a snapshot of `crosspoint-reader`'s `lib/EpdFont/scripts/fontconvert_sdcard.py`, but it now lives in this repo so the website can evolve SD-card-specific features like multi-family fallback handling independently.
 
 Built `.cpfont` files install on the device by copying to the SD card under `/fonts/YourFont/` (or `/.fonts/YourFont/` for a hidden folder).
+
+### 4. Hosted SD themes
+
+Downloadable SD themes live in `public/themes/<theme-id>/` and are served at `https://crosspointreader.com/themes/<theme-id>/`. The device downloads the manifest from `https://crosspointreader.com/themes/themes.json`.
+
+After changing a hosted theme:
+
+```bash
+npm run themes:manifest
+```
+
+The manifest generator scans every theme folder, writes file sizes and CRC32 values, and uses `https://crosspointreader.com/themes` as the asset base URL. Commit the changed theme files and regenerated `public/themes/themes.json` together.
+
+When `assets.freeInkIcons` changes, regenerate SD BMP fallbacks before the manifest:
+
+```bash
+npm run themes:icons
+npm run themes:manifest
+```
+
+`themes:icons` expects a sibling FreeInk SDK checkout at `../freeink-sdk`; pass the script arguments manually if your checkout is somewhere else.
 
 ## Beta builds
 

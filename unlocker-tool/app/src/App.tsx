@@ -9,6 +9,7 @@ import { useStateMachine } from "./store";
 import { api } from "./api";
 import type { Locale, Model } from "./types";
 import { takeResumeInstall } from "./resumeInstall";
+import { useSettingsStore } from "./stores/settingsStore";
 
 export function App() {
   const { state, error } = useStateMachine();
@@ -45,12 +46,23 @@ export function App() {
     setLocale(pending.locale);
 
     (async () => {
+      const { crosspetHttpOta } = useSettingsStore.getState();
       await api.acceptConsent(true, true);
       await api.selectDevice(pending.model, pending.locale);
       if (pending.kind === "catalog") {
-        await api.selectFirmware(pending.model, pending.locale, pending.releaseId);
+        await api.selectFirmware(
+          pending.model,
+          pending.locale,
+          pending.releaseId,
+          crosspetHttpOta,
+        );
       } else {
-        await api.selectLocalFirmware(pending.model, pending.locale, pending.path);
+        await api.selectLocalFirmware(
+          pending.model,
+          pending.locale,
+          pending.path,
+          crosspetHttpOta,
+        );
       }
     })().catch((e) => {
       console.error("Failed to resume install after restart:", e);

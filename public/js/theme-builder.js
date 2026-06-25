@@ -1555,8 +1555,8 @@
 
   // Preset values:
   //   "lyra"          -> built-in firmware default (no SD theme to fetch)
-  //   "sd:<id>"       -> fetched live from /themes/<id>/theme.json (the repo,
-  //                      via the Worker proxy; single source of truth)
+  //   "sd:<id>"       -> fetched live from /themes/<id>/theme.json (hosted
+  //                      static theme packages; single source of truth)
   //   "fallback:<k>"  -> baked-in copy, only used if the live manifest fails
   async function loadPreset(value) {
     if (!value || value === 'lyra') { applyBuilt(PRESETS.lyra.build()); return; }

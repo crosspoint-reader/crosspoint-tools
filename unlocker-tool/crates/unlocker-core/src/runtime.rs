@@ -60,6 +60,7 @@ impl Runtime {
             crosspoint_version: cfg.crosspoint_version,
             change_log: cfg.change_log,
             dns_internal_port: DNS_INTERNAL_PORT,
+            crosspet_http: cfg.crosspet_http,
         };
         helper.arm_servers(spec).await
     }
@@ -91,6 +92,8 @@ pub struct ArmConfig {
     pub firmware_sha256: String,
     pub crosspoint_version: String,
     pub change_log: String,
+    /// Serve crosspet devices a plain-HTTP firmware URL instead of HTTPS.
+    pub crosspet_http: bool,
 }
 
 async fn wait_for_bridge_ip(helper: &Helper) -> Result<Ipv4Addr> {
