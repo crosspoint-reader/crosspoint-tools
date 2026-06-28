@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": 14,
+  "version": 16,
   "id": "carousel",
   "name": "Carousel",
   "description": "A cover-focused home screen with a centered book, side previews, and a thicker outline while browsing covers.",
@@ -123,7 +123,7 @@
             "slots": [
               {
                 "id": "homeClock",
-                "fixed": 52
+                "fixed": 64
               },
               {
                 "id": "homeTitle",
@@ -160,7 +160,10 @@
       "widgets": [
         {
           "slot": "homeClock",
-          "type": "clock"
+          "type": "clock",
+          "inset": {
+            "left": 12
+          }
         },
         {
           "slot": "homeTitle",
@@ -168,7 +171,10 @@
         },
         {
           "slot": "homeBattery",
-          "type": "battery"
+          "type": "battery",
+          "inset": {
+            "right": 12
+          }
         },
         {
           "slot": "recents",

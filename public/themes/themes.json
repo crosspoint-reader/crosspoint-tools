@@ -5,7 +5,7 @@
     {
       "id": "carousel",
       "name": "Carousel",
-      "version": 14,
+      "version": 16,
       "description": "A cover-focused home screen with a centered book, side previews, and a thicker outline while browsing covers.",
       "files": [
         {
@@ -101,11 +101,11 @@
         {
           "path": "theme.json",
           "url": "carousel/theme.json",
-          "size": 7450,
-          "crc32": 3163799974
+          "size": 7565,
+          "crc32": 4082789453
         }
       ],
-      "totalSize": 10140
+      "totalSize": 10255
     },
     {
       "id": "super-minimal",
