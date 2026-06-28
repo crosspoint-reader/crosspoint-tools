@@ -26,29 +26,22 @@ export default {
       });
     }
 
-    // Proxy /themes/* to the SD themes directory in the firmware repo.
+    // Serve /themes/* from public/themes for SD theme loading.
     // Covers the manifest (/themes/themes.json) and every asset it references
-    // (e.g. /themes/carousel/icons/book.bmp). The upstream content-type is
-    // passed through so binary assets aren't mislabeled as JSON.
+    // (e.g. /themes/carousel/icons/book.bmp).
     if (url.pathname === '/themes' || url.pathname === '/themes.json') {
       return Response.redirect(new URL('/themes/themes.json', url.origin).toString(), 302);
     }
     if (url.pathname.startsWith('/themes/')) {
       const rel = url.pathname.slice('/themes/'.length);
-      const res = await fetch(
-        `https://raw.githubusercontent.com/crosspoint-reader/crosspoint-reader/feat-sd-themes/sd-themes/${rel}`,
-        { headers: { 'User-Agent': 'CrossPoint-Tools' } }
-      );
+      const res = await env.ASSETS.fetch(request);
       // Buffer the (small) theme files so we can send an explicit Content-Length.
       // Streaming res.body through would make Cloudflare use chunked transfer
       // encoding with no Content-Length, which hangs keep-alive HTTP clients
       // that wait for a zero-length read (the device downloader).
       let body = await res.arrayBuffer();
-      // The firmware builds asset URLs as `baseUrl + file.url`, with no
-      // separator, so the manifest's baseUrl must keep the /themes/ path
-      // boundary by ending in a trailing slash. Upstream ships it without one
-      // (".../themes"), which concatenates to ".../themesroundedraff/...".
-      // Rewrite the served manifest to guarantee the trailing slash.
+      // Keep manifests tolerant of hand-authored base URLs without a trailing
+      // slash; the firmware also normalizes this before downloading assets.
       if (rel === 'themes.json' && res.ok) {
         try {
           const manifest = JSON.parse(new TextDecoder().decode(body));
@@ -69,13 +62,11 @@ export default {
         'Cache-Control': 'public, max-age=3600, no-transform',
         'Content-Length': String(body.byteLength),
       });
-      // GitHub raw serves .json as text/plain; label it correctly, otherwise
-      // pass the upstream type through (so .bmp stays image/bmp, etc.).
       if (rel.endsWith('.json')) {
         headers.set('Content-Type', 'application/json');
       } else {
-        const upstreamType = res.headers.get('Content-Type');
-        if (upstreamType) headers.set('Content-Type', upstreamType);
+        const assetType = res.headers.get('Content-Type');
+        if (assetType) headers.set('Content-Type', assetType);
       }
       return new Response(body, { status: res.status, headers });
     }

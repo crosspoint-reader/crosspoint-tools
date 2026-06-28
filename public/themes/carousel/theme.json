@@ -1,0 +1,251 @@
+{
+  "schema": 1,
+  "version": 11,
+  "id": "carousel",
+  "name": "Carousel",
+  "description": "A cover-focused home screen with a centered book, side previews, and a thicker outline while browsing covers.",
+  "inherits": "lyra",
+  "constraints": {
+    "screenWidth": 480,
+    "screenHeight": 800
+  },
+  "requires": {
+    "crosspoint": {
+      "schema": 1,
+      "modules": ["cover-strip"]
+    }
+  },
+  "metrics": {
+    "homeCoverHeight": 300,
+    "homeCoverTileHeight": 340,
+    "homeRecentBooksCount": 3,
+    "homeMenuTopOffset": 8,
+    "menuRowHeight": 48,
+    "menuSpacing": 4
+  },
+  "components": {
+    "homeRecents": {
+      "type": "cover-strip",
+      "maxBooks": 3,
+      "wrap": true,
+      "selectionLineWidth": 3,
+      "inactiveSelectionLineWidth": 1,
+      "selectionCornerRadius": 6,
+      "slots": [
+        {
+          "book": "previous",
+          "x": "padding",
+          "y": "center",
+          "height": 225,
+          "widthPercent": 62,
+          "xOffset": 32
+        },
+        {
+          "book": "next",
+          "x": "right-padding",
+          "y": "center",
+          "height": 225,
+          "widthPercent": 62,
+          "xOffset": -32
+        },
+        {
+          "book": "selected",
+          "x": "center",
+          "y": "top",
+          "height": 300,
+          "widthPercent": 62,
+          "yOffset": 8,
+          "selected": true,
+          "title": {
+            "enabled": true,
+            "font": "large",
+            "style": "bold",
+            "maxLines": 1,
+            "fullWidth": true,
+            "offsetY": 12
+          }
+        }
+      ]
+    },
+    "homeMenu": {
+      "font": "large",
+      "style": "regular",
+      "centeredText": false,
+      "showIcons": true,
+      "drawPanel": false,
+      "selectionStyle": "fill",
+      "selectionCornerRadius": 6,
+      "selectionInset": 20
+    },
+    "list": {
+      "font": "medium",
+      "style": "regular",
+      "showIcons": true,
+      "textGap": 8,
+      "selectionCornerRadius": 6,
+      "selectionFill": true,
+      "selectionOutline": false,
+      "selectedTextInverted": false,
+      "selectionInsetX": 0,
+      "selectionInsetY": 0,
+      "titleOffsetY": 7,
+      "subtitleOffsetY": 30,
+      "valueOffsetY": 6,
+      "subtitleValueOffsetY": 16,
+      "iconOffsetY": 0
+    },
+    "buttonHints": {
+      "font": "small",
+      "style": "regular",
+      "buttonWidth": 80,
+      "smallButtonHeight": 15,
+      "cornerRadius": 6,
+      "fill": true,
+      "outline": true,
+      "drawEmpty": true,
+      "textOffsetY": 7
+    }
+  },
+  "screens": {
+    "home": {
+      "layout": {
+        "axis": "column",
+        "gap": 0,
+        "slots": [
+          {
+            "id": "header",
+            "fixed": 40,
+            "axis": "row",
+            "gap": 4,
+            "slots": [
+              { "id": "homeClock", "fixed": 52 },
+              { "id": "homeTitle", "flex": 1 },
+              { "id": "homeBattery", "fixed": 66 }
+            ]
+          },
+          { "id": "recents", "fixed": 340 },
+          { "id": "carouselMenuGap", "fixed": 52 },
+          { "id": "launchers", "fixed": 192 },
+          { "id": "homeSpacer", "flex": 1 },
+          { "id": "buttons", "fixed": 40 }
+        ]
+      },
+      "widgets": [
+        { "slot": "homeClock", "type": "clock" },
+        { "slot": "homeTitle", "type": "headerTitle" },
+        { "slot": "homeBattery", "type": "battery" },
+        { "slot": "recents", "type": "recents" },
+        {
+          "slot": "launchers",
+          "type": "launcherGrid",
+          "columns": 2,
+          "gap": 24,
+          "items": [
+            { "text": "Files", "icon": "folder", "action": "activity:fileBrowser" },
+            { "text": "Recent", "icon": "recent", "action": "activity:recentBooks" },
+            { "text": "Library", "icon": "library", "action": "activity:opds" },
+            { "text": "Transfer", "icon": "transfer", "action": "activity:fileTransfer" },
+            { "text": "Settings", "icon": "settings", "action": "activity:settings" }
+          ]
+        },
+        { "slot": "buttons", "type": "buttonHints" }
+      ]
+    },
+    "fileBrowser": {
+      "layout": {
+        "axis": "column",
+        "gap": 16,
+        "slots": [
+          { "id": "top", "fixed": 5 },
+          { "id": "header", "fixed": 84 },
+          { "id": "list", "flex": 1 },
+          { "id": "path", "fixed": 14 },
+          { "id": "buttons", "fixed": 40 }
+        ]
+      }
+    },
+    "recentBooks": {
+      "layout": {
+        "axis": "column",
+        "gap": 16,
+        "slots": [
+          { "id": "top", "fixed": 5 },
+          { "id": "header", "fixed": 84 },
+          { "id": "list", "flex": 1 },
+          { "id": "buttons", "fixed": 40 }
+        ]
+      },
+      "coverGrid": {
+        "columns": 3,
+        "gap": 14,
+        "rowGap": 20,
+        "coverWidth": 92,
+        "coverHeight": 132,
+        "rowHeight": 172,
+        "labelHeight": 34,
+        "labelLines": 2,
+        "selectionStyle": "coverFrame",
+        "cellInset": { "top": 5 },
+        "labelInset": { "left": 5, "right": 5 }
+      }
+    },
+    "settings": {
+      "layout": {
+        "axis": "column",
+        "gap": 0,
+        "slots": [
+          { "id": "top", "fixed": 5 },
+          { "id": "header", "fixed": 84 },
+          { "id": "tabs", "fixed": 40 },
+          { "id": "gap", "fixed": 16 },
+          { "id": "list", "flex": 1 },
+          { "id": "gap", "fixed": 16 },
+          { "id": "buttons", "fixed": 40 }
+        ]
+      }
+    },
+    "reader": {
+      "layout": {
+        "axis": "row",
+        "gap": 8,
+        "slots": [
+          { "id": "bookmark", "fixed": 18 },
+          { "id": "battery", "fixed": 66 },
+          { "id": "title", "flex": 1 },
+          { "id": "clock", "fixed": 42 },
+          { "id": "progress", "fixed": 82 }
+        ]
+      },
+      "chrome": {
+        "battery": {
+          "style": "icon",
+          "showPercentage": true
+        }
+      }
+    }
+  },
+  "assets": {
+    "icons": {
+      "book": "icons/book.bmp",
+      "book24": "icons/book24.bmp",
+      "bookmark": "icons/bookmark.bmp",
+      "cover": "icons/cover.bmp",
+      "file24": "icons/file24.bmp",
+      "folder": "icons/folder.bmp",
+      "folder24": "icons/folder24.bmp",
+      "hotspot": "icons/hotspot.bmp",
+      "image24": "icons/image24.bmp",
+      "library": "icons/library.bmp",
+      "recent": "icons/recent.bmp",
+      "settings": "icons/settings2.bmp",
+      "text24": "icons/text24.bmp",
+      "transfer": "icons/transfer.bmp",
+      "wifi": "icons/wifi.bmp"
+    }
+  },
+  "extensions": {
+    "crossink": {
+      "readingStatsFooter": true
+    }
+  }
+}
