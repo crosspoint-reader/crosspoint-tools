@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": 30,
+  "version": 31,
   "id": "tabs-and-covers",
   "name": "Tabs & Covers",
   "description": "A test theme with an icon tab bar, a featured continue-reading cover area, and a FreeInkUI recent-cover grid.",
@@ -70,6 +70,7 @@
   "screens": {
     "home": {
       "navigation": "splitAxis",
+      "initialAction": "reader:recent",
       "layout": {
         "axis": "column",
         "gap": 0,

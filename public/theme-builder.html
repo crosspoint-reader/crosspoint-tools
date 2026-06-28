@@ -50,7 +50,7 @@
   <header class="border-b border-stone-200 bg-white">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6">
       <h1 class="font-serif text-2xl font-medium tracking-tight text-stone-900">SD Theme Builder</h1>
-      <p class="mt-1 max-w-2xl text-sm text-stone-500">Visually build a CrossPoint SD theme and preview it on a simulated device screen. Exports a firmware-compatible <code class="rounded bg-stone-100 px-1 py-0.5 font-mono text-xs">theme.json</code> (schema 1, inherits <code class="rounded bg-stone-100 px-1 py-0.5 font-mono text-xs">lyra</code>).</p>
+      <p class="mt-1 max-w-2xl text-sm text-stone-500">Visually build a CrossPoint SD theme and preview it on a simulated device screen. Exports a firmware-compatible <code class="rounded bg-stone-100 px-1 py-0.5 font-mono text-xs">theme.json</code> (schema 1, inherits <code class="rounded bg-stone-100 px-1 py-0.5 font-mono text-xs">lyra</code>) using the new <code class="rounded bg-stone-100 px-1 py-0.5 font-mono text-xs">screens</code> layout + widget system.</p>
     </div>
   </header>
 
@@ -86,16 +86,17 @@
           </div>
           <div class="inline-flex flex-wrap gap-1 text-xs font-medium">
             <button type="button" data-surface="home" class="rounded-md bg-stone-900 px-2.5 py-1 text-white">Home</button>
+            <button type="button" data-surface="fileBrowser" class="rounded-md px-2.5 py-1 text-stone-600 hover:bg-stone-100">Files</button>
+            <button type="button" data-surface="recentBooks" class="rounded-md px-2.5 py-1 text-stone-600 hover:bg-stone-100">Recent</button>
             <button type="button" data-surface="settings" class="rounded-md px-2.5 py-1 text-stone-600 hover:bg-stone-100">Settings</button>
-            <button type="button" data-surface="files" class="rounded-md px-2.5 py-1 text-stone-600 hover:bg-stone-100">Files</button>
-            <button type="button" data-surface="hints" class="rounded-md px-2.5 py-1 text-stone-600 hover:bg-stone-100">Hints</button>
+            <button type="button" data-surface="reader" class="rounded-md px-2.5 py-1 text-stone-600 hover:bg-stone-100">Reader</button>
           </div>
         </div>
 
         <!-- the device bezel -->
         <div class="mx-auto w-fit rounded-[28px] bg-stone-800 p-3 shadow-lg">
           <div class="overflow-hidden rounded-[14px] bg-white ring-1 ring-black/10">
-            <canvas id="deviceCanvas" width="480" height="800" class="block h-auto w-[300px]" style="image-rendering: pixelated;"></canvas>
+            <canvas id="deviceCanvas" width="480" height="800" class="block" style="image-rendering: pixelated;"></canvas>
           </div>
         </div>
 

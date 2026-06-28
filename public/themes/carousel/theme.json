@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": 16,
+  "version": 17,
   "id": "carousel",
   "name": "Carousel",
   "description": "A cover-focused home screen with a centered book, side previews, and a thicker outline while browsing covers.",
@@ -173,6 +173,7 @@
           "slot": "homeBattery",
           "type": "battery",
           "inset": {
+            "top": 2,
             "right": 12
           }
         },

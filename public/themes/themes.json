@@ -5,7 +5,7 @@
     {
       "id": "carousel",
       "name": "Carousel",
-      "version": 16,
+      "version": 17,
       "description": "A cover-focused home screen with a centered book, side previews, and a thicker outline while browsing covers.",
       "files": [
         {
@@ -101,11 +101,11 @@
         {
           "path": "theme.json",
           "url": "carousel/theme.json",
-          "size": 7565,
-          "crc32": 4082789453
+          "size": 7587,
+          "crc32": 625541008
         }
       ],
-      "totalSize": 10255
+      "totalSize": 10277
     },
     {
       "id": "super-minimal",
@@ -125,17 +125,17 @@
     {
       "id": "tabs-and-covers",
       "name": "Tabs & Covers",
-      "version": 30,
+      "version": 31,
       "description": "A test theme with an icon tab bar, a featured continue-reading cover area, and a FreeInkUI recent-cover grid.",
       "files": [
         {
           "path": "theme.json",
           "url": "tabs-and-covers/theme.json",
-          "size": 7244,
-          "crc32": 460852394
+          "size": 7284,
+          "crc32": 1477959080
         }
       ],
-      "totalSize": 7244
+      "totalSize": 7284
     }
   ]
 }
