@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": 28,
+  "version": 30,
   "id": "tabs-and-covers",
   "name": "Tabs & Covers",
   "description": "A test theme with an icon tab bar, a featured continue-reading cover area, and a FreeInkUI recent-cover grid.",
@@ -12,7 +12,10 @@
   "requires": {
     "crosspoint": {
       "schema": 1,
-      "modules": ["cover-strip", "recent-cover-grid"]
+      "modules": [
+        "cover-strip",
+        "recent-cover-grid"
+      ]
     }
   },
   "metrics": {
@@ -71,12 +74,30 @@
         "axis": "column",
         "gap": 0,
         "slots": [
-          { "id": "tabs", "fixed": 60 },
-          { "id": "tabsFeatureGap", "fixed": 28 },
-          { "id": "featured", "fixed": 186 },
-          { "id": "featuredGridGap", "fixed": 34 },
-          { "id": "coverGrid", "flex": 1 },
-          { "id": "buttons", "fixed": 40 }
+          {
+            "id": "tabs",
+            "fixed": 60
+          },
+          {
+            "id": "tabsFeatureGap",
+            "fixed": 28
+          },
+          {
+            "id": "featured",
+            "fixed": 186
+          },
+          {
+            "id": "featuredGridGap",
+            "fixed": 34
+          },
+          {
+            "id": "coverGrid",
+            "flex": 1
+          },
+          {
+            "id": "buttons",
+            "fixed": 40
+          }
         ]
       },
       "widgets": [
@@ -87,15 +108,40 @@
           "columns": 5,
           "rows": 1,
           "gap": 6,
-          "inset": { "left": 22, "right": 22, "top": 16, "bottom": 4 },
+          "inset": {
+            "left": 22,
+            "right": 22,
+            "top": 16,
+            "bottom": 4
+          },
           "iconSize": 32,
           "selectedRadius": 5,
           "items": [
-            { "text": "Files", "icon": "folder", "action": "activity:fileBrowser" },
-            { "text": "Recent", "icon": "recent", "action": "activity:recentBooks" },
-            { "text": "Library", "icon": "library", "action": "activity:opds" },
-            { "text": "Send", "icon": "transfer", "action": "activity:fileTransfer" },
-            { "text": "Set", "icon": "settings", "action": "activity:settings" }
+            {
+              "text": "Files",
+              "icon": "folder",
+              "action": "activity:fileBrowser"
+            },
+            {
+              "text": "Recent",
+              "icon": "recent",
+              "action": "activity:recentBooks"
+            },
+            {
+              "text": "Library",
+              "icon": "library",
+              "action": "activity:opds"
+            },
+            {
+              "text": "Send",
+              "icon": "transfer",
+              "action": "activity:fileTransfer"
+            },
+            {
+              "text": "Set",
+              "icon": "settings",
+              "action": "activity:settings"
+            }
           ]
         },
         {
@@ -106,7 +152,12 @@
           "placeholderIconSize": 20,
           "coverGap": 18,
           "titleGap": 26,
-          "inset": { "left": 34, "right": 30, "top": 8, "bottom": 0 },
+          "inset": {
+            "left": 34,
+            "right": 30,
+            "top": 8,
+            "bottom": 0
+          },
           "selectedRadius": 5,
           "startIndex": 0,
           "layer": 0
@@ -118,8 +169,13 @@
           "rows": 2,
           "gap": 16,
           "rowGap": 42,
-          "cellInset": { "top": 5 },
-          "labelInset": { "left": 5, "right": 5 },
+          "cellInset": {
+            "top": 5
+          },
+          "labelInset": {
+            "left": 5,
+            "right": 5
+          },
           "coverWidth": 76,
           "coverHeight": 116,
           "placeholderIconSize": 20,
@@ -129,10 +185,23 @@
           "labelLines": 2,
           "selectionStyle": "coverFrame",
           "selectedRadius": 0,
-          "inset": { "left": 22, "right": 22, "top": 8, "bottom": 0 },
+          "inset": {
+            "left": 22,
+            "right": 22,
+            "top": 8,
+            "bottom": 0
+          },
           "startIndex": 1
         },
-        { "slot": "buttons", "type": "buttonHints" }
+        {
+          "slot": "buttons",
+          "type": "buttonHints",
+          "labels": {
+            "confirm": "select",
+            "previous": "left",
+            "next": "right"
+          }
+        }
       ]
     },
     "fileBrowser": {
@@ -140,10 +209,22 @@
         "axis": "column",
         "gap": 10,
         "slots": [
-          { "id": "header", "fixed": 56 },
-          { "id": "list", "flex": 1 },
-          { "id": "path", "fixed": 14 },
-          { "id": "buttons", "fixed": 40 }
+          {
+            "id": "header",
+            "fixed": 56
+          },
+          {
+            "id": "list",
+            "flex": 1
+          },
+          {
+            "id": "path",
+            "fixed": 14
+          },
+          {
+            "id": "buttons",
+            "fixed": 40
+          }
         ]
       }
     },
@@ -152,37 +233,70 @@
         "axis": "column",
         "gap": 24,
         "slots": [
-          { "id": "header", "fixed": 56 },
-          { "id": "list", "flex": 1 },
-          { "id": "buttons", "fixed": 40 }
+          {
+            "id": "header",
+            "fixed": 56
+          },
+          {
+            "id": "list",
+            "flex": 1
+          },
+          {
+            "id": "buttons",
+            "fixed": 40
+          }
         ]
       },
-      "coverGrid": {
-        "columns": 3,
-        "gap": 14,
-        "rowGap": 42,
-        "coverWidth": 92,
-        "coverHeight": 132,
-        "placeholderIconSize": 20,
-        "rowHeight": 172,
-        "labelHeight": 34,
-        "labelGap": 8,
-        "labelLines": 2,
-        "selectionStyle": "coverFrame",
-        "cellInset": { "top": 5 },
-        "labelInset": { "left": 5, "right": 5 }
-      }
+      "widgets": [
+        {
+          "slot": "list",
+          "type": "coverGrid",
+          "columns": 3,
+          "gap": 14,
+          "rowGap": 42,
+          "coverWidth": 92,
+          "coverHeight": 132,
+          "placeholderIconSize": 20,
+          "rowHeight": 172,
+          "labelHeight": 34,
+          "labelGap": 8,
+          "labelLines": 2,
+          "selectionStyle": "coverFrame",
+          "cellInset": {
+            "top": 5
+          },
+          "labelInset": {
+            "left": 5,
+            "right": 5
+          }
+        }
+      ]
     },
     "settings": {
       "layout": {
         "axis": "column",
         "gap": 0,
         "slots": [
-          { "id": "header", "fixed": 56 },
-          { "id": "tabs", "fixed": 40 },
-          { "id": "gap", "fixed": 12 },
-          { "id": "list", "flex": 1 },
-          { "id": "buttons", "fixed": 40 }
+          {
+            "id": "header",
+            "fixed": 56
+          },
+          {
+            "id": "tabs",
+            "fixed": 40
+          },
+          {
+            "id": "gap",
+            "fixed": 12
+          },
+          {
+            "id": "list",
+            "flex": 1
+          },
+          {
+            "id": "buttons",
+            "fixed": 40
+          }
         ]
       }
     },
@@ -191,11 +305,26 @@
         "axis": "row",
         "gap": 8,
         "slots": [
-          { "id": "bookmark", "fixed": 18 },
-          { "id": "battery", "fixed": 66 },
-          { "id": "title", "flex": 1 },
-          { "id": "clock", "fixed": 42 },
-          { "id": "progress", "fixed": 82 }
+          {
+            "id": "bookmark",
+            "fixed": 18
+          },
+          {
+            "id": "battery",
+            "fixed": 66
+          },
+          {
+            "id": "title",
+            "flex": 1
+          },
+          {
+            "id": "clock",
+            "fixed": 42
+          },
+          {
+            "id": "progress",
+            "fixed": 82
+          }
         ]
       },
       "chrome": {

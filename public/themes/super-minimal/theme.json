@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": 6,
+  "version": 10,
   "id": "super-minimal",
   "name": "Super Minimal",
   "description": "A quiet text-only theme with no cover area, centered home options, underline selection, and icon-only hints.",
@@ -111,7 +111,15 @@
             { "text": "Settings", "icon": "settings", "action": "activity:settings" }
           ]
         },
-        { "slot": "buttons", "type": "buttonHints" }
+        {
+          "slot": "buttons",
+          "type": "buttonHints",
+          "labels": {
+            "confirm": "select",
+            "previous": "up",
+            "next": "down"
+          }
+        }
       ]
     },
     "fileBrowser": {
@@ -136,19 +144,9 @@
           { "id": "buttons", "fixed": 40 }
         ]
       },
-      "coverGrid": {
-        "columns": 3,
-        "gap": 14,
-        "rowGap": 20,
-        "coverWidth": 92,
-        "coverHeight": 132,
-        "rowHeight": 172,
-        "labelHeight": 34,
-        "labelLines": 2,
-        "selectionStyle": "coverFrame",
-        "cellInset": { "top": 5 },
-        "labelInset": { "left": 5, "right": 5 }
-      }
+      "widgets": [
+        { "slot": "list", "type": "list" }
+      ]
     },
     "settings": {
       "layout": {

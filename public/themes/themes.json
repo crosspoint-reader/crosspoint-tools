@@ -5,7 +5,7 @@
     {
       "id": "carousel",
       "name": "Carousel",
-      "version": 11,
+      "version": 14,
       "description": "A cover-focused home screen with a centered book, side previews, and a thicker outline while browsing covers.",
       "files": [
         {
@@ -101,41 +101,41 @@
         {
           "path": "theme.json",
           "url": "carousel/theme.json",
-          "size": 6618,
-          "crc32": 3164177501
+          "size": 7450,
+          "crc32": 3163799974
         }
       ],
-      "totalSize": 9308
+      "totalSize": 10140
     },
     {
       "id": "super-minimal",
       "name": "Super Minimal",
-      "version": 6,
+      "version": 10,
       "description": "A quiet text-only theme with no cover area, centered home options, underline selection, and icon-only hints.",
       "files": [
         {
           "path": "theme.json",
           "url": "super-minimal/theme.json",
-          "size": 5037,
-          "crc32": 562223192
+          "size": 4914,
+          "crc32": 1945539935
         }
       ],
-      "totalSize": 5037
+      "totalSize": 4914
     },
     {
       "id": "tabs-and-covers",
       "name": "Tabs & Covers",
-      "version": 28,
+      "version": 30,
       "description": "A test theme with an icon tab bar, a featured continue-reading cover area, and a FreeInkUI recent-cover grid.",
       "files": [
         {
           "path": "theme.json",
           "url": "tabs-and-covers/theme.json",
-          "size": 5625,
-          "crc32": 1607625952
+          "size": 7244,
+          "crc32": 460852394
         }
       ],
-      "totalSize": 5625
+      "totalSize": 7244
     }
   ]
 }
