@@ -154,8 +154,8 @@ pub fn stub_catalog() -> Catalog {
             CrossPointRelease {
                 id: "insider-latest".into(),
                 channel: Channel::Insider,
-                name: "master-abc1234".into(),
-                version: "master-abc1234".into(),
+                name: "develop-abc1234".into(),
+                version: "develop-abc1234".into(),
                 released_at: "2026-04-29T00:00:00Z".into(),
                 notes: "Latest nightly build".into(),
                 firmware_url: "https://crosspointreader.com/api/build/firmware".into(),

@@ -45,7 +45,7 @@ const CHANNEL_META: Record<
   },
   insider: {
     title: "Insider (nightly)",
-    description: "Auto-built from master. May be unstable. For testing, not daily reading.",
+    description: "Auto-built from develop. May be unstable. For testing, not daily reading.",
     emptyText: "no nightly build available",
     pluralNoun: "nightly builds",
   },
