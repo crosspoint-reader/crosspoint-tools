@@ -832,30 +832,36 @@ async function handleStockFirmware(
   const model = url.searchParams.get('model') || 'x4';
   const lang = url.searchParams.get('lang') || 'en';
 
-  // Try R2 cache first (populated by nightly GitHub Actions job)
-  const cachedRaw = await env.BUILD_META.get(`stock-${model}-${lang}`);
-  if (cachedRaw) {
-    const cached = JSON.parse(cachedRaw) as { r2Key: string; version: string };
-    const object = await env.FIRMWARE_BUCKET.get(cached.r2Key);
-    if (object) {
-      return new Response(object.body, {
-        headers: {
-          ...headers,
-          'Content-Type': 'application/octet-stream',
-          'Content-Disposition': `attachment; filename="${model}-${lang}-firmware.bin"`,
-          'X-Firmware-Version': cached.version,
-        },
-      });
-    }
-  }
-
-  // Fetch version info then download directly
+  // Determine the current upstream version first so we never serve a stale
+  // cache. The info endpoint always reports the live upstream version, so if
+  // we blindly returned whatever the nightly job last cached, the page would
+  // advertise a newer version than the bytes we actually flash.
   const result = await fetchStockFirmwareInfo(model, lang);
   if (!result.ok) {
     if (result.reason === 'unknown_model') {
       return json({ error: 'Invalid model or language' }, 400, headers);
     }
     return json({ error: 'Upstream firmware API unreachable' }, 502, headers);
+  }
+
+  // Use the R2 cache (populated by nightly GitHub Actions job) only when it
+  // matches the current upstream version.
+  const cachedRaw = await env.BUILD_META.get(`stock-${model}-${lang}`);
+  if (cachedRaw) {
+    const cached = JSON.parse(cachedRaw) as { r2Key: string; version: string };
+    if (cached.version === result.data.version) {
+      const object = await env.FIRMWARE_BUCKET.get(cached.r2Key);
+      if (object) {
+        return new Response(object.body, {
+          headers: {
+            ...headers,
+            'Content-Type': 'application/octet-stream',
+            'Content-Disposition': `attachment; filename="${model}-${lang}-firmware.bin"`,
+            'X-Firmware-Version': cached.version,
+          },
+        });
+      }
+    }
   }
 
   const fwRes = await fetch(result.data.download_url);
