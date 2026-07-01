@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Create a Sync Account - CrossPoint Reader</title>
+  <meta name="description" content="Register a KOReader-compatible sync account to sync your reading progress across devices.">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://rsms.me/inter/inter.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['InterVariable', 'Inter', 'sans-serif'],
+            serif: ['Lora', 'serif'],
+            mono: ['"Geist Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f5f3',
+              100: '#d6e5de',
+              200: '#b3cfc2',
+              300: '#8fb9a6',
+              400: '#69917D',
+              500: '#4a7a62',
+              600: '#3d6652',
+              700: '#315243',
+              800: '#253e33',
+              900: '#1a2c24',
+            },
+          },
+        },
+      },
+    }
+  </script>
+  <script src="https://cdn.usefathom.com/script.js" data-site="OHQZUNQD" defer></script>
+</head>
+<body class="min-h-dvh bg-stone-50 font-sans">
+  <nav class="border-b border-stone-200 bg-white">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
+      <a href="/" class="flex min-w-0 shrink-0 items-center gap-2 text-stone-900 no-underline" aria-label="Homepage">
+        <img src="/logo.png" alt="" class="size-7 shrink-0 rounded-md">
+        <span class="text-sm/5 font-medium tracking-tight sm:text-sm/6">
+          <span class="sm:hidden">CrossPoint</span>
+          <span class="hidden sm:inline">CrossPoint Reader</span>
+        </span>
+      </a>
+    </div>
+  </nav>
+
+  <main class="mx-auto max-w-2xl px-6">
+    <div class="pb-16 pt-12 sm:pt-16">
+      <div class="mx-auto max-w-sm">
+        <div class="text-center">
+          <p class="text-sm font-medium text-brand-500">Progress Sync</p>
+          <h1 class="mt-2 font-serif text-3xl font-medium tracking-tight text-stone-900 text-balance sm:text-2xl">Create a Sync Account</h1>
+          <p class="mt-3 text-base/7 text-stone-500 text-pretty sm:text-sm/6">Register a KOReader-compatible sync account, then sign in on your device to sync reading progress across devices.</p>
+        </div>
+
+        <div class="mt-8 rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+          <form id="register-form" class="space-y-4">
+            <div>
+              <label for="username" class="block text-sm font-medium text-stone-700">Username</label>
+              <input type="text" id="username" name="username" required autocomplete="username" autocapitalize="none" spellcheck="false"
+                     class="mt-1 w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+            </div>
+
+            <div>
+              <label for="password" class="block text-sm font-medium text-stone-700">Password</label>
+              <input type="password" id="password" name="password" required autocomplete="new-password"
+                     class="mt-1 w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+            </div>
+
+            <div>
+              <label for="confirm" class="block text-sm font-medium text-stone-700">Confirm password</label>
+              <input type="password" id="confirm" name="confirm" required autocomplete="new-password"
+                     class="mt-1 w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+            </div>
+
+            <div>
+              <label for="server" class="block text-sm font-medium text-stone-700">Sync server</label>
+              <input type="text" id="server" name="server" inputmode="url" autocapitalize="none" spellcheck="false"
+                     value="https://sync.koreader.rocks:443"
+                     class="mt-1 w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 font-mono text-xs text-stone-900 placeholder:text-stone-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+              <p class="mt-1.5 text-xs text-stone-400">Leave the default unless you run your own KOReader sync server.</p>
+            </div>
+
+            <button type="submit" id="submit-btn"
+                    class="flex w-full items-center justify-center rounded-lg bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 disabled:opacity-50 disabled:cursor-not-allowed">
+              Create Account
+            </button>
+          </form>
+
+          <p id="status" class="mt-4 hidden text-sm/6"></p>
+
+          <!-- Success panel -->
+          <div id="success" class="mt-4 hidden rounded-lg bg-brand-50/60 p-4">
+            <p class="text-sm font-semibold text-brand-700">Account created</p>
+            <p class="mt-1 text-sm/6 text-stone-600">Enter these on your device under <span class="font-medium text-stone-700">Settings &rarr; Sync</span> to sign in:</p>
+            <dl class="mt-3 space-y-2 text-sm">
+              <div class="flex justify-between gap-3">
+                <dt class="text-stone-400">Server</dt>
+                <dd id="s-server" class="truncate font-mono text-xs text-stone-700"></dd>
+              </div>
+              <div class="flex justify-between gap-3">
+                <dt class="text-stone-400">Username</dt>
+                <dd id="s-username" class="truncate font-mono text-xs text-stone-700"></dd>
+              </div>
+            </dl>
+            <p class="mt-3 text-xs text-stone-400">Use the same password you just chose. Your password is never stored on this site.</p>
+          </div>
+        </div>
+
+        <p class="mt-6 text-center text-xs text-stone-400">
+          Uses the open <a href="https://github.com/koreader/koreader-sync-server" target="_blank" rel="noopener" class="underline underline-offset-2 hover:text-stone-600">KOReader sync</a> protocol. This site only relays your registration to the server you choose.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    const form = document.getElementById('register-form');
+    const btn = document.getElementById('submit-btn');
+    const status = document.getElementById('status');
+    const success = document.getElementById('success');
+
+    function showStatus(msg, ok = false) {
+      status.textContent = msg;
+      status.className = `mt-4 text-sm/6 ${ok ? 'text-brand-600' : 'text-red-600'}`;
+      status.classList.remove('hidden');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const confirm = document.getElementById('confirm').value;
+      const server = document.getElementById('server').value.trim();
+
+      success.classList.add('hidden');
+      status.classList.add('hidden');
+
+      if (password !== confirm) {
+        showStatus('Passwords do not match.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Creating…';
+
+      try {
+        const res = await fetch('/api/kosync/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, server }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data.ok) {
+          form.reset();
+          document.getElementById('server').value = data.server || 'https://sync.koreader.rocks:443';
+          document.getElementById('s-server').textContent = data.server;
+          document.getElementById('s-username').textContent = data.username;
+          success.classList.remove('hidden');
+        } else {
+          showStatus(data.error || 'Registration failed. Please try again.');
+        }
+      } catch {
+        showStatus('Something went wrong. Please try again.');
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Create Account';
+    });
+  </script>
+</body>
+</html>
