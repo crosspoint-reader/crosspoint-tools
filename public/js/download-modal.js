@@ -36,6 +36,7 @@ const MODAL_HTML = `
       <!-- Firmware -->
       <div id="dl-fw-section" class="hidden">
         <div class="text-sm font-semibold text-stone-900">Choose firmware</div>
+        <p id="dl-stock-risk-note" class="mt-2 hidden text-sm text-red-600">Removed due to brick risk</p>
         <div id="dl-fw-list" class="mt-3 space-y-2">
           <p class="text-sm text-stone-400">Loading...</p>
         </div>
@@ -75,6 +76,8 @@ function channelLabel(channel) {
 }
 
 function stockReleases(model) {
+  if (model === 'x3') return [];
+
   return [
     {
       id: `stock-en-${model}`,
@@ -122,12 +125,15 @@ function renderFirmwareList() {
   const section = $('dl-fw-section');
   const list = $('dl-fw-list');
   const action = $('dl-action');
+  const stockRiskNote = $('dl-stock-risk-note');
   if (!state.model) {
     section.classList.add('hidden');
     action.classList.add('hidden');
+    stockRiskNote.classList.add('hidden');
     return;
   }
   section.classList.remove('hidden');
+  stockRiskNote.classList.toggle('hidden', state.model !== 'x3');
 
   if (state.loading || !state.catalog) {
     list.innerHTML = '<p class="text-sm text-stone-400">Loading...</p>';

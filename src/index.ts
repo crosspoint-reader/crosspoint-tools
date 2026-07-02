@@ -760,6 +760,10 @@ type StockFetchResult =
   | { ok: true; data: { version: string; download_url: string } }
   | { ok: false; reason: 'unknown_model' | 'upstream_unreachable' };
 
+function isStockFirmwareTemporarilyUnavailable(model: string): boolean {
+  return model === 'x3';
+}
+
 async function fetchStockFirmwareInfo(model: string, lang: string): Promise<StockFetchResult> {
   const checkUrl = STOCK_CHECK_URLS[model]?.[lang];
   if (!checkUrl) return { ok: false, reason: 'unknown_model' };
@@ -781,6 +785,10 @@ async function handleStockFirmwareInfo(
 ): Promise<Response> {
   const model = url.searchParams.get('model') || 'x4';
   const lang = url.searchParams.get('lang') || 'en';
+
+  if (isStockFirmwareTemporarilyUnavailable(model)) {
+    return json({ error: 'Removed due to brick risk' }, 404, headers);
+  }
 
   const result = await fetchStockFirmwareInfo(model, lang);
   if (!result.ok) {
@@ -834,6 +842,10 @@ async function handleStockFirmware(
 ): Promise<Response> {
   const model = url.searchParams.get('model') || 'x4';
   const lang = url.searchParams.get('lang') || 'en';
+
+  if (isStockFirmwareTemporarilyUnavailable(model)) {
+    return json({ error: 'Removed due to brick risk' }, 404, headers);
+  }
 
   // Determine the current upstream version first so we never serve a stale
   // cache. The info endpoint always reports the live upstream version, so if

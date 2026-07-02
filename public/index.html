@@ -570,6 +570,9 @@
               <div class="text-sm font-semibold text-stone-900">Stock Chinese</div>
               <div class="mt-0.5 text-xs text-stone-400">Official</div>
             </button>
+            <div id="x3-stock-risk-note" class="hidden rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700 sm:col-span-2">
+              Removed due to brick risk
+            </div>
             <button class="fw-btn group relative rounded-xl p-4 text-left ring-1 ring-stone-950/5" data-fw="custom">
               <div class="text-sm font-semibold text-stone-900">Custom .bin</div>
               <div class="mt-0.5 text-xs text-stone-400">Upload file</div>
@@ -802,6 +805,19 @@
     let isRunning = false;
     let customFile = null;
     let fullFlashFile = null;
+    const stockFirmwareTemporarilyHiddenModels = new Set(['x3']);
+
+    function stockFirmwareHiddenForSelectedDevice() {
+      return stockFirmwareTemporarilyHiddenModels.has(deviceModel);
+    }
+
+    function updateStockFirmwareVisibility() {
+      const hideStockFirmware = stockFirmwareHiddenForSelectedDevice();
+      document.querySelectorAll('[data-fw="stock-en"], [data-fw="stock-ch"]').forEach(btn => {
+        btn.classList.toggle('hidden', hideStockFirmware);
+      });
+      document.getElementById('x3-stock-risk-note').classList.toggle('hidden', !hideStockFirmware);
+    }
 
     // --- Browser check ---
     if (!('serial' in navigator)) {
@@ -847,6 +863,7 @@
     // --- Step 2: Firmware selection ---
     function updateFirmware() {
       styleCards('.fw-btn', selectedFw, 'fw');
+      updateStockFirmwareVisibility();
       document.getElementById('step-flash').classList.toggle('hidden', !selectedFw);
       document.getElementById('step-num-2').className = selectedFw
         ? 'flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white'
@@ -1046,13 +1063,23 @@
         document.getElementById('nightly-version').textContent = 'No build available';
       }
 
+      if (stockFirmwareHiddenForSelectedDevice()) {
+        for (const lang of ['en', 'ch']) {
+          document.getElementById(`stock-${lang}-version`).textContent = 'Temporarily unavailable';
+          document.querySelector(`[data-action="stock-${lang}"]`).disabled = true;
+        }
+        return;
+      }
+
       for (const lang of ['en', 'ch']) {
         const el = document.getElementById(`stock-${lang}-version`);
+        const actionBtn = document.querySelector(`[data-action="stock-${lang}"]`);
         el.textContent = 'Loading...';
+        actionBtn.disabled = true;
         const info = await fetchStockFirmwareInfo(deviceModel, lang);
         if (info) {
           el.textContent = info.version;
-          document.querySelector(`[data-action="stock-${lang}"]`).disabled = false;
+          actionBtn.disabled = false;
         } else {
           el.textContent = 'Unavailable';
         }
