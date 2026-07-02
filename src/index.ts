@@ -787,7 +787,7 @@ async function handleStockFirmwareInfo(
   const lang = url.searchParams.get('lang') || 'en';
 
   if (isStockFirmwareTemporarilyUnavailable(model)) {
-    return json({ error: 'Removed due to brick risk' }, 404, headers);
+    return json({ error: 'Stock X3 FW Removed Due to Brick Risk' }, 404, headers);
   }
 
   const result = await fetchStockFirmwareInfo(model, lang);
@@ -844,7 +844,7 @@ async function handleStockFirmware(
   const lang = url.searchParams.get('lang') || 'en';
 
   if (isStockFirmwareTemporarilyUnavailable(model)) {
-    return json({ error: 'Removed due to brick risk' }, 404, headers);
+    return json({ error: 'Stock X3 FW Removed Due to Brick Risk' }, 404, headers);
   }
 
   // Determine the current upstream version first so we never serve a stale

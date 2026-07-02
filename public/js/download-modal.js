@@ -36,7 +36,7 @@ const MODAL_HTML = `
       <!-- Firmware -->
       <div id="dl-fw-section" class="hidden">
         <div class="text-sm font-semibold text-stone-900">Choose firmware</div>
-        <p id="dl-stock-risk-note" class="mt-2 hidden text-sm text-red-600">Removed due to brick risk</p>
+        <p id="dl-stock-risk-note" class="mt-2 hidden text-sm text-red-600">Stock X3 FW Removed Due to Brick Risk</p>
         <div id="dl-fw-list" class="mt-3 space-y-2">
           <p class="text-sm text-stone-400">Loading...</p>
         </div>
