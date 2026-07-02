@@ -34,18 +34,7 @@
   </script>
 </head>
 <body class="min-h-dvh bg-stone-50 font-sans text-stone-900">
-  <nav class="border-b border-stone-200 bg-white">
-    <div class="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-      <a href="/" class="flex min-w-0 items-center gap-2 text-stone-900 no-underline" aria-label="Homepage">
-        <img src="/logo.png" alt="" class="size-7 shrink-0 rounded-md">
-        <span class="text-sm/6 font-medium tracking-tight">CrossPoint Reader</span>
-      </a>
-      <span class="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">
-        Theme Builder
-        <span class="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Hidden Preview</span>
-      </span>
-    </div>
-  </nav>
+  <div data-site-header></div>
 
   <header class="border-b border-stone-200 bg-white">
     <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6">
@@ -133,5 +122,7 @@
   </main>
 
   <script src="/js/theme-builder.js"></script>
+  <div data-site-footer></div>
+  <script type="module" src="/js/site-nav.js"></script>
 </body>
 </html>

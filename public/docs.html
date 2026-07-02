@@ -101,38 +101,7 @@
   </style>
 </head>
 <body class="min-h-dvh bg-stone-50 font-sans">
-  <nav class="border-b border-stone-200 bg-white">
-    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-3 px-4 py-3 sm:flex-nowrap sm:px-6">
-      <a href="/" class="order-1 flex min-w-0 shrink-0 items-center gap-2 text-stone-900 no-underline" aria-label="Homepage">
-        <img src="/logo.png" alt="" class="size-7 shrink-0 rounded-md">
-        <span class="text-sm/5 font-medium tracking-tight sm:text-sm/6">
-          <span class="sm:hidden">CrossPoint</span>
-          <span class="hidden sm:inline">CrossPoint Reader</span>
-        </span>
-      </a>
-      <div class="order-3 flex w-full flex-wrap items-center justify-center gap-x-2 gap-y-2 sm:order-2 sm:ml-0 sm:w-auto sm:flex-1 sm:justify-center">
-        <a href="/fonts" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
-          <span class="sm:hidden">Fonts</span>
-          <span class="hidden sm:inline">Font Builder</span>
-        </a>
-        <a href="/roadmap" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">Roadmap</a>
-        <a href="/docs.html" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-900 bg-stone-100 no-underline sm:text-sm/5">Docs</a>
-        <a href="/" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
-          <span class="sm:hidden">Download</span>
-          <span class="hidden sm:inline">Download Firmware</span>
-        </a>
-        <a href="/#unlock-tool" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
-          <span class="sm:hidden">Locked?</span>
-          <span class="hidden sm:inline">Have a locked device?</span>
-        </a>
-      </div>
-      <a href="https://app.royalty.dev/crosspoint-reader/crosspoint-reader" target="_blank" rel="noopener" class="order-2 inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#B8953A] py-1.5 pr-3 pl-2 text-xs/5 font-semibold text-white no-underline transition-colors hover:bg-[#9A7A2E] sm:order-3 sm:text-sm/5">
-        <img src="/crown.svg" alt="" class="size-4 brightness-0 invert">
-        <span class="sm:hidden">Fund</span>
-        <span class="hidden sm:inline">Fund CrossPoint</span>
-      </a>
-    </div>
-  </nav>
+  <div data-site-header></div>
 
   <!-- DOCS -->
   <section class="border-b border-stone-200 bg-white">
@@ -155,16 +124,7 @@
   </section>
 
   <!-- Footer -->
-  <footer class="border-t border-stone-200 py-8 bg-stone-50">
-    <div class="mx-auto max-w-3xl px-6">
-      <div class="flex flex-col items-center justify-between gap-4 sm:flex-row">
-        <p class="text-sm text-stone-400">CrossPoint Reader is open-source under the MIT license.</p>
-        <div class="flex gap-4">
-          <a href="https://github.com/crosspoint-reader/crosspoint-reader" target="_blank" rel="noopener" class="text-sm text-stone-400 no-underline hover:text-stone-600">GitHub</a>
-        </div>
-      </div>
-    </div>
-  </footer>
+  <div data-site-footer></div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
@@ -406,5 +366,6 @@
     });
   })();
   </script>
+  <script type="module" src="/js/site-nav.js"></script>
 </body>
 </html>

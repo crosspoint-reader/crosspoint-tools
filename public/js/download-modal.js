@@ -293,12 +293,15 @@ function bindEvents() {
 }
 
 export function initDownloadModal() {
-  if (document.getElementById('download-modal')) return;
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = MODAL_HTML;
-  document.body.appendChild(wrapper.firstElementChild);
-  bindEvents();
+  if (!document.getElementById('download-modal')) {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = MODAL_HTML;
+    document.body.appendChild(wrapper.firstElementChild);
+    bindEvents();
+  }
   document.querySelectorAll('[data-open-download-modal]').forEach(el => {
+    if (el.dataset.downloadModalBound === 'true') return;
+    el.dataset.downloadModalBound = 'true';
     el.addEventListener('click', e => {
       e.preventDefault();
       openModal();

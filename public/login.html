@@ -49,41 +49,7 @@
   <script src="https://cdn.usefathom.com/script.js" data-site="OHQZUNQD" defer></script>
 </head>
 <body class="min-h-dvh bg-stone-50 font-sans">
-  <nav class="border-b border-stone-200 bg-white">
-    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-3 px-4 py-3 sm:flex-nowrap sm:px-6">
-      <a href="/" class="order-1 flex min-w-0 shrink-0 items-center gap-2 text-stone-900 no-underline" aria-label="Homepage">
-        <img src="/logo.png" alt="" class="size-7 shrink-0 rounded-md">
-        <span class="text-sm/5 font-medium tracking-tight sm:text-sm/6">
-          <span class="sm:hidden">CrossPoint</span>
-          <span class="hidden sm:inline">CrossPoint Reader</span>
-        </span>
-      </a>
-      <div class="order-3 flex w-full flex-wrap items-center justify-center gap-x-2 gap-y-2 sm:order-2 sm:ml-0 sm:w-auto sm:flex-1 sm:justify-center">
-        <a href="/fonts" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
-          <span class="sm:hidden">Fonts</span>
-          <span class="hidden sm:inline">Font Builder</span>
-        </a>
-        <a href="/roadmap" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">Roadmap</a>
-        <a href="#" data-open-download-modal class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
-          <span class="sm:hidden">Download</span>
-          <span class="hidden sm:inline">Download Firmware</span>
-        </a>
-        <a href="/#get-in-touch" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
-          <span class="sm:hidden">Contact</span>
-          <span class="hidden sm:inline">Get In Touch</span>
-        </a>
-        <a href="/#unlock-tool" class="rounded-md px-2.5 py-1.5 text-xs/5 font-medium text-stone-500 no-underline hover:text-stone-700 sm:text-sm/5">
-          <span class="sm:hidden">Locked?</span>
-          <span class="hidden sm:inline">Have a locked device?</span>
-        </a>
-      </div>
-      <a href="https://app.royalty.dev/crosspoint-reader/crosspoint-reader" target="_blank" rel="noopener" class="order-2 inline-flex shrink-0 items-center gap-1.5 rounded-md bg-[#B8953A] py-1.5 pr-3 pl-2 text-xs/5 font-semibold text-white no-underline transition-colors hover:bg-[#9A7A2E] sm:order-3 sm:text-sm/5">
-        <img src="/crown.svg" alt="" class="size-4 brightness-0 invert">
-        <span class="sm:hidden">Fund</span>
-        <span class="hidden sm:inline">Fund CrossPoint</span>
-      </a>
-    </div>
-  </nav>
+  <div data-site-header></div>
 
   <main class="mx-auto max-w-2xl px-6">
     <div class="pb-16 pt-12 sm:pt-16">
@@ -258,5 +224,7 @@
 
     initDownloadModal();
   </script>
+  <div data-site-footer></div>
+  <script type="module" src="/js/site-nav.js"></script>
 </body>
 </html>

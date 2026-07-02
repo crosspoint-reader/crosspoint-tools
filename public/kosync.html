@@ -42,17 +42,7 @@
   <script src="https://cdn.usefathom.com/script.js" data-site="OHQZUNQD" defer></script>
 </head>
 <body class="min-h-dvh bg-stone-50 font-sans">
-  <nav class="border-b border-stone-200 bg-white">
-    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-      <a href="/" class="flex min-w-0 shrink-0 items-center gap-2 text-stone-900 no-underline" aria-label="Homepage">
-        <img src="/logo.png" alt="" class="size-7 shrink-0 rounded-md">
-        <span class="text-sm/5 font-medium tracking-tight sm:text-sm/6">
-          <span class="sm:hidden">CrossPoint</span>
-          <span class="hidden sm:inline">CrossPoint Reader</span>
-        </span>
-      </a>
-    </div>
-  </nav>
+  <div data-site-header></div>
 
   <main class="mx-auto max-w-2xl px-6">
     <div class="pb-16 pt-12 sm:pt-16">
@@ -180,5 +170,7 @@
       btn.textContent = 'Create Account';
     });
   </script>
+  <div data-site-footer></div>
+  <script type="module" src="/js/site-nav.js"></script>
 </body>
 </html>
