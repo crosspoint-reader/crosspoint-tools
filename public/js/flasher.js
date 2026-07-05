@@ -57,6 +57,55 @@ function generateCrc32Le(sequence) {
   return u32ToLeBytes(crc32(u32ToLeBytes(sequence), 0xFFFFFFFF));
 }
 
+// --- MD5 ---
+//
+// The partition table's checksum row stores an MD5 digest and WebCrypto
+// doesn't offer MD5, so this is a minimal RFC 1321 implementation.
+
+const MD5_K = new Uint32Array(64);
+for (let i = 0; i < 64; i++) MD5_K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32);
+const MD5_S = [
+  7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+  5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+  4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+  6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+];
+
+function md5(input) {
+  const bitLen = input.length * 8;
+  const paddedLen = (Math.floor((input.length + 8) / 64) + 1) * 64;
+  const msg = new Uint8Array(paddedLen);
+  msg.set(input);
+  msg[input.length] = 0x80;
+  // 64-bit LE bit length; JS bit ops are 32-bit, so split manually.
+  msg.set(u32ToLeBytes(bitLen >>> 0), paddedLen - 8);
+  msg.set(u32ToLeBytes(Math.floor(bitLen / 2 ** 32)), paddedLen - 4);
+
+  let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  const M = new Uint32Array(16);
+  for (let chunk = 0; chunk < paddedLen; chunk += 64) {
+    for (let i = 0; i < 16; i++) M[i] = leBytesToU32(msg.subarray(chunk + i * 4, chunk + i * 4 + 4));
+    let A = a0, B = b0, C = c0, D = d0;
+    for (let i = 0; i < 64; i++) {
+      let F, g;
+      if (i < 16) { F = (B & C) | (~B & D); g = i; }
+      else if (i < 32) { F = (D & B) | (~D & C); g = (5 * i + 1) % 16; }
+      else if (i < 48) { F = B ^ C ^ D; g = (3 * i + 5) % 16; }
+      else { F = C ^ (B | ~D); g = (7 * i) % 16; }
+      F = (F + A + MD5_K[i] + M[g]) >>> 0;
+      A = D; D = C; C = B;
+      B = (B + ((F << MD5_S[i]) | (F >>> (32 - MD5_S[i])))) >>> 0;
+    }
+    a0 = (a0 + A) >>> 0; b0 = (b0 + B) >>> 0; c0 = (c0 + C) >>> 0; d0 = (d0 + D) >>> 0;
+  }
+  const out = new Uint8Array(16);
+  out.set(u32ToLeBytes(a0), 0);
+  out.set(u32ToLeBytes(b0), 4);
+  out.set(u32ToLeBytes(c0), 8);
+  out.set(u32ToLeBytes(d0), 12);
+  return out;
+}
+
 // --- Firmware Image Validation ---
 
 const ESP_IMAGE_MAGIC = 0xE9;
@@ -292,6 +341,44 @@ export function parsePartitionTable(data) {
     partitions.push({ type, offset: off, size });
   }
   return partitions;
+}
+
+// Inverse of PARTITION_TYPES, plus the labels firmware uses with
+// esp_partition_find_first(). These match the Arduino/IDF default_16MB
+// scheme the device firmware is built against.
+const PARTITION_ENTRY_INFO = {
+  'app-ota_0': { type: 0x00, subtype: 0x10, label: 'app0' },
+  'app-ota_1': { type: 0x00, subtype: 0x11, label: 'app1' },
+  'data-ota': { type: 0x01, subtype: 0x00, label: 'otadata' },
+  'data-nvs': { type: 0x01, subtype: 0x02, label: 'nvs' },
+  'data-spiffs': { type: 0x01, subtype: 0x82, label: 'spiffs' },
+  'data-coredump': { type: 0x01, subtype: 0x03, label: 'coredump' },
+};
+
+// Builds the 4 KB partition table sector for one of the reference layouts
+// above: 32-byte entries (magic 0xAA50, type, subtype, offset, size, label,
+// flags = 0), then the checksum row (0xEBEB + MD5 of the entries), then
+// 0xFF fill. Matches gen_esp32part.py output byte for byte.
+export function buildPartitionTableBinary(table) {
+  const out = new Uint8Array(0x1000).fill(0xFF);
+  table.forEach((p, i) => {
+    const info = PARTITION_ENTRY_INFO[p.type];
+    if (!info) throw new Error(`No entry info for partition type ${p.type}.`);
+    const entry = out.subarray(i * 32, (i + 1) * 32);
+    entry.fill(0);
+    entry[0] = 0xAA;
+    entry[1] = 0x50;
+    entry[2] = info.type;
+    entry[3] = info.subtype;
+    entry.set(u32ToLeBytes(p.offset), 4);
+    entry.set(u32ToLeBytes(p.size), 8);
+    for (let j = 0; j < info.label.length; j++) entry[12 + j] = info.label.charCodeAt(j);
+  });
+  const md5Row = out.subarray(table.length * 32, (table.length + 1) * 32);
+  md5Row[0] = 0xEB;
+  md5Row[1] = 0xEB;
+  md5Row.set(md5(out.subarray(0, table.length * 32)), 16);
+  return out;
 }
 
 // Hard floor at 0x9000: 0x0..0x8000 holds the 2nd-stage bootloader and
@@ -577,9 +664,103 @@ export class CrossPointFlasher {
     await this.disconnect();
     step(2, 'done');
   }
+
+  // --- Boot Region Repair ---
+
+  // Recovers a device whose partition table sector was overwritten (e.g. a
+  // firmware image flashed at 0x0 with a generic esptool guide, which runs
+  // through the bootloader, PT, NVS, otadata, and the head of app0). Writes
+  // a known-good PT at 0x8000 and blanks NVS + otadata so the bootloader
+  // starts from a clean default; optionally restores a bootloader at 0x0
+  // (ESP32-C3 boots the 2nd-stage bootloader from offset 0) and writes
+  // firmware into app0 (blank otadata makes the bootloader pick app0, so no
+  // boot-selector write is needed). Without firmwareData, firmware still
+  // needs to be flashed afterwards via the normal flash flow.
+  async repairBootRegion(table, { bootloaderData = null, firmwareData = null, onStepChange, onProgress, skipReset = false } = {}) {
+    const nvs = table.find((p) => p.type === 'data-nvs');
+    const otadata = table.find((p) => p.type === 'data-ota');
+    const app0 = table.find((p) => p.type === 'app-ota_0');
+    if (!nvs || !otadata || !app0) throw new Error('Reference layout is missing NVS, otadata, or app0.');
+    if (firmwareData) {
+      await validateFirmwareImage(firmwareData);
+      if (firmwareData.length > app0.size) {
+        throw new Error(`Firmware too large: ${firmwareData.length} bytes won't fit in app0 (${app0.size} bytes).`);
+      }
+    }
+    if (bootloaderData) {
+      if (bootloaderData[0] !== ESP_IMAGE_MAGIC) {
+        throw new Error('Invalid bootloader: ESP image magic byte (0xE9) missing. Are you sure this is a bootloader .bin?');
+      }
+      if (bootloaderData.length > 0x8000) {
+        throw new Error(`Bootloader too large: ${bootloaderData.length} bytes won't fit below the partition table at 0x8000.`);
+      }
+    }
+
+    const writeLabel = 'Write ' + [
+      bootloaderData && 'bootloader',
+      'partition table',
+      firmwareData && 'firmware',
+    ].filter(Boolean).join(' + ');
+    const steps = [
+      'Connect to device',
+      writeLabel,
+      'Verify partition table',
+      skipReset ? 'Disconnect' : 'Reset device',
+    ];
+    const step = (idx, status) => { if (onStepChange) onStepChange(idx, steps[idx], status); };
+
+    step(0, 'running');
+    await this.connect();
+    step(0, 'done');
+
+    step(1, 'running');
+    const fileArray = [];
+    if (bootloaderData) {
+      fileArray.push({ data: this.espLoader.ui8ToBstr(bootloaderData), address: 0x0 });
+    }
+    fileArray.push({ data: this.espLoader.ui8ToBstr(buildPartitionTableBinary(table)), address: 0x8000 });
+    // Blank (all 0xFF) NVS and otadata: both regions hold leftover garbage
+    // after an overwrite, and erased flash is the state firmware knows how
+    // to initialize from (otadata all-0xFF = boot app0 by IDF default).
+    fileArray.push({ data: this.espLoader.ui8ToBstr(new Uint8Array(nvs.size).fill(0xFF)), address: nvs.offset });
+    fileArray.push({ data: this.espLoader.ui8ToBstr(new Uint8Array(otadata.size).fill(0xFF)), address: otadata.offset });
+    if (firmwareData) {
+      fileArray.push({ data: this.espLoader.ui8ToBstr(firmwareData), address: app0.offset });
+    }
+    await this.espLoader.writeFlash({
+      fileArray,
+      flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep',
+      eraseAll: false, compress: true,
+      reportProgress: (_, written, total) => { if (onProgress) onProgress('Write boot region', written, total); },
+    });
+    step(1, 'done');
+
+    step(2, 'running');
+    const readBack = parsePartitionTable(await this.espLoader.readFlash(0x8000, 0x1000));
+    if (!matchesPartitionTable(readBack, table)) {
+      throw new Error('Partition table did not verify after write. Read it back on the debug page and retry.');
+    }
+    this.layout = extractLayout(readBack);
+    step(2, 'done');
+
+    step(3, 'running');
+    await this.disconnect(skipReset);
+    step(3, 'done');
+
+    return { partitions: readBack };
+  }
 }
 
 // --- Firmware Download Helpers ---
+
+// Bundled ESP32-C3 2nd-stage bootloader (from the CrossPoint PlatformIO
+// build), served as a static asset. Used by the boot-region repair flow to
+// restore offset 0x0 after an accidental overwrite.
+export async function fetchBundledBootloader() {
+  const res = await fetch('/firmware/bootloader.bin');
+  if (!res.ok) throw new Error(`Failed to download bundled bootloader: ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
 
 export async function fetchEarlyAccessFirmware() {
   const res = await fetch('/api/build/firmware');

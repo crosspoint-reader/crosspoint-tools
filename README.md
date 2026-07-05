@@ -89,6 +89,10 @@ The browser-based flasher (`public/js/flasher.js`) uses [esptool-js](https://git
 
 Useful when a user reports a flash failure or unexpected behavior — ask them to load `/debug`, connect the device, and share the layout badge and dumped partition entries.
 
+### Repair boot region
+
+If the dumped partition entries are garbage (rows of `unknown` types with huge offsets that decode as ASCII), the partition table sector at `0x8000` has been overwritten — typically by a firmware image flashed at `0x0` with a generic esptool guide — and flashing fails with `Partition table has no otadata partition`. The **Repair boot region** card on `/debug` recovers this: it restores the second-stage bootloader at `0x0` (the bundled ESP32-C3 build at `public/firmware/bootloader.bin`, from the CrossPoint PlatformIO build's `.pio/build/default/bootloader.bin`; a custom `bootloader.bin` can be supplied to override it), writes a known-good partition table (CrossPoint X4, stock X3, or KO fork layout, generated client-side with a valid MD5 checksum row) at `0x8000`, and blanks the NVS and otadata partitions. By default it also flashes the latest stable CrossPoint firmware into app0 (blank otadata boots app0, so no boot-selector write is needed) — the device reboots straight into CrossPoint. Uncheck that option to only repair the boot region and flash stock or a beta build from the flash page afterwards.
+
 ## Setup
 
 ### Prerequisites
