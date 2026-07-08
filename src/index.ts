@@ -2711,6 +2711,16 @@ async function getOrComputeR2Sha(
   return { sha, size };
 }
 
+async function computeR2Sha(env: Env, r2Key: string): Promise<{ sha: string; size: number } | null> {
+  const obj = await env.FIRMWARE_BUCKET.get(r2Key);
+  if (!obj) return null;
+  const buf = await obj.arrayBuffer();
+  return {
+    sha: await sha256Hex(buf),
+    size: obj.size,
+  };
+}
+
 async function fetchStableForCatalog(env: Env): Promise<CatalogRelease | null> {
   try {
     const res = await fetch(
@@ -2814,11 +2824,7 @@ async function fetchBetasForCatalog(env: Env): Promise<CatalogRelease[]> {
 // `stable` purely to satisfy the schema; the id prefix is what gates the UI.
 // Returns null (entry omitted) until the .bin is uploaded to R2.
 async function fetchEscapeHatchForCatalog(env: Env): Promise<CatalogRelease | null> {
-  const result = await getOrComputeR2Sha(
-    env,
-    'sha256:recovery:escape-hatch',
-    ESCAPE_HATCH_R2_KEY
-  );
+  const result = await computeR2Sha(env, ESCAPE_HATCH_R2_KEY);
   if (!result) return null;
   return {
     id: 'recovery-escape-hatch',
