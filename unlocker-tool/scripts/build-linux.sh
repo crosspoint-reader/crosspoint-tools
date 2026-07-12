@@ -100,10 +100,14 @@ RPM=$(find "${BUNDLE_DIR}/rpm" -name "*.rpm" -type f 2>/dev/null | head -1)
 [[ -f "${APPIMAGE}" ]] || { echo "no AppImage produced" >&2; exit 1; }
 
 if [[ -n "${DEB}" ]]; then
-    if ! dpkg-deb -c "${DEB}" | grep -q '/unlocker-helper$'; then
+    DEB_CONTENTS=$(mktemp)
+    dpkg-deb -c "${DEB}" > "${DEB_CONTENTS}"
+    if ! grep -q '/unlocker-helper$' "${DEB_CONTENTS}"; then
+        rm -f "${DEB_CONTENTS}"
         echo "Debian package is missing bundled unlocker-helper" >&2
         exit 1
     fi
+    rm -f "${DEB_CONTENTS}"
 fi
 
 echo

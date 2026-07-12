@@ -25,6 +25,76 @@ export interface Env {
   BUCKET: R2Bucket;
 }
 
+type PlatformManifest = {
+  version: string;
+  platforms: Record<string, { url: string; signature: string }>;
+};
+
+const LATEST_ALIAS_RE =
+  /^unlocker-latest(?:-(arm64|amd64))?\.(dmg|tar\.gz|msi|AppImage|deb|rpm)$/;
+
+function linuxPlatformForAliasArch(arch: string | undefined): string {
+  return arch === "arm64" ? "linux-aarch64" : "linux-x86_64";
+}
+
+export function manifestKeyForLatestAlias(key: string): string | null {
+  const latestMatch = key.match(LATEST_ALIAS_RE);
+  if (!latestMatch) return null;
+
+  const arch = latestMatch[1];
+  const ext = latestMatch[2];
+  const linuxPlatform = linuxPlatformForAliasArch(arch);
+  const manifestForExt: Record<string, string> = {
+    dmg: "latest.json",
+    "tar.gz": "latest.json",
+    msi: "latest-windows-x86_64.json",
+    AppImage: `latest-${linuxPlatform}.json`,
+    deb: `latest-${linuxPlatform}.json`,
+    rpm: `latest-${linuxPlatform}.json`,
+  };
+
+  return manifestForExt[ext] ?? "latest.json";
+}
+
+export function targetKeyForLatestAlias(
+  key: string,
+  latest: PlatformManifest,
+): string | null {
+  const latestMatch = key.match(LATEST_ALIAS_RE);
+  if (!latestMatch) return null;
+
+  const arch = latestMatch[1];
+  const ext = latestMatch[2];
+  const linuxPlatform = linuxPlatformForAliasArch(arch);
+
+  const platformForExt: Record<string, string> = {
+    dmg: "darwin-aarch64",
+    "tar.gz": "darwin-aarch64",
+    msi: "windows-x86_64",
+    AppImage: linuxPlatform,
+    deb: linuxPlatform,
+    rpm: linuxPlatform,
+  };
+  const platformKey = platformForExt[ext];
+
+  const platformUrl = platformKey ? latest.platforms[platformKey]?.url : null;
+  const versionFromPlatformUrl = platformUrl?.match(
+    /XteinkUnlocker_([\d.]+)/,
+  )?.[1];
+  const version = versionFromPlatformUrl || latest.version;
+
+  const fileMap: Record<string, string> = {
+    dmg: `v${version}/XteinkUnlocker_${version}_universal.dmg`,
+    "tar.gz": `v${version}/XteinkUnlocker_${version}_darwin-universal.app.tar.gz`,
+    msi: `v${version}/XteinkUnlocker_${version}_x64.msi`,
+    AppImage: `v${version}/XteinkUnlocker_${version}_${linuxPlatform}.AppImage`,
+    deb: `v${version}/XteinkUnlocker_${version}_${linuxPlatform}.deb`,
+    rpm: `v${version}/XteinkUnlocker_${version}_${linuxPlatform}.rpm`,
+  };
+
+  return fileMap[ext] ?? null;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -50,60 +120,13 @@ export default {
       });
     }
 
-    // /unlocker-latest[-arch].(dmg|tar.gz|msi|AppImage|deb|rpm)
-    const latestMatch = key.match(
-      /^unlocker-latest(?:-(arm64|amd64))?\.(dmg|tar\.gz|msi|AppImage|deb|rpm)$/,
-    );
-    if (latestMatch) {
+    const manifestKey = manifestKeyForLatestAlias(key);
+    if (manifestKey) {
       try {
-        const arch = latestMatch[1];
-        const ext = latestMatch[2];
-        const linuxPlatform =
-          arch === "arm64" ? "linux-aarch64" : "linux-x86_64";
-        const manifestForExt: Record<string, string> = {
-          dmg: "latest.json",
-          "tar.gz": "latest.json",
-          msi: "latest-windows-x86_64.json",
-          AppImage: `latest-${linuxPlatform}.json`,
-          deb: `latest-${linuxPlatform}.json`,
-          rpm: `latest-${linuxPlatform}.json`,
-        };
-        const manifestKey = manifestForExt[ext] ?? "latest.json";
         const manifestObj = await env.BUCKET.get(manifestKey);
         if (manifestObj) {
-          const latest = await manifestObj.json<{
-            version: string;
-            platforms: Record<string, { url: string; signature: string }>;
-          }>();
-
-          const extractVersion = (platformKey: string): string | null => {
-            const platformUrl = latest.platforms[platformKey]?.url;
-            if (!platformUrl) return null;
-            const m = platformUrl.match(/XteinkUnlocker_([\d.]+)/);
-            return m ? m[1] : null;
-          };
-
-          const platformForExt: Record<string, string> = {
-            dmg: "darwin-aarch64",
-            "tar.gz": "darwin-aarch64",
-            msi: "windows-x86_64",
-            AppImage: linuxPlatform,
-            deb: linuxPlatform,
-            rpm: linuxPlatform,
-          };
-          const platformKey = platformForExt[ext];
-          const version =
-            (platformKey && extractVersion(platformKey)) || latest.version;
-
-          const fileMap: Record<string, string> = {
-            dmg: `v${version}/XteinkUnlocker_${version}_universal.dmg`,
-            "tar.gz": `v${version}/XteinkUnlocker_${version}_darwin-universal.app.tar.gz`,
-            msi: `v${version}/XteinkUnlocker_${version}_x64.msi`,
-            AppImage: `v${version}/XteinkUnlocker_${version}_${linuxPlatform}.AppImage`,
-            deb: `v${version}/XteinkUnlocker_${version}_${linuxPlatform}.deb`,
-            rpm: `v${version}/XteinkUnlocker_${version}_${linuxPlatform}.rpm`,
-          };
-          const targetKey = fileMap[ext];
+          const latest = await manifestObj.json<PlatformManifest>();
+          const targetKey = targetKeyForLatestAlias(key, latest);
           if (targetKey) {
             return Response.redirect(`${url.origin}/${targetKey}`, 302);
           }
