@@ -7,7 +7,7 @@ let ESPLoader, Transport;
 
 export async function loadEsptool() {
   if (ESPLoader) return;
-  const mod = await import('/js/esptool.bundle.js');
+  const mod = await import('./esptool.bundle.js');
   ESPLoader = mod.ESPLoader;
   Transport = mod.Transport;
 }

@@ -43,9 +43,11 @@ global.navigator = { clipboard: { writeText() {} } };
 global.alert = () => {};
 if (typeof URLSearchParams === 'undefined') global.URLSearchParams = require('url').URLSearchParams;
 
-// The builder lives in a "type: module" package, so load its source and run it
-// as CommonJS via new Function (its test hook assigns module.exports).
-const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'theme-builder.js'), 'utf8');
+// The builder is an ES module, so load its source, strip the ESM export
+// keyword, and run it as CommonJS via new Function (its test hook assigns
+// module.exports).
+const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'theme-builder.js'), 'utf8')
+  .replace('export function initThemeBuilder', 'function initThemeBuilder');
 const fakeModule = { exports: {} };
 new Function('module', 'exports', 'globalThis', src)(fakeModule, fakeModule.exports, global);
 const mod = fakeModule.exports;

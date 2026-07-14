@@ -77,9 +77,31 @@ export default {
       return handleInsiderAccess(request, url, env);
     }
 
-    // Let static assets handle everything else
+    // Redirect legacy static-site URLs to their SPA routes
+    const legacyTarget = LEGACY_HTML_ROUTES[url.pathname];
+    if (legacyTarget) {
+      const newUrl = new URL(legacyTarget, url.origin);
+      newUrl.search = url.search;
+      return Response.redirect(newUrl.toString(), 301);
+    }
+
+    // Let static assets handle everything else (SPA fallback serves index.html)
     return env.ASSETS.fetch(request);
   },
+};
+
+const LEGACY_HTML_ROUTES: Record<string, string> = {
+  '/index.html': '/',
+  '/docs.html': '/docs',
+  '/roadmap.html': '/roadmap',
+  '/fonts.html': '/fonts',
+  '/theme-builder.html': '/theme-builder',
+  '/debug.html': '/debug',
+  '/admin.html': '/admin',
+  '/login.html': '/login',
+  '/kosync.html': '/kosync',
+  '/sticky.html': '/sticky',
+  '/unlocker.html': '/unlocker',
 };
 
 async function handleApi(

@@ -1,6 +1,6 @@
 {
   "name": "crosspoint-tools",
-  "main": "src/index.ts",
+  "main": "worker/index.ts",
   "compatibility_date": "2025-04-01",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
@@ -8,10 +8,10 @@
     { "pattern": "crosspointreader.com", "custom_domain": true }
   ],
 
-  // Static frontend assets
+  // Static frontend assets (client build output; managed by @cloudflare/vite-plugin)
   "assets": {
-    "directory": "./public",
     "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
     "run_worker_first": true
   },
 

@@ -16,8 +16,10 @@
  *
  * Grounded in firmware source: ThemeLayout.{h,cpp}, BaseTheme.h (struct
  * defaults + LyraMetrics), ThemeHomeRenderer.cpp.
+ *
+ * Loaded as an ES module by the React page (src/pages/ThemeBuilderPage.jsx),
+ * which calls initThemeBuilder() after the markup has mounted.
  */
-(function () {
   'use strict';
 
   // ---------------------------------------------------------------------------
@@ -2289,6 +2291,13 @@
     module.exports = { importTheme, buildThemeJson, newTheme, render, getState: () => state };
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-})();
+  // Module entry point, called by the React page once the markup is in the DOM.
+  // Guarded per-canvas so React StrictMode's double-invoked effects (and any
+  // re-mounts of the page) never attach duplicate event listeners.
+  export function initThemeBuilder() {
+    const canvasEl = document.getElementById('deviceCanvas');
+    if (!canvasEl || canvasEl.dataset.tbInit) return;
+    canvasEl.dataset.tbInit = '1';
+    clearTimeout(iconPollTimer);
+    init();
+  }
