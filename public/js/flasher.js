@@ -197,6 +197,17 @@ export const X3_PARTITION_TABLE = [
   { type: 'data-coredump', offset: 0xff0000, size: 0x10000 },
 ];
 
+// CrossPoint's partitions.csv (all envs, including sticky) — same values as
+// the X4 layout, kept separate so the Sticky page doesn't couple to X4.
+export const STICKY_PARTITION_TABLE = [
+  { type: 'data-nvs', offset: 0x9000, size: 0x5000 },
+  { type: 'data-ota', offset: 0xe000, size: 0x2000 },
+  { type: 'app-ota_0', offset: 0x10000, size: 0x640000 },
+  { type: 'app-ota_1', offset: 0x650000, size: 0x640000 },
+  { type: 'data-spiffs', offset: 0xc90000, size: 0x360000 },
+  { type: 'data-coredump', offset: 0xff0000, size: 0x10000 },
+];
+
 export const CROSSPOINT_KO_PARTITION_TABLE = [
   { type: 'data-nvs', offset: 0x9000, size: 0x5000 },
   { type: 'data-ota', offset: 0xe000, size: 0x2000 },
@@ -764,6 +775,15 @@ export class CrossPointFlasher {
 export async function fetchBundledBootloader() {
   const res = await fetch('/firmware/bootloader.bin');
   if (!res.ok) throw new Error(`Failed to download bundled bootloader: ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+// ESP32-S3 2nd-stage bootloader from the CrossPoint sticky env. Used by the
+// Sticky full install: the stock Seeed bootloader won't boot a CrossPoint app
+// from its OTA slot, so first-time installs must replace the boot region.
+export async function fetchStickyBootloader() {
+  const res = await fetch('/firmware/sticky-bootloader.bin');
+  if (!res.ok) throw new Error(`Failed to download Sticky bootloader: ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
 }
 

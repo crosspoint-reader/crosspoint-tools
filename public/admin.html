@@ -594,10 +594,10 @@
           headers: { 'Authorization': 'Bearer ' + secret },
           body: formData,
         });
-        const data = await res.json();
+        const r = await readJsonResponse(res);
 
-        if (res.ok) {
-          log('Sticky build uploaded: ' + data.build.name);
+        if (r.ok) {
+          log('Sticky build uploaded: ' + r.data.build.name);
           document.getElementById('sticky-name').value = '';
           document.getElementById('sticky-notes').value = '';
           document.getElementById('sticky-file-input').value = '';
@@ -605,7 +605,7 @@
           stickyFile = null;
           loadStickyInfo();
         } else {
-          log('Sticky upload failed: ' + data.error);
+          log('Sticky upload failed: ' + describeFailure(r));
         }
       } catch (err) {
         log('Sticky upload error: ' + err.message);
@@ -616,6 +616,20 @@
     }
 
     let stickyBuild = null;
+
+    // Parse a response body as JSON without throwing on HTML error pages
+    // (edge errors, challenges). Returns { ok, status, data, raw }.
+    async function readJsonResponse(res) {
+      const raw = await res.text();
+      let data = null;
+      try { data = JSON.parse(raw); } catch {}
+      return { ok: res.ok, status: res.status, data, raw };
+    }
+
+    function describeFailure(r) {
+      if (r.data && r.data.error) return r.data.error;
+      return 'HTTP ' + r.status + ' (non-JSON response: ' + r.raw.slice(0, 80).replace(/\s+/g, ' ') + '...)';
+    }
 
     async function loadStickyInfo() {
       try {
@@ -667,13 +681,13 @@
           },
           body: JSON.stringify({ name, notes }),
         });
-        const data = await res.json();
-        if (res.ok) {
-          log('Sticky build updated: ' + data.build.name);
+        const r = await readJsonResponse(res);
+        if (r.ok) {
+          log('Sticky build updated: ' + r.data.build.name);
           cancelStickyEdit();
           loadStickyInfo();
         } else {
-          log('Sticky update failed: ' + data.error);
+          log('Sticky update failed: ' + describeFailure(r));
         }
       } catch (err) {
         log('Sticky update error: ' + err.message);
@@ -689,12 +703,12 @@
           method: 'DELETE',
           headers: { 'Authorization': 'Bearer ' + secret },
         });
-        if (res.ok) {
+        const r = await readJsonResponse(res);
+        if (r.ok) {
           log('Deleted Sticky build: ' + stickyBuild.name);
           loadStickyInfo();
         } else {
-          const data = await res.json();
-          log('Sticky delete failed: ' + data.error);
+          log('Sticky delete failed: ' + describeFailure(r));
         }
       } catch (err) {
         log('Sticky delete error: ' + err.message);
