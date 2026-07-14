@@ -1,6 +1,6 @@
 /* Typography for markdown rendered via dangerouslySetInnerHTML on the docs
    page. Scoped under .docs-prose; mirrors the Free-Ink docs treatment
-   (Space Grotesk display headings, stone body, brand-green links). */
+   (Lora display headings, stone body, brand-green links). */
 
 .docs-prose {
   font-size: 1rem;

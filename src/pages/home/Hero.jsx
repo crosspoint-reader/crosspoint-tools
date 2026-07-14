@@ -3,10 +3,10 @@ import { Button, Eyebrow } from '../../components/ui.jsx'
 
 // E-ink device frame: screen contents come from a firmware screenshot so the
 // mockups render pixel-identical to the real UI.
-function EinkShot({ src, screenClass = '' }) {
+function EinkShot({ src, screenClass = '', x3 = false }) {
   return (
-    <div className="eink-device">
-      <div className={`eink-screen ${screenClass}`.trim()}>
+    <div className={x3 ? 'eink-device eink-device-x3' : 'eink-device'}>
+      <div className={`eink-screen ${x3 ? 'eink-screen-x3' : ''} ${screenClass}`.trim()}>
         <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" />
       </div>
     </div>
@@ -102,7 +102,7 @@ export default function Hero({ onOpenBuy }) {
 
           {/* main device: home screen (Lyra theme, pixel-accurate port) */}
           <div className="eink eink-s-55 sm:eink-s-60 relative">
-            <EinkShot src="/screenshots/hero-home.png" screenClass="is-home" />
+            <EinkShot src="/screenshots/hero-home.png" screenClass="is-home" x3 />
           </div>
         </div>
       </div>
