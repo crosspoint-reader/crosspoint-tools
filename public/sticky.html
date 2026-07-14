@@ -95,6 +95,15 @@
         <div class="text-sm font-semibold text-stone-700">After flashing</div>
         <p class="mt-1 text-sm/6 text-stone-500">Press and hold the <strong class="text-stone-600">power button</strong> (top right) to boot CrossPoint.</p>
       </div>
+
+      <!-- Recovery -->
+      <div class="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
+        <div class="text-sm font-semibold text-stone-900">Device not booting?</div>
+        <p class="mt-1 text-xs text-stone-500">Flashing writes to the inactive OTA slot, so the previous firmware is still on the device. This switches the boot selector back to the other slot without writing any firmware.</p>
+        <button class="flash-btn mt-3 rounded-lg bg-stone-800 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed" data-action="swap">
+          Boot previous firmware
+        </button>
+      </div>
     </div>
   </div>
 
@@ -218,11 +227,24 @@
 
       setRunning(true);
       progressCard.classList.remove('hidden');
-      document.getElementById('restart-card').classList.remove('hidden');
+      document.getElementById('restart-card').classList.toggle('hidden', btn.dataset.action === 'swap');
       progressStatus.innerHTML = '';
       progressCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       try {
+        if (btn.dataset.action === 'swap') {
+          progressTitle.textContent = 'Switching boot partition...';
+          const flasher = new CrossPointFlasher(serialPort, { baudrate: 921600 });
+          const steps = ['Connect to device', 'Validate partition table', 'Read OTA data', 'Update boot partition', 'Reset device'];
+          const states = steps.map(() => 'pending');
+          renderSteps(steps, states);
+          const result = await flasher.swapBootPartition({
+            onStepChange: (idx, name, status) => { states[idx] = status; renderSteps(steps, states); },
+          });
+          progressStatus.innerHTML = `<div class="rounded-lg bg-brand-50 px-4 py-3 text-sm/6 text-brand-700">Boot selector now points at app${result.ota.activeApp}. Press and hold the power button (top right) to boot.</div>`;
+          return;
+        }
+
         progressTitle.textContent = 'Flashing ' + document.getElementById('sticky-build-name').textContent + '...';
         progressStatus.innerHTML = '<p class="text-sm text-stone-400">Downloading firmware...</p>';
         const res = await fetch('/api/sticky/firmware');
