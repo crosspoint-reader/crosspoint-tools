@@ -2697,11 +2697,13 @@ async function handleStickyUpload(
 
   const formData = await request.formData();
   const nameRaw = formData.get('name');
+  const notesRaw = formData.get('notes');
   const firmware = formData.get('firmware');
   if (!firmware || typeof firmware === 'string') {
     return json({ error: 'Firmware .bin file is required' }, 400, headers);
   }
   const name = (typeof nameRaw === 'string' && nameRaw.trim()) ? nameRaw.trim() : 'Sticky Beta';
+  const notes = (typeof notesRaw === 'string' ? notesRaw.trim() : '') || '';
 
   const data = await (firmware as File).arrayBuffer();
   const sha256 = await sha256Hex(data);
@@ -2711,6 +2713,7 @@ async function handleStickyUpload(
 
   const build = {
     name,
+    notes,
     firmwareSize: data.byteLength,
     firmwareSha256: sha256,
     uploadedAt: new Date().toISOString(),

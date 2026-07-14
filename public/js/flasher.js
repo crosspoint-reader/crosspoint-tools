@@ -423,13 +423,14 @@ export class CrossPointFlasher {
   }
 
   // Must be called synchronously inside a user gesture (click handler) before any awaits.
-  static async requestPort() {
+  // Defaults to the Espressif USB-Serial-JTAG VID/PID the Xteink devices enumerate
+  // with; pass null to list every serial port (e.g. hardware whose stock firmware
+  // enumerates with a vendor-specific VID/PID, like the Sticky).
+  static async requestPort(filters = [{ usbVendorId: 12346, usbProductId: 4097 }]) {
     if (!('serial' in navigator && navigator.serial)) {
       throw new Error('WebSerial is not supported. Please use Chrome or Edge.');
     }
-    return await navigator.serial.requestPort({
-      filters: [{ usbVendorId: 12346, usbProductId: 4097 }],
-    });
+    return await navigator.serial.requestPort(filters ? { filters } : {});
   }
 
   async connect() {

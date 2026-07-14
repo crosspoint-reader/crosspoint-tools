@@ -65,8 +65,9 @@
           <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white">2</span>
           <h3 class="text-sm font-semibold text-stone-900">Flash</h3>
         </div>
-        <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
-          Firmware is written to the inactive OTA app slot, so the device's partition table must have two OTA slots and an otadata partition. If flashing fails at "Validate partition table", the installed firmware doesn't use an OTA layout and needs a full-image flash instead.
+        <div class="mt-4 hidden rounded-lg bg-brand-50/60 px-4 py-3" id="sticky-notes-card">
+          <div class="text-sm font-semibold text-stone-700">What's in this build</div>
+          <div class="mt-1 text-sm/6 text-stone-700" id="sticky-build-notes"></div>
         </div>
         <div class="mt-4">
           <div class="rounded-xl bg-stone-50 p-5 ring-1 ring-stone-950/5">
@@ -107,6 +108,38 @@
       document.getElementById('browser-warning').classList.remove('hidden');
     }
 
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function safeUrl(url) {
+      const trimmed = url.trim();
+      if (/^(https?:\/\/|\/|#|mailto:)/i.test(trimmed)) return trimmed;
+      return '#';
+    }
+
+    // Minimal, safe markdown subset: escape first, then apply patterns over the
+    // escaped string. Supports: [text](url), **bold**, *italic*, `code`, bare
+    // URLs, and newline -> <br>. Same renderer as the main flash page.
+    function renderMarkdown(str) {
+      const cls = 'font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700';
+      let html = escapeHtml(str);
+      html = html.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, text, url) =>
+        '<a href="' + safeUrl(url) + '" target="_blank" rel="noopener" class="' + cls + '">' + text + '</a>'
+      );
+      html = html.replace(/`([^`]+)`/g, '<code class="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.9em]">$1</code>');
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+      html = html.replace(
+        /(^|[\s(>])(https?:\/\/[^\s<]+[^\s<.,;:!?)'"\]])/g,
+        '$1<a href="$2" target="_blank" rel="noopener" class="' + cls + '">$2</a>'
+      );
+      html = html.replace(/\n/g, '<br>');
+      return html;
+    }
+
     // --- Load current Sticky build info ---
     async function loadStickyInfo() {
       const infoEl = document.getElementById('sticky-build-info');
@@ -122,6 +155,10 @@
         document.getElementById('sticky-build-name').textContent = data.build.name;
         document.getElementById('flash-btn-label').textContent = 'Flash ' + data.build.name;
         infoEl.textContent = `${size} MB - ${date}`;
+        if (data.build.notes) {
+          document.getElementById('sticky-build-notes').innerHTML = renderMarkdown(data.build.notes);
+          document.getElementById('sticky-notes-card').classList.remove('hidden');
+        }
         document.querySelector('[data-action="sticky"]').disabled = false;
       } catch {
         infoEl.textContent = 'Failed to load';
@@ -157,9 +194,11 @@
       if (!btn || btn.disabled || isRunning) return;
 
       // Request the serial port FIRST, while we still have the user gesture.
+      // No VID/PID filter: stock Seeed firmware enumerates with its own IDs,
+      // so the default Espressif USB-Serial-JTAG filter would hide the device.
       let serialPort;
       try {
-        serialPort = await CrossPointFlasher.requestPort();
+        serialPort = await CrossPointFlasher.requestPort(null);
       } catch (err) {
         if (err.name !== 'NotFoundError') alert(err.message);
         return;
