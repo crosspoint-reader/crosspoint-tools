@@ -91,6 +91,17 @@
     }
     .eink-screen * { box-sizing: border-box; }
 
+    /* X3 variant: 528×792 panel (X4 is the 480×800 default). Add alongside
+       .eink-device / .eink-screen when the screenshot is an X3 capture. */
+    .eink-device-x3 {
+      width: calc(544px * var(--eink-scale));
+      height: calc(812px * var(--eink-scale));
+    }
+    .eink-screen-x3 {
+      width: calc(528px * var(--eink-scale));
+      height: calc(792px * var(--eink-scale));
+    }
+
     /* Bare screen (no device bezel) used for cutouts */
     .eink-bare {
       width: calc(480px * var(--eink-scale));
@@ -252,8 +263,8 @@
 
         <!-- main device: home screen (Lyra theme, pixel-accurate port) -->
         <div class="eink eink-s-55 sm:eink-s-60 relative">
-          <div class="eink-device">
-            <div class="eink-screen is-home">
+          <div class="eink-device eink-device-x3">
+            <div class="eink-screen eink-screen-x3 is-home">
               <img src="/screenshots/hero-home.png" alt="" class="absolute inset-0 w-full h-full object-cover">
             </div>
           </div>
