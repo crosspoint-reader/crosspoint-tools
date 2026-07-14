@@ -461,7 +461,20 @@ export class CrossPointFlasher {
 
   async disconnect(skipReset = false) {
     if (!this.espLoader) return;
+    // Release DTR before the reset pulse: through a USB-UART bridge DTR straps
+    // GPIO0, and resetting with it asserted drops the chip into ROM download
+    // mode ("waiting for download") instead of booting the app. On boards with
+    // a self-holding power latch (Sticky) that state is unrecoverable from the
+    // device itself — the power button drives the latch, not EN.
+    try { await this.espLoader.transport.setDTR(false); } catch {}
     await this.espLoader.after(skipReset ? 'no_reset_stub' : 'hard_reset');
+    // Clear both control lines before close so the port doesn't glitch EN/IO0
+    // into a download-mode reset as the OS releases the device.
+    try {
+      await this.espLoader.transport.setDTR(false);
+      await this.espLoader.transport.setRTS(false);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } catch {}
     await this.espLoader.transport.disconnect();
     this.espLoader = null;
   }
