@@ -692,7 +692,10 @@ export class CrossPointFlasher {
   // firmware into app0 (blank otadata makes the bootloader pick app0, so no
   // boot-selector write is needed). Without firmwareData, firmware still
   // needs to be flashed afterwards via the normal flash flow.
-  async repairBootRegion(table, { bootloaderData = null, firmwareData = null, onStepChange, onProgress, skipReset = false } = {}) {
+  // otadataData: optional initialized otadata image (e.g. Arduino's
+  // boot_app0.bin, which selects ota_0 explicitly). Defaults to blank 0xFF,
+  // which relies on the bootloader's no-otadata fallback instead.
+  async repairBootRegion(table, { bootloaderData = null, firmwareData = null, otadataData = null, onStepChange, onProgress, skipReset = false } = {}) {
     const nvs = table.find((p) => p.type === 'data-nvs');
     const otadata = table.find((p) => p.type === 'data-ota');
     const app0 = table.find((p) => p.type === 'app-ota_0');
@@ -710,6 +713,9 @@ export class CrossPointFlasher {
       if (bootloaderData.length > 0x8000) {
         throw new Error(`Bootloader too large: ${bootloaderData.length} bytes won't fit below the partition table at 0x8000.`);
       }
+    }
+    if (otadataData && otadataData.length > otadata.size) {
+      throw new Error(`otadata image too large: ${otadataData.length} bytes won't fit in otadata (${otadata.size} bytes).`);
     }
 
     const writeLabel = 'Write ' + [
@@ -738,8 +744,13 @@ export class CrossPointFlasher {
     // Blank (all 0xFF) NVS and otadata: both regions hold leftover garbage
     // after an overwrite, and erased flash is the state firmware knows how
     // to initialize from (otadata all-0xFF = boot app0 by IDF default).
+    // An explicit otadataData image (boot_app0.bin) overrides the blank.
     fileArray.push({ data: this.espLoader.ui8ToBstr(new Uint8Array(nvs.size).fill(0xFF)), address: nvs.offset });
-    fileArray.push({ data: this.espLoader.ui8ToBstr(new Uint8Array(otadata.size).fill(0xFF)), address: otadata.offset });
+    if (otadataData) {
+      fileArray.push({ data: this.espLoader.ui8ToBstr(otadataData), address: otadata.offset });
+    } else {
+      fileArray.push({ data: this.espLoader.ui8ToBstr(new Uint8Array(otadata.size).fill(0xFF)), address: otadata.offset });
+    }
     if (firmwareData) {
       fileArray.push({ data: this.espLoader.ui8ToBstr(firmwareData), address: app0.offset });
     }
@@ -784,6 +795,14 @@ export async function fetchBundledBootloader() {
 export async function fetchStickyBootloader() {
   const res = await fetch('/firmware/sticky-bootloader.bin');
   if (!res.ok) throw new Error(`Failed to download Sticky bootloader: ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+// Arduino's boot_app0.bin: an initialized otadata image that explicitly
+// selects ota_0, matching what `pio upload` writes at the otadata offset.
+export async function fetchStickyBootApp0() {
+  const res = await fetch('/firmware/sticky-boot-app0.bin');
+  if (!res.ok) throw new Error(`Failed to download boot_app0: ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
 }
 
