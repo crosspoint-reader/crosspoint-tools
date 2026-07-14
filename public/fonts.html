@@ -169,6 +169,8 @@
                   <br><br>
                   <strong class="text-white">Default</strong>: Enables the same general Unicode ranges as the default CrossPoint fonts: English, most European languages, Cyrillic (Russian, Ukrainian, etc.), combining diacritics, math operators, arrows, and common ligatures.
                   <br><br>
+                  <strong class="text-white">Arabic</strong>: Covers Arabic, Farsi, and Urdu letterforms (including Persian/Urdu-specific letters and presentation forms). Note: correct joined rendering depends on the reader's text-shaping pipeline, not just glyph coverage — isolated codepoints alone may render disconnected.
+                  <br><br>
                   <strong class="text-white">Reading (recommended for fiction)</strong>: Includes Default coverage plus extra ranges often seen in English-language fiction and scifi/popsci: broader Latin, Greek terms like λ and φ, box/geometric symbols, supplemental arrows, uncommon dialogue punctuation, CJK quote marks, music notes (♪ ♫ ♬), stars (★), and dingbats (✓).
                   <br><br>
                   <strong class="text-white">Note on Fallback Fonts</strong>: Fallback fonts only fill missing characters. The main family is always checked first, then your fallback family 1, your fallback family 2, and finally the builder's safety-net font. Fallback fonts do not replace characters the main family already has.
@@ -185,6 +187,7 @@
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="cyrillic" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Cyrillic</label>
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="vietnamese" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Vietnamese</label>
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="hebrew" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Hebrew</label>
+              <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="arabic" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Arabic <span class="text-xs text-stone-400">(Farsi, Urdu)</span></label>
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="armenian" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Armenian</label>
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="georgian" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Georgian</label>
               <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="intervalPreset" value="ethiopic" class="rounded border-stone-300 text-brand-600 focus:ring-brand-500"> Ethiopic</label>

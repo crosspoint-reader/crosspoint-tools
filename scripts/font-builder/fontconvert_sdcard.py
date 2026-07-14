@@ -54,6 +54,11 @@ INTERVAL_PRESETS = {
     "greek":       [(0x0370, 0x03FF), (0x1F00, 0x1FFF)],
     "cyrillic":    [(0x0400, 0x04FF), (0x0500, 0x052F)],
     "hebrew":      [(0x0590, 0x05FF), (0xFB1D, 0xFB4F)],
+    "arabic":      [(0x0600, 0x06FF),   # Arabic (incl. Arabic-Indic & Extended digits)
+                    (0x0750, 0x077F),   # Arabic Supplement (Sindhi, extra Urdu/Farsi letters)
+                    (0x08A0, 0x08FF),   # Arabic Extended-A (Quranic/Persian/Urdu extras)
+                    (0xFB50, 0xFDFF),   # Arabic Presentation Forms-A (incl. Persian/Urdu ligature forms)
+                    (0xFE70, 0xFEFF)],  # Arabic Presentation Forms-B (contextual init/medi/fina/isol forms)
     "georgian":    [(0x10A0, 0x10FF), (0x2D00, 0x2D2F)],
     "armenian":    [(0x0530, 0x058F)],
     "ethiopic":    [(0x1200, 0x137F), (0x1380, 0x139F), (0x2D80, 0x2DDF)],
