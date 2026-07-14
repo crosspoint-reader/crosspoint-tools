@@ -73,16 +73,13 @@
           <div class="rounded-xl bg-stone-50 p-5 ring-1 ring-stone-950/5">
             <div class="text-sm font-semibold text-stone-900" id="sticky-build-name">Sticky Beta</div>
             <div class="mt-1 font-mono text-xs text-stone-400 tabular-nums" id="sticky-build-info">Loading...</div>
-            <div class="mt-4 flex flex-wrap items-center gap-3">
+            <div class="mt-4">
               <button class="flash-btn inline-flex items-center justify-center rounded-lg bg-brand-500 py-2 pr-4 pl-3 text-sm font-semibold text-white hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:opacity-50 disabled:cursor-not-allowed" data-action="full-install" disabled>
                 <svg class="mr-1.5 size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
                 <span id="install-btn-label">Install Sticky Beta</span>
               </button>
-              <button class="flash-btn inline-flex items-center justify-center rounded-lg bg-stone-800 py-2 pr-4 pl-3 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed" data-action="sticky" disabled>
-                <span id="flash-btn-label">Update (OTA)</span>
-              </button>
             </div>
-            <p class="mt-2 text-xs text-stone-400"><strong class="text-stone-500">Install</strong> replaces the bootloader and partition table &mdash; required coming from stock Seeed firmware, erases settings. <strong class="text-stone-500">Update</strong> flashes the inactive OTA slot and only works once CrossPoint is already installed.</p>
+            <p class="mt-2 text-xs text-stone-400">Writes the bootloader, partition table, and firmware. Erases saved settings.</p>
           </div>
         </div>
       </div>
@@ -100,14 +97,6 @@
         <p class="mt-1 text-sm/6 text-stone-500">Press and hold the <strong class="text-stone-600">power button</strong> (top right) to boot CrossPoint.</p>
       </div>
 
-      <!-- Recovery -->
-      <div class="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
-        <div class="text-sm font-semibold text-stone-900">Device not booting?</div>
-        <p class="mt-1 text-xs text-stone-500">Flashing writes to the inactive OTA slot, so the previous firmware is still on the device. This switches the boot selector back to the other slot without writing any firmware.</p>
-        <button class="flash-btn mt-3 rounded-lg bg-stone-800 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-700 disabled:opacity-50 disabled:cursor-not-allowed" data-action="swap">
-          Boot previous firmware
-        </button>
-      </div>
     </div>
   </div>
 
@@ -173,7 +162,6 @@
           document.getElementById('sticky-build-notes').innerHTML = renderMarkdown(data.build.notes);
           document.getElementById('sticky-notes-card').classList.remove('hidden');
         }
-        document.querySelector('[data-action="sticky"]').disabled = false;
       } catch {
         infoEl.textContent = 'Failed to load';
       }
@@ -232,79 +220,35 @@
 
       setRunning(true);
       progressCard.classList.remove('hidden');
-      document.getElementById('restart-card').classList.toggle('hidden', btn.dataset.action === 'swap');
+      document.getElementById('restart-card').classList.remove('hidden');
       progressStatus.innerHTML = '';
       progressCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       try {
-        if (btn.dataset.action === 'full-install') {
-          progressTitle.textContent = 'Installing ' + document.getElementById('sticky-build-name').textContent + '...';
-          progressStatus.innerHTML = '<p class="text-sm text-stone-400">Downloading firmware...</p>';
-          const res = await fetch('/api/sticky/firmware');
-          if (!res.ok) throw new Error(`Failed to download firmware: ${res.status}`);
-          const firmwareData = new Uint8Array(await res.arrayBuffer());
-          const bootloaderData = await fetchStickyBootloader();
-          progressStatus.innerHTML = '';
-
-          const flasher = new CrossPointFlasher(serialPort, { baudrate: 921600 });
-          const steps = ['Connect to device', 'Write bootloader + partition table + firmware', 'Verify partition table', 'Reset device'];
-          const states = steps.map(() => 'pending');
-          renderSteps(steps, states);
-
-          await flasher.repairBootRegion(STICKY_PARTITION_TABLE, {
-            bootloaderData, firmwareData,
-            onStepChange: (idx, name, status) => { states[idx] = status; renderSteps(steps, states); },
-            onProgress: (step, current, total) => {
-              const bar = document.getElementById('flash-progress');
-              if (bar) bar.style.width = `${(current / total * 100).toFixed(1)}%`;
-            },
-          });
-          progressStatus.innerHTML = '<div class="rounded-lg bg-brand-50 px-4 py-3 text-sm/6 text-brand-700">Installed! Press and hold the power button (top right) to boot CrossPoint.</div>';
-          return;
-        }
-
-        if (btn.dataset.action === 'swap') {
-          progressTitle.textContent = 'Switching boot partition...';
-          const flasher = new CrossPointFlasher(serialPort, { baudrate: 921600 });
-          const steps = ['Connect to device', 'Validate partition table', 'Read OTA data', 'Update boot partition', 'Reset device'];
-          const states = steps.map(() => 'pending');
-          renderSteps(steps, states);
-          const result = await flasher.swapBootPartition({
-            onStepChange: (idx, name, status) => { states[idx] = status; renderSteps(steps, states); },
-          });
-          progressStatus.innerHTML = `<div class="rounded-lg bg-brand-50 px-4 py-3 text-sm/6 text-brand-700">Boot selector now points at app${result.ota.activeApp}. Press and hold the power button (top right) to boot.</div>`;
-          return;
-        }
-
-        progressTitle.textContent = 'Flashing ' + document.getElementById('sticky-build-name').textContent + '...';
+        progressTitle.textContent = 'Installing ' + document.getElementById('sticky-build-name').textContent + '...';
         progressStatus.innerHTML = '<p class="text-sm text-stone-400">Downloading firmware...</p>';
         const res = await fetch('/api/sticky/firmware');
         if (!res.ok) throw new Error(`Failed to download firmware: ${res.status}`);
-        const firmware = new Uint8Array(await res.arrayBuffer());
+        const firmwareData = new Uint8Array(await res.arrayBuffer());
+        const bootloaderData = await fetchStickyBootloader();
         progressStatus.innerHTML = '';
 
         // 921600 baud: the Sticky flashes through a USB-UART bridge, where the
         // configured baud is the real wire speed (115200 would take 5+ min).
         const flasher = new CrossPointFlasher(serialPort, { baudrate: 921600 });
-        const steps = [
-          'Connect to device',
-          'Validate partition table',
-          'Read OTA data',
-          'Flash firmware',
-          'Update boot partition',
-          'Reset device',
-        ];
+        const steps = ['Connect to device', 'Write bootloader + partition table + firmware', 'Verify partition table', 'Reset device'];
         const states = steps.map(() => 'pending');
         renderSteps(steps, states);
 
-        const result = await flasher.flashFirmware(firmware, {
+        await flasher.repairBootRegion(STICKY_PARTITION_TABLE, {
+          bootloaderData, firmwareData,
           onStepChange: (idx, name, status) => { states[idx] = status; renderSteps(steps, states); },
           onProgress: (step, current, total) => {
             const bar = document.getElementById('flash-progress');
             if (bar) bar.style.width = `${(current / total * 100).toFixed(1)}%`;
           },
         });
-        progressStatus.innerHTML = `<div class="rounded-lg bg-brand-50 px-4 py-3 text-sm/6 text-brand-700">Flashed to ${result.partition}! Press and hold the power button (top right) to boot CrossPoint.</div>`;
+        progressStatus.innerHTML = '<div class="rounded-lg bg-brand-50 px-4 py-3 text-sm/6 text-brand-700">Installed! Press and hold the power button (top right) to boot CrossPoint.</div>';
       } catch (err) {
         progressStatus.innerHTML = `<div class="rounded-lg bg-red-50 px-4 py-3 text-sm/6 text-red-700">${err.message || err}</div>`;
       } finally {
