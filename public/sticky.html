@@ -93,7 +93,7 @@
       <!-- Restart Instructions -->
       <div class="hidden rounded-xl bg-stone-50 p-5 ring-1 ring-stone-950/5" id="restart-card">
         <div class="text-sm font-semibold text-stone-700">After flashing</div>
-        <p class="mt-1 text-sm/6 text-stone-500">The device resets automatically. If it doesn't come back up, hold the power button to power-cycle it &mdash; unplugging USB won't cut power, the Sticky latches its own.</p>
+        <p class="mt-1 text-sm/6 text-stone-500">Press and hold the <strong class="text-stone-600">power button</strong> (top right) to boot CrossPoint.</p>
       </div>
     </div>
   </div>
@@ -194,11 +194,19 @@
       if (!btn || btn.disabled || isRunning) return;
 
       // Request the serial port FIRST, while we still have the user gesture.
-      // No VID/PID filter: stock Seeed firmware enumerates with its own IDs,
-      // so the default Espressif USB-Serial-JTAG filter would hide the device.
+      // Vendor-level filter: Espressif (0x303A, any PID — covers USB-Serial-JTAG,
+      // ROM download mode, and TinyUSB CDC), Seeed (0x2886) for the stock
+      // firmware, and the Silicon Labs / WCH USB-UART bridges Seeed boards ship
+      // with. The default Xteink filter also pins the product ID, which would
+      // hide the Sticky; no filter at all shows Bluetooth serial ports.
       let serialPort;
       try {
-        serialPort = await CrossPointFlasher.requestPort(null);
+        serialPort = await CrossPointFlasher.requestPort([
+          { usbVendorId: 0x303A },
+          { usbVendorId: 0x2886 },
+          { usbVendorId: 0x10C4 },
+          { usbVendorId: 0x1A86 },
+        ]);
       } catch (err) {
         if (err.name !== 'NotFoundError') alert(err.message);
         return;
@@ -222,7 +230,9 @@
         const firmware = new Uint8Array(await res.arrayBuffer());
         progressStatus.innerHTML = '';
 
-        const flasher = new CrossPointFlasher(serialPort);
+        // 921600 baud: the Sticky flashes through a USB-UART bridge, where the
+        // configured baud is the real wire speed (115200 would take 5+ min).
+        const flasher = new CrossPointFlasher(serialPort, { baudrate: 921600 });
         const steps = [
           'Connect to device',
           'Validate partition table',
@@ -241,7 +251,7 @@
             if (bar) bar.style.width = `${(current / total * 100).toFixed(1)}%`;
           },
         });
-        progressStatus.innerHTML = `<div class="rounded-lg bg-brand-50 px-4 py-3 text-sm/6 text-brand-700">Flashed to ${result.partition}! The device should restart on its own.</div>`;
+        progressStatus.innerHTML = `<div class="rounded-lg bg-brand-50 px-4 py-3 text-sm/6 text-brand-700">Flashed to ${result.partition}! Press and hold the power button (top right) to boot CrossPoint.</div>`;
       } catch (err) {
         progressStatus.innerHTML = `<div class="rounded-lg bg-red-50 px-4 py-3 text-sm/6 text-red-700">${err.message || err}</div>`;
       } finally {

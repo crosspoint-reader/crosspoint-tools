@@ -152,7 +152,31 @@
           </div>
         </div>
 
-        <p id="sticky-current" class="mt-3 text-xs text-stone-400">No Sticky build uploaded</p>
+        <div id="sticky-current-item" class="mt-4 hidden border-t border-stone-100 pt-2.5">
+          <div class="flex items-center justify-between">
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-medium text-stone-700" id="sticky-current-name"></div>
+              <div class="text-xs text-stone-400" id="sticky-current-meta"></div>
+            </div>
+            <div class="ml-2 flex shrink-0 gap-0.5">
+              <button onclick="editSticky()" class="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600" title="Edit">
+                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z"/></svg>
+              </button>
+              <button onclick="deleteSticky()" class="rounded-md p-1 text-stone-400 hover:bg-red-50 hover:text-red-600" title="Delete">
+                <svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+          <div id="sticky-edit" class="hidden mt-2 space-y-2">
+            <input type="text" id="sticky-edit-name" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+            <textarea id="sticky-edit-notes" rows="2" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 resize-none"></textarea>
+            <div class="flex gap-2">
+              <button onclick="saveStickyEdit()" class="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600">Save</button>
+              <button onclick="cancelStickyEdit()" class="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700">Cancel</button>
+            </div>
+          </div>
+        </div>
+        <p id="sticky-empty" class="mt-3 text-xs text-stone-400">No Sticky build uploaded</p>
       </div>
 
       <!-- Log -->
@@ -591,20 +615,90 @@
       refreshStickyButton();
     }
 
+    let stickyBuild = null;
+
     async function loadStickyInfo() {
       try {
         const res = await fetch('/api/sticky/info');
         const data = await res.json();
-        const el = document.getElementById('sticky-current');
-        if (!data.build) {
-          el.textContent = 'No Sticky build uploaded';
+        stickyBuild = data.build || null;
+        const itemEl = document.getElementById('sticky-current-item');
+        const emptyEl = document.getElementById('sticky-empty');
+        if (!stickyBuild) {
+          itemEl.classList.add('hidden');
+          emptyEl.classList.remove('hidden');
           return;
         }
-        const size = (data.build.firmwareSize / 1024 / 1024).toFixed(1);
-        const date = new Date(data.build.uploadedAt).toLocaleDateString();
-        el.innerHTML = 'Current: <span class="font-medium text-stone-600">' + escapeHtml(data.build.name) + '</span> &middot; ' + size + ' MB &middot; ' + date +
-          (data.build.notes ? ' &middot; <span class="text-stone-500" title="' + escapeHtml(data.build.notes) + '">has notes</span>' : '');
+        const size = (stickyBuild.firmwareSize / 1024 / 1024).toFixed(1);
+        const date = new Date(stickyBuild.uploadedAt).toLocaleDateString();
+        document.getElementById('sticky-current-name').textContent = stickyBuild.name;
+        document.getElementById('sticky-current-meta').innerHTML = size + ' MB &middot; ' + date +
+          (stickyBuild.notes ? ' &middot; <span class="text-stone-500" title="' + escapeHtml(stickyBuild.notes) + '">has notes</span>' : '');
+        itemEl.classList.remove('hidden');
+        emptyEl.classList.add('hidden');
       } catch {}
+    }
+
+    function editSticky() {
+      if (!stickyBuild) return;
+      const editEl = document.getElementById('sticky-edit');
+      editEl.classList.toggle('hidden');
+      if (!editEl.classList.contains('hidden')) {
+        document.getElementById('sticky-edit-name').value = stickyBuild.name;
+        document.getElementById('sticky-edit-notes').value = stickyBuild.notes || '';
+      }
+    }
+
+    function cancelStickyEdit() {
+      document.getElementById('sticky-edit').classList.add('hidden');
+    }
+
+    async function saveStickyEdit() {
+      const name = document.getElementById('sticky-edit-name').value.trim();
+      const notes = document.getElementById('sticky-edit-notes').value.trim();
+      if (!name) return;
+
+      try {
+        const res = await fetch('/api/sticky', {
+          method: 'PATCH',
+          headers: {
+            'Authorization': 'Bearer ' + secret,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name, notes }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          log('Sticky build updated: ' + data.build.name);
+          cancelStickyEdit();
+          loadStickyInfo();
+        } else {
+          log('Sticky update failed: ' + data.error);
+        }
+      } catch (err) {
+        log('Sticky update error: ' + err.message);
+      }
+    }
+
+    async function deleteSticky() {
+      if (!stickyBuild) return;
+      if (!confirm('Delete Sticky build "' + stickyBuild.name + '"?')) return;
+
+      try {
+        const res = await fetch('/api/sticky', {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + secret },
+        });
+        if (res.ok) {
+          log('Deleted Sticky build: ' + stickyBuild.name);
+          loadStickyInfo();
+        } else {
+          const data = await res.json();
+          log('Sticky delete failed: ' + data.error);
+        }
+      } catch (err) {
+        log('Sticky delete error: ' + err.message);
+      }
     }
 
     async function saveBetaEdit(id) {

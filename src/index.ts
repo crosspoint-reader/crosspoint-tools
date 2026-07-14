@@ -212,6 +212,11 @@ async function handleApi(
       case '/api/sticky/upload':
         return handleStickyUpload(request, env, corsHeaders);
 
+      case '/api/sticky':
+        if (request.method === 'PATCH') return handleStickyUpdate(request, env, corsHeaders);
+        if (request.method === 'DELETE') return handleStickyDelete(request, env, corsHeaders);
+        return json({ error: 'Method not allowed' }, 405, corsHeaders);
+
       case '/api/sticky/info':
         return handleStickyInfo(env, corsHeaders);
 
@@ -2721,6 +2726,55 @@ async function handleStickyUpload(
   await env.BUILD_META.put(STICKY_META_KEY, JSON.stringify(build));
 
   return json({ build }, 201, headers);
+}
+
+async function handleStickyUpdate(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const raw = await env.BUILD_META.get(STICKY_META_KEY);
+  if (!raw) {
+    return json({ error: 'No Sticky build uploaded' }, 404, headers);
+  }
+  const build = JSON.parse(raw) as { name: string; notes?: string };
+
+  const body = await request.json() as { name?: string; notes?: string };
+  if (body.name !== undefined) {
+    if (typeof body.name !== 'string' || !body.name.trim()) {
+      return json({ error: 'Name cannot be empty' }, 400, headers);
+    }
+    build.name = body.name.trim();
+  }
+  if (body.notes !== undefined) {
+    build.notes = typeof body.notes === 'string' ? body.notes.trim() : '';
+  }
+
+  await env.BUILD_META.put(STICKY_META_KEY, JSON.stringify(build));
+  return json({ build }, 200, headers);
+}
+
+async function handleStickyDelete(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const raw = await env.BUILD_META.get(STICKY_META_KEY);
+  if (!raw) {
+    return json({ error: 'No Sticky build uploaded' }, 404, headers);
+  }
+
+  await env.FIRMWARE_BUCKET.delete(STICKY_R2_KEY);
+  await env.BUILD_META.delete(STICKY_META_KEY);
+  return json({ ok: true }, 200, headers);
 }
 
 async function handleStickyInfo(

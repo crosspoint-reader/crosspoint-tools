@@ -416,10 +416,14 @@ function extractLayout(partitions) {
 // --- Main Flasher Class ---
 
 export class CrossPointFlasher {
-  constructor(port = null) {
+  // baudrate only matters for devices behind a real USB-UART bridge; native
+  // USB (USB-Serial-JTAG / CDC) ignores it. esptool-js connects at 115200
+  // (the ROM baud) and switches up after the stub loads.
+  constructor(port = null, { baudrate = 115200 } = {}) {
     this.espLoader = null;
     this.layout = null;
     this.port = port;
+    this.baudrate = baudrate;
   }
 
   // Must be called synchronously inside a user gesture (click handler) before any awaits.
@@ -439,7 +443,7 @@ export class CrossPointFlasher {
     await loadEsptool();
     const transport = new Transport(port, false);
     this.espLoader = new ESPLoader({
-      transport, baudrate: 115200, romBaudrate: 115200, enableTracing: false,
+      transport, baudrate: this.baudrate, romBaudrate: 115200, enableTracing: false,
     });
     await this.espLoader.main();
   }
