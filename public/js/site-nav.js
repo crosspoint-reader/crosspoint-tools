@@ -16,12 +16,6 @@ const headerLinks = [
     label: 'Roadmap',
   },
   {
-    href: '#',
-    label: 'Download Firmware',
-    shortLabel: 'Download',
-    attrs: 'data-open-download-modal',
-  },
-  {
     href: '/#get-in-touch',
     homeHref: '#get-in-touch',
     label: 'Get In Touch',

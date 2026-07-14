@@ -15,7 +15,7 @@ const MODAL_HTML = `
 
     <div class="space-y-6 px-6 py-5">
       <div class="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
-        <p>If your device is locked, our <a href="/#unlock-tool" class="font-medium underline underline-offset-2 hover:text-amber-950">Unlock Tool</a> lets you install CrossPoint over OTA instead of USB.</p>
+        <p>To install via SD card, save the file as <code class="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px]">update.bin</code> in the root of your SD card, then insert it into your device and follow the on-screen prompts to flash.</p>
       </div>
 
       <!-- Device -->
