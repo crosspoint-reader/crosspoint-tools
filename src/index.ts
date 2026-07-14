@@ -209,6 +209,15 @@ async function handleApi(
         if (request.method === 'PUT') return handleBannerUpdate(request, env, corsHeaders);
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
+      case '/api/sticky/upload':
+        return handleStickyUpload(request, env, corsHeaders);
+
+      case '/api/sticky/info':
+        return handleStickyInfo(env, corsHeaders);
+
+      case '/api/sticky/firmware':
+        return handleStickyFirmware(env, corsHeaders);
+
       default:
         // Dynamic routes: /api/beta/{id}/firmware
         if (url.pathname.startsWith('/api/beta/') && url.pathname.endsWith('/firmware')) {
@@ -2660,6 +2669,81 @@ async function handleBetaFirmware(
       ...headers,
       'Content-Type': 'application/octet-stream',
       'Content-Disposition': `attachment; filename="${id}.bin"`,
+      'Content-Length': String(object.size),
+    },
+  });
+}
+
+// --- Sticky Beta Build ---
+//
+// A single admin-uploaded ESP32-S3 build for the Seeed reTerminal Sticky,
+// served only on the hidden /sticky page. Uploading replaces the previous
+// build in place; there is exactly one at a time.
+
+const STICKY_R2_KEY = 'builds/sticky/firmware.bin';
+const STICKY_META_KEY = 'sticky-build';
+
+async function handleStickyUpload(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const formData = await request.formData();
+  const nameRaw = formData.get('name');
+  const firmware = formData.get('firmware');
+  if (!firmware || typeof firmware === 'string') {
+    return json({ error: 'Firmware .bin file is required' }, 400, headers);
+  }
+  const name = (typeof nameRaw === 'string' && nameRaw.trim()) ? nameRaw.trim() : 'Sticky Beta';
+
+  const data = await (firmware as File).arrayBuffer();
+  const sha256 = await sha256Hex(data);
+  await env.FIRMWARE_BUCKET.put(STICKY_R2_KEY, data, {
+    customMetadata: { sha256 },
+  });
+
+  const build = {
+    name,
+    firmwareSize: data.byteLength,
+    firmwareSha256: sha256,
+    uploadedAt: new Date().toISOString(),
+  };
+  await env.BUILD_META.put(STICKY_META_KEY, JSON.stringify(build));
+
+  return json({ build }, 201, headers);
+}
+
+async function handleStickyInfo(
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const raw = await env.BUILD_META.get(STICKY_META_KEY);
+  if (!raw) {
+    return json({ build: null }, 200, headers);
+  }
+  return json({ build: JSON.parse(raw) }, 200, headers);
+}
+
+async function handleStickyFirmware(
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const object = await env.FIRMWARE_BUCKET.get(STICKY_R2_KEY);
+  if (!object) {
+    return json({ error: 'No Sticky build uploaded' }, 404, headers);
+  }
+  return new Response(object.body, {
+    headers: {
+      ...headers,
+      'Content-Type': 'application/octet-stream',
+      'Content-Disposition': 'attachment; filename="sticky-firmware.bin"',
       'Content-Length': String(object.size),
     },
   });

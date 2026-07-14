@@ -133,6 +133,27 @@
         <p id="beta-empty" class="mt-3 text-xs text-stone-400">No beta builds</p>
       </div>
 
+      <!-- Sticky Beta -->
+      <div class="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
+        <h2 class="text-sm font-semibold text-stone-900">Sticky Beta</h2>
+        <p class="mt-1 text-xs text-stone-400">Upload the ESP32-S3 build served on the hidden <a href="/sticky" class="font-medium text-brand-500 underline underline-offset-2">/sticky</a> page. Uploading replaces the current build.</p>
+
+        <div class="mt-3 space-y-2">
+          <input type="text" id="sticky-name" placeholder="Build name (e.g. Sticky Beta v1)" class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20">
+          <div class="flex gap-2">
+            <label class="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
+              <span id="sticky-file-label">Choose .bin file...</span>
+              <input type="file" accept=".bin" id="sticky-file-input" class="hidden">
+            </label>
+            <button onclick="uploadSticky()" id="sticky-upload-btn" class="shrink-0 rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+              Upload
+            </button>
+          </div>
+        </div>
+
+        <p id="sticky-current" class="mt-3 text-xs text-stone-400">No Sticky build uploaded</p>
+      </div>
+
       <!-- Log -->
       <div class="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
         <h2 class="text-sm font-semibold text-stone-900">Activity Log</h2>
@@ -184,6 +205,7 @@
 
         refreshStatus();
         loadBetaList();
+        loadStickyInfo();
         loadBanner();
       } catch (err) {
         document.getElementById('auth-error').textContent = 'Connection error';
@@ -510,6 +532,75 @@
 
     function cancelBetaEdit(id) {
       document.getElementById('beta-edit-' + id).classList.add('hidden');
+    }
+
+    // --- Sticky Beta ---
+
+    let stickyFile = null;
+
+    document.getElementById('sticky-file-input').addEventListener('change', (e) => {
+      stickyFile = e.target.files[0];
+      document.getElementById('sticky-file-label').textContent = stickyFile ? stickyFile.name : 'Choose .bin file...';
+      refreshStickyButton();
+    });
+    document.getElementById('sticky-name').addEventListener('input', refreshStickyButton);
+
+    function refreshStickyButton() {
+      const hasName = !!document.getElementById('sticky-name').value.trim();
+      document.getElementById('sticky-upload-btn').disabled = !stickyFile || !hasName;
+    }
+
+    async function uploadSticky() {
+      const name = document.getElementById('sticky-name').value.trim();
+      if (!name || !stickyFile) return;
+
+      const btn = document.getElementById('sticky-upload-btn');
+      btn.disabled = true;
+      btn.textContent = 'Uploading...';
+
+      try {
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('firmware', stickyFile);
+
+        const res = await fetch('/api/sticky/upload', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + secret },
+          body: formData,
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          log('Sticky build uploaded: ' + data.build.name);
+          document.getElementById('sticky-name').value = '';
+          document.getElementById('sticky-file-input').value = '';
+          document.getElementById('sticky-file-label').textContent = 'Choose .bin file...';
+          stickyFile = null;
+          loadStickyInfo();
+        } else {
+          log('Sticky upload failed: ' + data.error);
+        }
+      } catch (err) {
+        log('Sticky upload error: ' + err.message);
+      }
+
+      btn.textContent = 'Upload';
+      refreshStickyButton();
+    }
+
+    async function loadStickyInfo() {
+      try {
+        const res = await fetch('/api/sticky/info');
+        const data = await res.json();
+        const el = document.getElementById('sticky-current');
+        if (!data.build) {
+          el.textContent = 'No Sticky build uploaded';
+          return;
+        }
+        const size = (data.build.firmwareSize / 1024 / 1024).toFixed(1);
+        const date = new Date(data.build.uploadedAt).toLocaleDateString();
+        el.innerHTML = 'Current: <span class="font-medium text-stone-600">' + escapeHtml(data.build.name) + '</span> &middot; ' + size + ' MB &middot; ' + date;
+      } catch {}
     }
 
     async function saveBetaEdit(id) {
