@@ -197,9 +197,10 @@ export const X3_PARTITION_TABLE = [
   { type: 'data-coredump', offset: 0xff0000, size: 0x10000 },
 ];
 
-// CrossPoint's partitions.csv (all envs, including sticky) — same values as
-// the X4 layout, kept separate so the Sticky page doesn't couple to X4.
-export const STICKY_PARTITION_TABLE = [
+// CrossPoint's partitions.csv (all envs: sticky, m5paper, lilygo) — same
+// values as the X4 layout, kept separate so non-Xteink device installs don't
+// couple to X4.
+export const CROSSPOINT_PARTITION_TABLE = [
   { type: 'data-nvs', offset: 0x9000, size: 0x5000 },
   { type: 'data-ota', offset: 0xe000, size: 0x2000 },
   { type: 'app-ota_0', offset: 0x10000, size: 0x640000 },
@@ -708,7 +709,10 @@ export class CrossPointFlasher {
   // otadataData: optional initialized otadata image (e.g. Arduino's
   // boot_app0.bin, which selects ota_0 explicitly). Defaults to blank 0xFF,
   // which relies on the bootloader's no-otadata fallback instead.
-  async repairBootRegion(table, { bootloaderData = null, firmwareData = null, otadataData = null, onStepChange, onProgress, skipReset = false } = {}) {
+  // bootloaderOffset: where the chip's ROM expects the 2nd-stage bootloader —
+  // 0x0 on ESP32-C3/S3, 0x1000 on the classic ESP32 (M5Paper). Writing at the
+  // wrong offset leaves the board unbootable until reflashed.
+  async repairBootRegion(table, { bootloaderData = null, bootloaderOffset = 0x0, firmwareData = null, otadataData = null, onStepChange, onProgress, skipReset = false } = {}) {
     const nvs = table.find((p) => p.type === 'data-nvs');
     const otadata = table.find((p) => p.type === 'data-ota');
     const app0 = table.find((p) => p.type === 'app-ota_0');
@@ -723,8 +727,8 @@ export class CrossPointFlasher {
       if (bootloaderData[0] !== ESP_IMAGE_MAGIC) {
         throw new Error('Invalid bootloader: ESP image magic byte (0xE9) missing. Are you sure this is a bootloader .bin?');
       }
-      if (bootloaderData.length > 0x8000) {
-        throw new Error(`Bootloader too large: ${bootloaderData.length} bytes won't fit below the partition table at 0x8000.`);
+      if (bootloaderOffset + bootloaderData.length > 0x8000) {
+        throw new Error(`Bootloader too large: ${bootloaderData.length} bytes at 0x${bootloaderOffset.toString(16)} won't fit below the partition table at 0x8000.`);
       }
     }
     if (otadataData && otadataData.length > otadata.size) {
@@ -751,7 +755,7 @@ export class CrossPointFlasher {
     step(1, 'running');
     const fileArray = [];
     if (bootloaderData) {
-      fileArray.push({ data: this.espLoader.ui8ToBstr(bootloaderData), address: 0x0 });
+      fileArray.push({ data: this.espLoader.ui8ToBstr(bootloaderData), address: bootloaderOffset });
     }
     fileArray.push({ data: this.espLoader.ui8ToBstr(buildPartitionTableBinary(table)), address: 0x8000 });
     // Blank (all 0xFF) NVS and otadata: both regions hold leftover garbage
@@ -802,20 +806,13 @@ export async function fetchBundledBootloader() {
   return new Uint8Array(await res.arrayBuffer());
 }
 
-// ESP32-S3 2nd-stage bootloader from the CrossPoint sticky env. Used by the
-// Sticky full install: the stock Seeed bootloader won't boot a CrossPoint app
-// from its OTA slot, so first-time installs must replace the boot region.
-export async function fetchStickyBootloader() {
-  const res = await fetch('/firmware/sticky-bootloader.bin');
-  if (!res.ok) throw new Error(`Failed to download Sticky bootloader: ${res.status}`);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-// Arduino's boot_app0.bin: an initialized otadata image that explicitly
-// selects ota_0, matching what `pio upload` writes at the otadata offset.
-export async function fetchStickyBootApp0() {
-  const res = await fetch('/firmware/sticky-boot-app0.bin');
-  if (!res.ok) throw new Error(`Failed to download boot_app0: ${res.status}`);
+// Static boot-region asset (per-device bootloader, boot_app0 otadata image)
+// served from /public/firmware. Used by the full-install flow for non-Xteink
+// devices: their stock bootloaders won't boot a CrossPoint app from its OTA
+// slot, so first-time installs must replace the whole boot region.
+export async function fetchFlashAsset(path, label) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`Failed to download ${label}: ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
 }
 

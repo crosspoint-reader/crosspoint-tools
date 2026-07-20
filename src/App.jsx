@@ -11,7 +11,6 @@ const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 const InsiderPage = lazy(() => import('./pages/InsiderPage.jsx'))
 const LoginPage = lazy(() => import('./pages/LoginPage.jsx'))
 const KosyncPage = lazy(() => import('./pages/KosyncPage.jsx'))
-const StickyPage = lazy(() => import('./pages/StickyPage.jsx'))
 const UnlockerPage = lazy(() => import('./pages/UnlockerPage.jsx'))
 
 // Old static-site URLs that must keep working.
@@ -26,7 +25,7 @@ const HTML_REDIRECTS = {
   '/insider.html': '/insider',
   '/login.html': '/login',
   '/kosync.html': '/kosync',
-  '/sticky.html': '/sticky',
+  '/sticky.html': '/#flash-tools',
   '/unlocker.html': '/unlocker',
 }
 
@@ -64,7 +63,8 @@ export default function App() {
           <Route path="/early-access" element={<Navigate to="/insider" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/kosync" element={<KosyncPage />} />
-          <Route path="/sticky" element={<StickyPage />} />
+          {/* Standalone Sticky flasher merged into the homepage flasher */}
+          <Route path="/sticky" element={<Navigate to="/#flash-tools" replace />} />
           <Route path="/unlocker" element={<UnlockerPage />} />
           {Object.entries(HTML_REDIRECTS).map(([from, to]) => (
             <Route key={from} path={from} element={<Navigate to={to} replace />} />

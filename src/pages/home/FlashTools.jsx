@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { Eyebrow } from '../../components/ui.jsx'
 import {
   CrossPointFlasher,
+  CROSSPOINT_PARTITION_TABLE,
   fetchReleaseFirmware,
   fetchReleaseMeta,
   fetchEarlyAccessFirmware,
@@ -13,6 +13,7 @@ import {
   fetchBetaFirmware,
   fetchDeviceBuildInfo,
   fetchDeviceBuildFirmware,
+  fetchFlashAsset,
 } from '../../lib/flasher.js'
 import { renderMarkdown } from './markdown.js'
 
@@ -74,7 +75,7 @@ function StepsList({ steps, states, percent }) {
         const spin = st === 'running' ? 'animate-spin' : ''
         const showBar =
           st === 'running' &&
-          (name.includes('Flash') || name.includes('Read flash') || name.includes('Write flash'))
+          (name.includes('Flash') || name.includes('Read flash') || name.includes('Write'))
         return (
           <li key={name} className={`flex items-center gap-3 py-3 text-sm/5 ${FLASH_STEP_COLORS[st]}`}>
             <span className={`flex size-5 shrink-0 items-center justify-center ${spin}`} aria-hidden="true">
@@ -101,13 +102,58 @@ function StepsList({ steps, states, percent }) {
 const MODELS = [
   { id: 'x4', name: 'Xteink X4', res: '480 × 800' },
   { id: 'x3', name: 'Xteink X3', res: '528 × 792' },
-  { id: 'm5paper', name: 'M5Paper', res: 'Beta builds' },
-  { id: 'lilygo', name: 'LilyGo T5', res: 'Beta builds' },
+  { id: 'sticky', name: 'Seeed Sticky', res: '480 × 800' },
+  { id: 'm5paper', name: 'M5Paper', res: '540 × 960' },
+  { id: 'lilygo', name: 'LilyGo T5', res: '540 × 960' },
 ]
 
 // Non-Xteink devices flash a single admin-uploaded build instead of the
-// release/nightly/stock catalog.
-const DEVICE_BUILD_MODELS = { m5paper: 'M5Paper', lilygo: 'LilyGo T5' }
+// release/nightly/stock catalog, and always through the full boot-region
+// install (bootloader + partition table + otadata + firmware): their stock
+// bootloader/partition table can't boot a CrossPoint app from an OTA slot,
+// so the OTA-slot flow the Xteink devices use would brick-loop them.
+//
+// bootloaderOffset: where the chip's ROM loads the 2nd-stage bootloader —
+// 0x0 on the S3 devices, 0x1000 on the M5Paper's classic ESP32.
+// baudrate: real wire speed through a USB-UART bridge; native USB (S3)
+// ignores it. The M5Paper's CP2104 bridge drops out at 921600 on macOS, so
+// it stays a tier lower.
+const DEVICE_INSTALLS = {
+  sticky: {
+    name: 'Seeed Sticky',
+    bootloader: '/firmware/sticky-bootloader.bin',
+    bootloaderOffset: 0x0,
+    baudrate: 921600,
+    after: 'Press and hold the power button (top right) to boot CrossPoint.',
+  },
+  m5paper: {
+    name: 'M5Paper',
+    bootloader: '/firmware/m5paper-bootloader.bin',
+    bootloaderOffset: 0x1000,
+    baudrate: 460800,
+    after: 'The device restarts on its own. If the screen stays blank, unplug and replug the USB cable.',
+  },
+  lilygo: {
+    name: 'LilyGo T5',
+    bootloader: '/firmware/lilygo-bootloader.bin',
+    bootloaderOffset: 0x0,
+    baudrate: 921600,
+    after: 'The device restarts on its own. If the screen stays blank, unplug and replug the USB cable.',
+  },
+}
+
+// Vendor-level port filters for the non-Xteink devices: Espressif (0x303A,
+// any PID — USB-Serial-JTAG, ROM download mode, TinyUSB CDC), Seeed (0x2886)
+// for stock Sticky firmware, and the Silicon Labs / WCH USB-UART bridges
+// (CP2104 on the M5Paper, CH34x on some LilyGo revisions). The default
+// Xteink filter also pins the product ID, which would hide all of these; no
+// filter at all shows Bluetooth serial ports.
+const DEVICE_PORT_FILTERS = [
+  { usbVendorId: 0x303a },
+  { usbVendorId: 0x2886 },
+  { usbVendorId: 0x10c4 },
+  { usbVendorId: 0x1a86 },
+]
 
 export default function FlashTools() {
   const serialSupported = useMemo(() => typeof navigator !== 'undefined' && 'serial' in navigator, [])
@@ -137,7 +183,7 @@ export default function FlashTools() {
 
   useEffect(() => {
     let cancelled = false
-    Object.keys(DEVICE_BUILD_MODELS).forEach((id) => {
+    Object.keys(DEVICE_INSTALLS).forEach((id) => {
       fetchDeviceBuildInfo(id)
         .then((b) => {
           if (!cancelled && b) setDeviceAvailability((a) => ({ ...a, [id]: true }))
@@ -176,7 +222,7 @@ export default function FlashTools() {
   useEffect(() => {
     if (!model) return
     let cancelled = false
-    if (DEVICE_BUILD_MODELS[model]) {
+    if (DEVICE_INSTALLS[model]) {
       setDeviceBuild(null)
       fetchDeviceBuildInfo(model)
         .then((b) => {
@@ -280,14 +326,21 @@ export default function FlashTools() {
   async function runFlash(action) {
     if (running) return
 
+    const install = DEVICE_INSTALLS[model]
+
     // Request the serial port FIRST, while we still have the user gesture.
     // Any await before this (file reads, fetches) consumes the gesture and
     // requestPort() will throw "Must be handling a user gesture".
     let serialPort
     try {
-      serialPort = await CrossPointFlasher.requestPort()
+      serialPort = await CrossPointFlasher.requestPort(install ? DEVICE_PORT_FILTERS : undefined)
     } catch (err) {
       if (err.name !== 'NotFoundError') alert(err.message)
+      return
+    }
+
+    if (install) {
+      await runDeviceInstall(install, action, serialPort)
       return
     }
 
@@ -304,7 +357,7 @@ export default function FlashTools() {
       'stock-en': 'Flashing English Firmware...',
       'stock-ch': 'Flashing Chinese Firmware...',
       custom: 'Flashing Custom Firmware...',
-      device: `Flashing ${DEVICE_BUILD_MODELS[model] || 'Device'} Beta...`,
+      device: `Flashing ${DEVICE_INSTALLS[model]?.name || 'Device'} Beta...`,
     }
     const title = action.startsWith('beta-') ? 'Flashing Beta Firmware...' : titles[action]
 
@@ -381,6 +434,65 @@ export default function FlashTools() {
     setRunning(false)
   }
 
+  // Full boot-region install for the non-Xteink devices (see DEVICE_INSTALLS).
+  // Same flow the standalone Sticky page used: bootloader + partition table +
+  // boot_app0 otadata + firmware in one write, then a serial hard reset.
+  async function runDeviceInstall(install, action, serialPort) {
+    const buildName = action === 'custom' ? 'Custom Firmware' : deviceBuild?.name || `${install.name} Beta`
+    const steps = [
+      'Connect to device',
+      'Write bootloader + partition table + firmware',
+      'Verify partition table',
+      'Reset device',
+    ]
+    const states = steps.map(() => 'pending')
+
+    setRunning(true)
+    setRestart({ text: install.after })
+    setPercent(0)
+    setProgress({
+      title: `Installing ${buildName}...`,
+      steps,
+      states: [...states],
+      status: { kind: 'info', text: 'Downloading firmware...' },
+    })
+
+    try {
+      let firmware
+      if (action === 'custom') {
+        if (!customFile) throw new Error('No file selected')
+        firmware = new Uint8Array(await customFile.arrayBuffer())
+      } else {
+        firmware = await fetchDeviceBuildFirmware(model)
+      }
+      const bootloaderData = await fetchFlashAsset(install.bootloader, `${install.name} bootloader`)
+      const otadataData = await fetchFlashAsset('/firmware/sticky-boot-app0.bin', 'boot_app0')
+
+      setProgress((p) => ({ ...p, status: null }))
+
+      const flasher = new CrossPointFlasher(serialPort, { baudrate: install.baudrate })
+      await flasher.repairBootRegion(CROSSPOINT_PARTITION_TABLE, {
+        bootloaderData,
+        bootloaderOffset: install.bootloaderOffset,
+        firmwareData: firmware,
+        otadataData,
+        onStepChange: (idx, name, status) => {
+          states[idx] = status
+          setProgress((p) => (p ? { ...p, states: [...states] } : p))
+        },
+        onProgress: (step, current, total) => {
+          setPercent((current / total) * 100)
+        },
+      })
+
+      setProgress((p) => ({ ...p, status: { kind: 'ok', text: `Installed! ${install.after}` } }))
+    } catch (err) {
+      setProgress((p) => ({ ...p, status: { kind: 'err', text: err.message } }))
+    }
+
+    setRunning(false)
+  }
+
   const selectedBeta = fw?.startsWith('beta-') ? betaBuilds.find((b) => `beta-${b.id}` === fw) : null
 
   return (
@@ -423,7 +535,7 @@ export default function FlashTools() {
               <h3 className="font-display text-sm font-semibold text-stone-900">Select your device</h3>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {MODELS.filter((m) => !DEVICE_BUILD_MODELS[m.id] || deviceAvailability[m.id]).map((m) => (
+              {MODELS.filter((m) => !DEVICE_INSTALLS[m.id] || deviceAvailability[m.id]).map((m) => (
                 <button
                   key={m.id}
                   type="button"
@@ -435,14 +547,6 @@ export default function FlashTools() {
                   <div className="mt-0.5 font-mono text-xs text-stone-400">{m.res}</div>
                 </button>
               ))}
-              <Link
-                to="/sticky"
-                className={cardClass(false)}
-                style={running ? { pointerEvents: 'none' } : undefined}
-              >
-                <div className="text-sm font-semibold text-stone-900">Seeed Studio Sticky</div>
-                <div className="mt-0.5 font-mono text-xs text-stone-400">Sticky flasher</div>
-              </Link>
             </div>
           </div>
 
@@ -453,7 +557,7 @@ export default function FlashTools() {
                 <StepBadge n={2} active={!!fw} />
                 <h3 className="font-display text-sm font-semibold text-stone-900">Choose firmware</h3>
               </div>
-              {DEVICE_BUILD_MODELS[model] ? (
+              {DEVICE_INSTALLS[model] ? (
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <button
                     type="button"
@@ -518,11 +622,13 @@ export default function FlashTools() {
                 <StepBadge n={3} active />
                 <h3 className="font-display text-sm font-semibold text-stone-900">Flash</h3>
               </div>
-              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
-                Make sure your device is not asleep and is sitting at the home screen before
-                flashing. If the flasher fails to detect your device remove your sd card and try
-                again.
-              </div>
+              {!DEVICE_INSTALLS[model] && (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
+                  Make sure your device is not asleep and is sitting at the home screen before
+                  flashing. If the flasher fails to detect your device remove your sd card and try
+                  again.
+                </div>
+              )}
               <div className="mt-4">
                 <div className="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
                   {/* CrossPoint panel */}
@@ -719,8 +825,8 @@ export default function FlashTools() {
                         Flash {deviceBuild.name}
                       </button>
                       <p className="mt-2 text-xs text-stone-400">
-                        Beta build for the {DEVICE_BUILD_MODELS[model]}. If you are coming from
-                        another firmware you may need to flash twice for CrossPoint to show up.
+                        Beta build for the {DEVICE_INSTALLS[model]?.name}. Writes the bootloader,
+                        partition table, and firmware.
                       </p>
                     </div>
                   )}
@@ -729,7 +835,11 @@ export default function FlashTools() {
                   {fw === 'custom' && (
                     <div>
                       <div className="text-sm font-semibold text-stone-900">Custom Firmware</div>
-                      <p className="mt-1 text-xs text-stone-400">Upload a .bin file to flash to the OTA partition.</p>
+                      <p className="mt-1 text-xs text-stone-400">
+                        {DEVICE_INSTALLS[model]
+                          ? 'Upload a firmware .bin. Writes the full boot region (bootloader + partition table + firmware).'
+                          : 'Upload a .bin file to flash to the OTA partition.'}
+                      </p>
                       <div className="mt-4 flex gap-2">
                         <label className="flex flex-1 cursor-pointer items-center justify-center rounded-md border border-dashed border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
                           <span>{customFile ? customFile.name : 'Choose file...'}</span>
@@ -782,7 +892,10 @@ export default function FlashTools() {
           {restart && (
             <div className="rounded-xl bg-stone-100/70 p-5 ring-1 ring-stone-950/5">
               <div className="font-display text-sm font-semibold text-stone-700">After flashing</div>
-              {restart.unplug ? (
+              {restart.text ? (
+                // Non-Xteink full install: device-specific instructions from DEVICE_INSTALLS
+                <p className="mt-1 text-sm/6 text-stone-500">{restart.text}</p>
+              ) : restart.unplug ? (
                 // X3 + CrossPoint/beta/custom: no serial reset, device must be power-cycled by unplugging USB
                 <p className="mt-1 text-sm/6 text-stone-500">
                   Unplug and reconnect the USB cable. Don't press the Reset button.

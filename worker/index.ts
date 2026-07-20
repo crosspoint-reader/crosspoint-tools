@@ -100,7 +100,7 @@ const LEGACY_HTML_ROUTES: Record<string, string> = {
   '/admin.html': '/admin',
   '/login.html': '/login',
   '/kosync.html': '/kosync',
-  '/sticky.html': '/sticky',
+  '/sticky.html': '/#flash-tools',
   '/unlocker.html': '/unlocker',
 };
 
@@ -2720,8 +2720,8 @@ async function handleBetaFirmware(
 // --- Sticky Beta Build ---
 //
 // A single admin-uploaded build per non-Xteink device (Sticky, M5Paper,
-// LilyGo T5). Sticky is served on the hidden /sticky page; the others are
-// offered as device options in the homepage flasher. Uploading replaces the
+// LilyGo T5), offered as device options in the homepage flasher (the old
+// standalone /sticky page is merged into it). Uploading replaces the
 // previous build in place; there is exactly one per device at a time.
 
 interface DeviceBuildConfig {
