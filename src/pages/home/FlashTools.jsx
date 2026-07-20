@@ -177,8 +177,24 @@ export default function FlashTools() {
   // Admin-uploaded build for non-Xteink devices (m5paper, lilygo)
   const [deviceBuild, setDeviceBuild] = useState(null)
 
-  // Which non-Xteink devices have a build uploaded; their cards stay hidden
-  // from the device grid until one exists.
+  // Stable release publish date, shown on the Xteink cards (both flash the
+  // same release build).
+  const [releaseDate, setReleaseDate] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchReleaseMeta()
+      .then((meta) => {
+        if (!cancelled && meta?.publishedAt) setReleaseDate(meta.publishedAt)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Uploaded build per non-Xteink device; their cards stay hidden from the
+  // device grid until one exists, and show the build's upload date.
   const [deviceAvailability, setDeviceAvailability] = useState({})
 
   useEffect(() => {
@@ -186,7 +202,7 @@ export default function FlashTools() {
     Object.keys(DEVICE_INSTALLS).forEach((id) => {
       fetchDeviceBuildInfo(id)
         .then((b) => {
-          if (!cancelled && b) setDeviceAvailability((a) => ({ ...a, [id]: true }))
+          if (!cancelled && b) setDeviceAvailability((a) => ({ ...a, [id]: b }))
         })
         .catch(() => {})
     })
@@ -544,7 +560,17 @@ export default function FlashTools() {
                   style={running ? { pointerEvents: 'none' } : undefined}
                 >
                   <div className="text-sm font-semibold text-stone-900">{m.name}</div>
-                  <div className="mt-0.5 font-mono text-xs text-stone-400">{m.res}</div>
+                  <div className="mt-0.5 font-mono text-xs text-stone-400">
+                    {(() => {
+                      // Device builds show their upload date; Xteink cards show
+                      // the stable release date; resolution is the fallback
+                      // while either is still loading.
+                      const date = DEVICE_INSTALLS[m.id]
+                        ? deviceAvailability[m.id]?.uploadedAt
+                        : releaseDate
+                      return date ? `Updated ${fmtDate(date)}` : m.res
+                    })()}
+                  </div>
                 </button>
               ))}
             </div>
