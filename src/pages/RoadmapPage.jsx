@@ -100,45 +100,35 @@ export default function RoadmapPage() {
           {/* Phase progress indicator */}
           <div className="mt-10">
             <div className="mx-auto flex max-w-3xl items-center">
-              {/* Phase 0 (in progress) */}
+              {/* Phase 0 (complete) */}
               <div className="flex flex-col items-center">
-                <div className="flex size-9 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white ring-4 ring-brand-100">
-                  0
+                <div className="flex size-9 items-center justify-center rounded-full bg-brand-500 text-white">
+                  <CheckIcon className="size-4" />
                 </div>
                 <div className="mt-2 font-mono text-[11px] font-medium tracking-wide text-stone-500 uppercase">
                   Close-out
                 </div>
               </div>
-              <div className="mx-1 h-1 flex-1 rounded-full bg-stone-200">
-                <div className="h-full w-1/3 rounded-full bg-brand-400" />
-              </div>
-              {/* Phase 1 */}
+              <div className="mx-1 h-1 flex-1 rounded-full bg-brand-400" />
+              {/* Phase 1 (in progress) */}
               <div className="flex flex-col items-center">
-                <div className="flex size-9 items-center justify-center rounded-full bg-white font-mono text-xs font-semibold text-stone-600 ring-2 ring-stone-300">
+                <div className="flex size-9 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white ring-4 ring-brand-100">
                   1
                 </div>
                 <div className="mt-2 font-mono text-[11px] font-medium tracking-wide text-stone-500 uppercase">
-                  Footprint
+                  Multi-device
                 </div>
               </div>
-              <div className="mx-1 h-1 flex-1 rounded-full bg-stone-200" />
+              <div className="mx-1 h-1 flex-1 rounded-full bg-stone-200">
+                <div className="h-full w-1/4 rounded-full bg-brand-400" />
+              </div>
               {/* Phase 2 */}
               <div className="flex flex-col items-center">
                 <div className="flex size-9 items-center justify-center rounded-full bg-white font-mono text-xs font-semibold text-stone-600 ring-2 ring-stone-300">
                   2
                 </div>
                 <div className="mt-2 font-mono text-[11px] font-medium tracking-wide text-stone-500 uppercase">
-                  Multi-device
-                </div>
-              </div>
-              <div className="mx-1 h-1 flex-1 rounded-full bg-stone-200" />
-              {/* Phase 3 */}
-              <div className="flex flex-col items-center">
-                <div className="flex size-9 items-center justify-center rounded-full bg-white font-mono text-xs font-semibold text-stone-600 ring-2 ring-stone-300">
-                  3
-                </div>
-                <div className="mt-2 font-mono text-[11px] font-medium tracking-wide text-stone-500 uppercase">
-                  Reading
+                  Languages
                 </div>
               </div>
             </div>
@@ -172,21 +162,20 @@ export default function RoadmapPage() {
           </div>
         </div>
         <p className="mt-4 max-w-2xl text-pretty text-stone-600">
-          CrossPoint transitions from its current state into the tighter scope below in sequential phases. We close
-          out commitments already in flight before locking down to the stricter "fill gaps the stock firmware leaves"
-          delineator. Phases are sequential; we do not start the next phase until the prior one is wrapped or
-          explicitly carried over.
+          CrossPoint is moving through the tighter scope below in sequential phases. Phase 0 closed out the
+          commitments already in flight; we do not start the next phase until the prior one is wrapped or explicitly
+          carried over.
         </p>
 
         {/* Timeline */}
         <ol className="relative mt-12 space-y-10 before:absolute before:top-2 before:bottom-2 before:left-5 before:w-px before:bg-gradient-to-b before:from-brand-300 before:via-stone-200 before:to-stone-100 sm:before:left-6">
           {/* Phase 0 */}
           <li className="relative pl-16 sm:pl-20">
-            <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-brand-500 font-mono text-sm font-bold text-white ring-4 ring-brand-100 sm:size-12 sm:text-base">
-              0
+            <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-brand-500 text-white sm:size-12">
+              <CheckIcon className="size-5 sm:size-6" />
             </div>
             <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.18)] sm:p-8">
-              <PhaseBadges status="In progress" phase="Phase 0" live />
+              <PhaseBadges status="Complete" phase="Phase 0" />
               <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
                 Close Out Legacy Scope Items
               </h3>
@@ -222,10 +211,9 @@ export default function RoadmapPage() {
                       </span>
                     </li>
                     <li className="flex gap-2.5 rounded-md px-1 py-1 transition-colors hover:bg-stone-100/60">
-                      <AlertIcon className="mt-0.5 size-4 shrink-0 text-stone-400" />
-                      <span className="text-stone-700">
-                        <strong className="font-semibold text-stone-900">Transparent sleep screens</strong>{' '}
-                        (potential): in if it lands clean, shelved if it stalls.
+                      <AlertIcon className="mt-0.5 size-4 shrink-0 text-stone-300" />
+                      <span className="text-stone-400 line-through decoration-stone-400">
+                        <strong className="font-semibold text-stone-500">Transparent sleep screens</strong>: shelved.
                       </span>
                     </li>
                   </ul>
@@ -253,11 +241,11 @@ export default function RoadmapPage() {
                     </li>
                   </ul>
                   <p className="mt-4 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-900 ring-1 ring-brand-200">
-                    Once Phase 0 closes, the tighter{' '}
+                    Phase 0 is closed. The tighter{' '}
                     <a href="#scope" className="font-semibold underline underline-offset-2">
                       scope
                     </a>{' '}
-                    is fully enforced. "But it was on the old roadmap" is no longer a valid argument.
+                    is now fully enforced. "But it was on the old roadmap" is no longer a valid argument.
                   </p>
                 </div>
               </div>
@@ -266,17 +254,18 @@ export default function RoadmapPage() {
 
           {/* Phase 1 */}
           <li className="relative pl-16 sm:pl-20">
-            <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-white font-mono text-sm font-bold text-stone-700 ring-2 ring-stone-300 sm:size-12 sm:text-base">
+            <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-brand-500 font-mono text-sm font-bold text-white ring-4 ring-brand-100 sm:size-12 sm:text-base">
               1
             </div>
             <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.18)] sm:p-8">
-              <PhaseBadges status="Up next" phase="Phase 1" />
+              <PhaseBadges status="In progress" phase="Phase 1" live />
               <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
-                Consolidation &amp; Footprint
+                Consolidation, Footprint &amp; Multi-Device Support
               </h3>
               <p className="mt-2 text-stone-600">
-                <span className="font-semibold text-stone-900">Goal:</span> Reduce memory and flash usage and clean up
-                the codebase so that future device support and reading-quality work has room to breathe.
+                <span className="font-semibold text-stone-900">Goal:</span> Reduce memory and flash usage, clean up
+                the codebase, and land the SDK / HAL generalization work so CrossPoint runs cleanly on ESP32-based
+                e-reader hardware beyond Xteink (X3 / X4), including ESP32-S3 class devices.
               </p>
 
               <FocusGrid
@@ -284,7 +273,9 @@ export default function RoadmapPage() {
                   'DRAM & heap fragmentation reduction',
                   'Flash footprint reduction',
                   'HAL / SDK boundary refactors',
-                  'Themes → SD-loaded assets',
+                  'Pluggable per-device SDK layers & build configs',
+                  'New ESP32 target documentation',
+                  'E-ink driver refinement (ghosting, partial updates)',
                 ]}
               />
 
@@ -308,73 +299,22 @@ export default function RoadmapPage() {
               2
             </div>
             <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.18)] sm:p-8">
-              <PhaseBadges status="Planned" phase="Phase 2" />
+              <PhaseBadges status="Up next" phase="Phase 2" />
               <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
-                Multi-Device ESP32 Support &amp; Recovery Bridge
-              </h3>
-              <p className="mt-2 text-stone-600">
-                <span className="font-semibold text-stone-900">Goal:</span> Land the SDK / HAL generalization work so
-                CrossPoint runs cleanly on ESP32-based e-reader hardware beyond Xteink (X3 / X4), including ESP32-S3
-                class devices. In parallel, lay the groundwork for CrossPoint to act as a safe bridge onto community
-                firmware for users on locked devices.
-              </p>
-
-              <FocusGrid
-                items={[
-                  'Pluggable per-device SDK layers',
-                  'Per-device build configuration',
-                  'New ESP32 target documentation',
-                  'Bootloader / recovery bridge',
-                ]}
-              />
-
-              <div className="mt-5 rounded-lg bg-brand-50/60 px-4 py-3 ring-1 ring-brand-200/70">
-                <p className="text-sm text-stone-700">
-                  <strong className="font-semibold text-stone-900">Bootloader / recovery bridge:</strong> a workflow
-                  that helps users on locked devices reach community firmware (CrossPoint <em>or</em> other forks)
-                  without bricking. Includes a recoverable fallback when a flash goes wrong. Fork-neutral: CrossPoint
-                  should be a bridge, not a trap. Driven by{' '}
-                  <a
-                    className="font-semibold text-brand-700 underline underline-offset-2"
-                    href="https://github.com/jeremydk"
-                    target="_blank"
-                    rel="noopener"
-                  >
-                    @jeremydk
-                  </a>{' '}
-                  alongside the SDK abstraction work.
-                </p>
-              </div>
-
-              <p className="mt-4 text-xs text-stone-500">
-                Depends on Phase 1 cleanup landing first; otherwise we generalize a moving target.
-              </p>
-            </div>
-          </li>
-
-          {/* Phase 3 */}
-          <li className="relative pl-16 sm:pl-20">
-            <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-white font-mono text-sm font-bold text-stone-700 ring-2 ring-stone-300 sm:size-12 sm:text-base">
-              3
-            </div>
-            <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.18)] sm:p-8">
-              <PhaseBadges status="Future" phase="Phase 3" />
-              <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
-                Reading Experience Deepening
+                Languages, Fonts &amp; Themes
               </h3>
               <p className="mt-2 text-stone-600">
                 <span className="font-semibold text-stone-900">Goal:</span> With the codebase smaller and portable,
-                invest in the things only a focused reader firmware should do: EPUB rendering, typography,
-                hyphenation, layout edge cases, and gap-filling for languages and scripts that neither stock nor other
-                CrossPoint forks handle well.
+                make reading great in every language: multi-language support, better font support with custom fonts,
+                UI translations, and themes loaded from the SD card instead of consuming flash.
               </p>
 
               <FocusGrid
                 items={[
-                  'EPUB parsing & rendering',
-                  'Typography (fonts, hyphenation, justification)',
-                  'Underserved languages & complex scripts',
-                  'E-ink driver refinement (ghosting, partial updates)',
+                  'Multi-language reading support',
+                  'Better font support & custom fonts',
+                  'UI languages & localization',
+                  'Themes → SD-loaded assets',
                 ]}
               />
             </div>
@@ -568,10 +508,6 @@ export default function RoadmapPage() {
                       'Memory, Flash & Code Quality',
                       'Refactors that reduce resource use, even without a user-visible feature.',
                     ],
-                    [
-                      'Bootloader / Recovery Bridge',
-                      'Helps users on locked devices reach any community firmware safely.',
-                    ],
                   ].map(([title, body]) => (
                     <li key={title}>
                       <strong className="font-semibold text-stone-900">{title}</strong>
@@ -600,7 +536,6 @@ export default function RoadmapPage() {
                     ['Media Playback', 'No audio players or audiobooks.'],
                     ['Complex Annotation', 'No typed-out notes.'],
                     ['Stock-firmware duplication', "If it already works well, we don't reimplement it."],
-                    ['Fork duplication', 'If another popular fork solves it well, we defer.'],
                     [
                       'PDF Rendering',
                       'Fixed layout makes for a poor e-ink reading experience on this hardware class.',
@@ -632,13 +567,16 @@ export default function RoadmapPage() {
                 {[
                   <>
                     Does the stock firmware already handle this well?{' '}
-                    <span className="text-stone-500">If yes, we pass.</span>
+                    <span className="text-stone-500">We should hit that bar or surpass it.</span>
                   </>,
                   <>
                     Does another popular CrossPoint fork already handle this well?{' '}
                     <span className="text-stone-500">If yes, we usually defer.</span>
                   </>,
-                  <>Does it improve the core reading experience, or reduce memory / flash / code complexity?</>,
+                  <>
+                    Does it improve the core reading experience, or reduce memory / flash / code complexity?{' '}
+                    <span className="text-stone-500">If yes, it's a strong candidate.</span>
+                  </>,
                   <>
                     Is it in one of the temporarily closed areas?{' '}
                     <span className="text-stone-500">If yes, wait.</span>
@@ -717,43 +655,16 @@ export default function RoadmapPage() {
                 <p className="mt-3 text-xs text-stone-500">
                   <strong className="font-semibold text-stone-700">Status:</strong>{' '}
                   <a
-                    href="https://github.com/jeremydk"
+                    href="https://github.com/itsthisjustin"
                     target="_blank"
                     rel="noopener"
                     className="text-brand-600 underline underline-offset-2"
                   >
-                    @jeremydk
+                    @itsthisjustin
                   </a>{' '}
                   is actively working. Coordinate before touching{' '}
-                  <code className="rounded bg-stone-100 px-1 font-mono text-[0.85em]">open-x4-sdk/</code> or{' '}
+                  <code className="rounded bg-stone-100 px-1 font-mono text-[0.85em]">freeink-sdk/</code> or{' '}
                   <code className="rounded bg-stone-100 px-1 font-mono text-[0.85em]">lib/hal/</code>.
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
-                <div className="flex items-start justify-between gap-3">
-                  <h4 className="font-display font-semibold text-stone-900">
-                    Bootloader / Recovery Bridge for Locked Devices
-                  </h4>
-                  <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-brand-700 uppercase">
-                    In progress
-                  </span>
-                </div>
-                <p className="mt-2 text-sm text-stone-600">
-                  Bootloader / recovery-flash workflow that lets users reach <em>any</em> community firmware without
-                  bricking, with a recoverable fallback when a flash goes wrong.
-                </p>
-                <p className="mt-3 text-xs text-stone-500">
-                  <strong className="font-semibold text-stone-700">Status:</strong>{' '}
-                  <a
-                    href="https://github.com/jeremydk"
-                    target="_blank"
-                    rel="noopener"
-                    className="text-brand-600 underline underline-offset-2"
-                  >
-                    @jeremydk
-                  </a>{' '}
-                  alongside SDK abstraction. ESP32 bootloader / OTA experience welcome.
                 </p>
               </div>
 
@@ -771,8 +682,17 @@ export default function RoadmapPage() {
                   rendering edge cases, accessibility, input quirks.
                 </p>
                 <p className="mt-3 text-xs text-stone-500">
-                  Feedback even without code is genuinely useful, so open a Discussion with screenshots, sample
-                  EPUBs, and expected vs actual behavior.
+                  <strong className="font-semibold text-stone-700">Status:</strong>{' '}
+                  <a
+                    href="https://github.com/uxjulia"
+                    target="_blank"
+                    rel="noopener"
+                    className="text-brand-600 underline underline-offset-2"
+                  >
+                    @uxjulia
+                  </a>{' '}
+                  is coordinating. Feedback even without code is genuinely useful, so open a Discussion with
+                  screenshots, sample EPUBs, and expected vs actual behavior.
                 </p>
               </div>
             </div>
