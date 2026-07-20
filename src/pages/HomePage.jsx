@@ -8,7 +8,6 @@ import EveryLanguage from './home/EveryLanguage.jsx'
 import Rhythm from './home/Rhythm.jsx'
 import FlashTools from './home/FlashTools.jsx'
 import Community from './home/Community.jsx'
-import UnlockSection from './home/UnlockSection.jsx'
 import GetInTouch from './home/GetInTouch.jsx'
 
 export default function HomePage() {
@@ -23,7 +22,6 @@ export default function HomePage() {
       <Rhythm />
       <FlashTools />
       <Community />
-      <UnlockSection />
       <GetInTouch />
       <BuyModal open={buyOpen} onClose={() => setBuyOpen(false)} />
     </Layout>

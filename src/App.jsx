@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { lazy, Suspense, useEffect } from 'react'
 import HomePage from './pages/HomePage.jsx'
 
@@ -12,6 +12,8 @@ const InsiderPage = lazy(() => import('./pages/InsiderPage.jsx'))
 const LoginPage = lazy(() => import('./pages/LoginPage.jsx'))
 const KosyncPage = lazy(() => import('./pages/KosyncPage.jsx'))
 const UnlockerPage = lazy(() => import('./pages/UnlockerPage.jsx'))
+const ContactPage = lazy(() => import('./pages/ContactPage.jsx'))
+const UnlockPage = lazy(() => import('./pages/UnlockPage.jsx'))
 
 // Old static-site URLs that must keep working.
 const HTML_REDIRECTS = {
@@ -29,12 +31,25 @@ const HTML_REDIRECTS = {
   '/unlocker.html': '/unlocker',
 }
 
+// Hash anchors whose sections moved off the homepage onto standalone pages.
+// Old deep links (e.g. /#unlock-tool from Reddit posts) forward to the page.
+const HASH_REDIRECTS = {
+  '#unlock-tool': '/unlock',
+  '#get-in-touch': '/contact',
+}
+
 // On every route change start at the top; when the URL carries a hash anchor,
 // scroll to it once the page has rendered.
 function ScrollManager() {
   const { pathname, hash } = useLocation()
+  const navigate = useNavigate()
   useEffect(() => {
     if (hash) {
+      const to = HASH_REDIRECTS[hash]
+      if (to) {
+        navigate(to, { replace: true })
+        return
+      }
       const el = document.getElementById(hash.slice(1))
       if (el) {
         el.scrollIntoView()
@@ -42,7 +57,7 @@ function ScrollManager() {
       }
     }
     window.scrollTo(0, 0)
-  }, [pathname, hash])
+  }, [pathname, hash, navigate])
   return null
 }
 
@@ -66,6 +81,8 @@ export default function App() {
           {/* Standalone Sticky flasher merged into the homepage flasher */}
           <Route path="/sticky" element={<Navigate to="/#flash-tools" replace />} />
           <Route path="/unlocker" element={<UnlockerPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/unlock" element={<UnlockPage />} />
           {Object.entries(HTML_REDIRECTS).map(([from, to]) => (
             <Route key={from} path={from} element={<Navigate to={to} replace />} />
           ))}

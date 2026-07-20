@@ -17,7 +17,7 @@ const COLUMNS = [
     links: [
       { name: 'Font Builder', href: '/fonts', route: true },
       { name: 'Advanced flash controls', href: '/debug', route: true },
-      { name: 'Unlock Tool', href: '/#unlock-tool' },
+      { name: 'Unlock Tool', href: '/unlock', route: true },
       { name: 'Register for KoSync', href: '/kosync', route: true },
     ],
   },
@@ -27,7 +27,7 @@ const COLUMNS = [
       { name: 'GitHub', href: GITHUB },
       { name: 'Docs', href: '/docs', route: true },
       { name: 'Fund CrossPoint', href: 'https://app.royalty.dev/crosspoint-reader/crosspoint-reader' },
-      { name: 'Get in touch', href: '/#get-in-touch' },
+      { name: 'Get in touch', href: '/contact', route: true },
     ],
   },
 ]

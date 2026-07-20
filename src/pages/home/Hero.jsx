@@ -121,8 +121,8 @@ export default function Hero({ onOpenBuy }) {
           </h1>
           <p className="mt-6 max-w-[48ch] font-serif text-xl/9 text-pretty text-stone-600">
             CrossPoint is <strong className="font-medium text-stone-900">the best way to read
-            on the go</strong>, built in the open, by the community. Get it for Xteink X3 and
-            X4, reTerminal Sticky, M5Paper, LilyGo T5, and more devices with every release.
+            on the go</strong>, built in the open, by the community. Get it for the Xteink,
+            reTerminal Sticky, M5Paper, LilyGo T5, and more devices with every release.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-3">

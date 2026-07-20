@@ -55,7 +55,7 @@ export default function UnlockerPage() {
           <span className="font-semibold">Try SD card flashing first.</span> It's simpler and needs
           no extra software.{' '}
           <Link
-            to="/#unlock-tool"
+            to="/unlock"
             className="font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700"
           >
             See the SD flashing steps

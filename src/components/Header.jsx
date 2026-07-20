@@ -6,8 +6,8 @@ const NAV = [
   { name: 'Font Builder', short: 'Fonts', href: '/fonts', route: true },
   { name: 'Docs', short: 'Docs', href: '/docs', route: true },
   { name: 'Roadmap', short: 'Roadmap', href: '/roadmap', route: true },
-  { name: 'Get In Touch', short: 'Contact', href: '/#get-in-touch' },
-  { name: 'Have a locked device?', short: 'Locked?', href: '/#unlock-tool' },
+  { name: 'Get In Touch', short: 'Contact', href: '/contact', route: true },
+  { name: 'Have a locked device?', short: 'Locked?', href: '/unlock', route: true },
 ]
 
 const FUND_URL = 'https://app.royalty.dev/crosspoint-reader/crosspoint-reader'
