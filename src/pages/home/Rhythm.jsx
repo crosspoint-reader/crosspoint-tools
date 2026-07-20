@@ -81,8 +81,7 @@ export default function Rhythm() {
           <h3 className="font-display text-lg font-semibold text-stone-900">And there&rsquo;s more where that came from.</h3>
           <p className="mt-4 font-serif text-xl/9 text-pretty text-stone-600">
             <LittleThing>Tilt the device</LittleThing> to turn the page.{' '}
-            <LittleThing>Focus Reading</LittleThing> that bolds the front of each word to pull
-            your eye through the text. <LittleThing>Themes</LittleThing> that restyle the whole
+            <LittleThing>Themes</LittleThing> that restyle the whole
             interface. A <LittleThing>web file manager</LittleThing> for your library, right in the
             browser. An <LittleThing>EPUB optimizer</LittleThing> that slims books down before
             they reach the device. A <LittleThing>hotspot mode</LittleThing> for loading books
