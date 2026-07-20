@@ -131,7 +131,7 @@ const DEVICE_INSTALLS = {
     bootloader: '/firmware/m5paper-bootloader.bin',
     bootloaderOffset: 0x1000,
     baudrate: 460800,
-    after: 'The device restarts on its own. If the screen stays blank, unplug and replug the USB cable.',
+    after: 'Press and hold the rotary dial to boot.',
   },
   lilygo: {
     name: 'LilyGo T5',

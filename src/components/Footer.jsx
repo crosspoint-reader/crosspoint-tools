@@ -45,8 +45,8 @@ export default function Footer() {
               </span>
             </Link>
             <p className="mt-4 max-w-[34ch] text-sm/6 text-stone-500">
-              E-reader software built in the open. Get it for the Xteink X3 and X4, Seeed
-              Studio Sticky, M5Paper, LilyGo T5, and more.
+              E-reader software built in the open. Get it for Xteink X3 and X4, reTerminal
+              Sticky, M5Paper, LilyGo T5, and more.
             </p>
           </div>
 
