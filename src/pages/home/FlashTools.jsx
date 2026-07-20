@@ -10,6 +10,8 @@ import {
   fetchBuildMeta,
   fetchBetaBuilds,
   fetchBetaFirmware,
+  fetchDeviceBuildInfo,
+  fetchDeviceBuildFirmware,
 } from '../../lib/flasher.js'
 import { renderMarkdown } from './markdown.js'
 
@@ -98,7 +100,13 @@ function StepsList({ steps, states, percent }) {
 const MODELS = [
   { id: 'x4', name: 'Xteink X4', res: '480 × 800' },
   { id: 'x3', name: 'Xteink X3', res: '528 × 792' },
+  { id: 'm5paper', name: 'M5Paper', res: 'Beta builds' },
+  { id: 'lilygo', name: 'LilyGo T5', res: 'Beta builds' },
 ]
+
+// Non-Xteink devices flash a single admin-uploaded build instead of the
+// release/nightly/stock catalog.
+const DEVICE_BUILD_MODELS = { m5paper: 'M5Paper', lilygo: 'LilyGo T5' }
 
 export default function FlashTools() {
   const serialSupported = useMemo(() => typeof navigator !== 'undefined' && 'serial' in navigator, [])
@@ -118,6 +126,9 @@ export default function FlashTools() {
 
   // Beta builds from /api (buttons inserted before "Custom .bin")
   const [betaBuilds, setBetaBuilds] = useState([])
+
+  // Admin-uploaded build for non-Xteink devices (m5paper, lilygo)
+  const [deviceBuild, setDeviceBuild] = useState(null)
 
   // Nightly changelog + AI summary
   const [changelog, setChangelog] = useState({ status: 'idle', commits: [] })
@@ -146,6 +157,17 @@ export default function FlashTools() {
   useEffect(() => {
     if (!model) return
     let cancelled = false
+    if (DEVICE_BUILD_MODELS[model]) {
+      setDeviceBuild(null)
+      fetchDeviceBuildInfo(model)
+        .then((b) => {
+          if (!cancelled) setDeviceBuild(b)
+        })
+        .catch(() => {})
+      return () => {
+        cancelled = true
+      }
+    }
     setCrosspoint({ text: 'Loading...', enabled: false, tag: null, notesUrl: null })
     setNightly({ text: 'Loading...', enabled: false })
     setStock({ en: { text: 'Loading...', enabled: false }, ch: { text: 'Loading...', enabled: false } })
@@ -254,7 +276,8 @@ export default function FlashTools() {
     // pointer. Avoid serial hard reset here; a clean unplug/replug matches the known-good flasher
     // behavior.
     const skipReset =
-      action === 'crosspoint' || action === 'nightly' || action === 'custom' || action.startsWith('beta-')
+      action === 'crosspoint' || action === 'nightly' || action === 'custom' ||
+      action === 'device' || action.startsWith('beta-')
 
     const titles = {
       crosspoint: 'Flashing CrossPoint Firmware...',
@@ -262,6 +285,7 @@ export default function FlashTools() {
       'stock-en': 'Flashing English Firmware...',
       'stock-ch': 'Flashing Chinese Firmware...',
       custom: 'Flashing Custom Firmware...',
+      device: `Flashing ${DEVICE_BUILD_MODELS[model] || 'Device'} Beta...`,
     }
     const title = action.startsWith('beta-') ? 'Flashing Beta Firmware...' : titles[action]
 
@@ -270,6 +294,7 @@ export default function FlashTools() {
       nightly: 'Downloading nightly build...',
       'stock-en': 'Downloading firmware...',
       'stock-ch': 'Downloading firmware...',
+      device: 'Downloading beta firmware...',
     }
     const downloadMsg = action.startsWith('beta-') ? 'Downloading beta firmware...' : downloadMsgs[action]
 
@@ -301,6 +326,8 @@ export default function FlashTools() {
       } else if (action === 'custom') {
         if (!customFile) throw new Error('No file selected')
         firmware = new Uint8Array(await customFile.arrayBuffer())
+      } else if (action === 'device') {
+        firmware = await fetchDeviceBuildFirmware(model)
       } else if (action.startsWith('beta-')) {
         firmware = await fetchBetaFirmware(action.replace('beta-', ''))
       }
@@ -406,6 +433,25 @@ export default function FlashTools() {
                 <StepBadge n={2} active={!!fw} />
                 <h3 className="font-display text-sm font-semibold text-stone-900">Choose firmware</h3>
               </div>
+              {DEVICE_BUILD_MODELS[model] ? (
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => selectFw('device')}
+                    disabled={!deviceBuild}
+                    className={`${cardClass(fw === 'device')} disabled:cursor-not-allowed disabled:opacity-60`}
+                  >
+                    <div className="text-sm font-semibold text-stone-900">
+                      {deviceBuild ? deviceBuild.name : 'No build available'}
+                    </div>
+                    <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
+                  </button>
+                  <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
+                    <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
+                    <div className="mt-0.5 font-mono text-xs text-stone-400">Upload file</div>
+                  </button>
+                </div>
+              ) : (
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <button type="button" onClick={() => selectFw('crosspoint')} className={cardClass(fw === 'crosspoint')}>
                   <div className="text-sm font-semibold text-stone-900">
@@ -441,6 +487,7 @@ export default function FlashTools() {
                   <div className="mt-0.5 font-mono text-xs text-stone-400">Upload file</div>
                 </button>
               </div>
+              )}
             </div>
           )}
 
@@ -605,6 +652,36 @@ export default function FlashTools() {
                       <p className="mt-2 text-xs text-stone-400">
                         If you are coming from Stock or another firmware you may need to flash
                         twice for CrossPoint to show up.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Device build panel (M5Paper / LilyGo) */}
+                  {fw === 'device' && deviceBuild && (
+                    <div>
+                      <div className="text-sm font-semibold text-stone-900">{deviceBuild.name}</div>
+                      <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">
+                        {(deviceBuild.firmwareSize / 1024 / 1024).toFixed(1)} MB &middot;{' '}
+                        {fmtDate(deviceBuild.uploadedAt)}
+                      </div>
+                      {deviceBuild.notes && (
+                        <div
+                          className="mt-3 text-sm/6 text-stone-700"
+                          dangerouslySetInnerHTML={{ __html: renderMarkdown(deviceBuild.notes) }}
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => runFlash('device')}
+                        disabled={running}
+                        className="mt-4 inline-flex items-center justify-center rounded-md bg-amber-600 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <BoltIcon />
+                        Flash {deviceBuild.name}
+                      </button>
+                      <p className="mt-2 text-xs text-stone-400">
+                        Beta build for the {DEVICE_BUILD_MODELS[model]}. If you are coming from
+                        another firmware you may need to flash twice for CrossPoint to show up.
                       </p>
                     </div>
                   )}

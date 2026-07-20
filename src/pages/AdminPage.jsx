@@ -689,9 +689,10 @@ function BetaCard({ secret, log }) {
   )
 }
 
-// --- Sticky beta -------------------------------------------------------------
+// --- Device beta builds (Sticky, M5Paper, LilyGo) ----------------------------
+// One admin-uploaded build per device; uploading replaces the previous build.
 
-function StickyCard({ secret, log }) {
+function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, baseUrl, namePlaceholder }) {
   const [name, setName] = useState('')
   const [notes, setNotes] = useState('')
   const [file, setFile] = useState(null)
@@ -700,21 +701,21 @@ function StickyCard({ secret, log }) {
   const [edit, setEdit] = useState(null) // { name, notes } when panel open
   const fileInputRef = useRef(null)
 
-  const loadStickyInfo = useCallback(async () => {
+  const loadBuildInfo = useCallback(async () => {
     try {
-      const res = await fetch('/api/sticky/info')
+      const res = await fetch(infoUrl)
       const data = await res.json()
       setBuild(data.build || null)
     } catch {
       // ignore, matches original behavior
     }
-  }, [])
+  }, [infoUrl])
 
   useEffect(() => {
-    loadStickyInfo()
-  }, [loadStickyInfo])
+    loadBuildInfo()
+  }, [loadBuildInfo])
 
-  async function uploadSticky() {
+  async function uploadBuild() {
     const trimmedName = name.trim()
     if (!trimmedName || !file) return
 
@@ -726,7 +727,7 @@ function StickyCard({ secret, log }) {
       formData.append('notes', notes.trim())
       formData.append('firmware', file)
 
-      const res = await fetch('/api/sticky/upload', {
+      const res = await fetch(uploadUrl, {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + secret },
         body: formData,
@@ -734,35 +735,35 @@ function StickyCard({ secret, log }) {
       const r = await readJsonResponse(res)
 
       if (r.ok) {
-        log('Sticky build uploaded: ' + r.data.build.name)
+        log(label + ' build uploaded: ' + r.data.build.name)
         setName('')
         setNotes('')
         setFile(null)
         if (fileInputRef.current) fileInputRef.current.value = ''
-        loadStickyInfo()
+        loadBuildInfo()
       } else {
-        log('Sticky upload failed: ' + describeFailure(r))
+        log(label + ' upload failed: ' + describeFailure(r))
       }
     } catch (err) {
-      log('Sticky upload error: ' + err.message)
+      log(label + ' upload error: ' + err.message)
     }
 
     setBusy(false)
   }
 
-  function toggleEditSticky() {
+  function toggleEditBuild() {
     if (!build) return
     setEdit((prev) => (prev ? null : { name: build.name, notes: build.notes || '' }))
   }
 
-  async function saveStickyEdit() {
+  async function saveBuildEdit() {
     if (!edit) return
     const editName = edit.name.trim()
     const editNotes = edit.notes.trim()
     if (!editName) return
 
     try {
-      const res = await fetch('/api/sticky', {
+      const res = await fetch(baseUrl, {
         method: 'PATCH',
         headers: {
           Authorization: 'Bearer ' + secret,
@@ -772,35 +773,35 @@ function StickyCard({ secret, log }) {
       })
       const r = await readJsonResponse(res)
       if (r.ok) {
-        log('Sticky build updated: ' + r.data.build.name)
+        log(label + ' build updated: ' + r.data.build.name)
         setEdit(null)
-        loadStickyInfo()
+        loadBuildInfo()
       } else {
-        log('Sticky update failed: ' + describeFailure(r))
+        log(label + ' update failed: ' + describeFailure(r))
       }
     } catch (err) {
-      log('Sticky update error: ' + err.message)
+      log(label + ' update error: ' + err.message)
     }
   }
 
-  async function deleteSticky() {
+  async function deleteBuild() {
     if (!build) return
-    if (!window.confirm('Delete Sticky build "' + build.name + '"?')) return
+    if (!window.confirm('Delete ' + label + ' build "' + build.name + '"?')) return
 
     try {
-      const res = await fetch('/api/sticky', {
+      const res = await fetch(baseUrl, {
         method: 'DELETE',
         headers: { Authorization: 'Bearer ' + secret },
       })
       const r = await readJsonResponse(res)
       if (r.ok) {
-        log('Deleted Sticky build: ' + build.name)
-        loadStickyInfo()
+        log('Deleted ' + label + ' build: ' + build.name)
+        loadBuildInfo()
       } else {
-        log('Sticky delete failed: ' + describeFailure(r))
+        log(label + ' delete failed: ' + describeFailure(r))
       }
     } catch (err) {
-      log('Sticky delete error: ' + err.message)
+      log(label + ' delete error: ' + err.message)
     }
   }
 
@@ -808,21 +809,15 @@ function StickyCard({ secret, log }) {
 
   return (
     <Card>
-      <CardTitle>Sticky Beta</CardTitle>
-      <p className="mt-1 text-xs text-stone-400">
-        Upload the ESP32-S3 build served on the hidden{' '}
-        <Link to="/sticky" className="font-medium text-brand-500 underline underline-offset-2">
-          /sticky
-        </Link>{' '}
-        page. Uploading replaces the current build.
-      </p>
+      <CardTitle>{label} Beta</CardTitle>
+      <p className="mt-1 text-xs text-stone-400">{description}</p>
 
       <div className="mt-3 space-y-2">
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Build name (e.g. Sticky Beta v1)"
+          placeholder={namePlaceholder}
           className={inputCls}
         />
         <textarea
@@ -847,7 +842,7 @@ function StickyCard({ secret, log }) {
             as="button"
             variant="primary"
             className="shrink-0"
-            onClick={uploadSticky}
+            onClick={uploadBuild}
             disabled={uploadDisabled}
           >
             {busy ? 'Uploading...' : 'Upload'}
@@ -877,7 +872,7 @@ function StickyCard({ secret, log }) {
             <div className="ml-2 flex shrink-0 gap-0.5">
               <button
                 type="button"
-                onClick={toggleEditSticky}
+                onClick={toggleEditBuild}
                 className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
                 title="Edit"
               >
@@ -885,7 +880,7 @@ function StickyCard({ secret, log }) {
               </button>
               <button
                 type="button"
-                onClick={deleteSticky}
+                onClick={deleteBuild}
                 className="rounded-md p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
                 title="Delete"
               >
@@ -910,7 +905,7 @@ function StickyCard({ secret, log }) {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={saveStickyEdit}
+                  onClick={saveBuildEdit}
                   className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600"
                 >
                   Save
@@ -927,7 +922,7 @@ function StickyCard({ secret, log }) {
           )}
         </div>
       ) : (
-        <p className="mt-3 text-xs text-stone-400">No Sticky build uploaded</p>
+        <p className="mt-3 text-xs text-stone-400">No {label} build uploaded</p>
       )}
     </Card>
   )
@@ -1057,7 +1052,44 @@ export default function AdminPage() {
             <TriggerBuildCard secret={secret} log={log} refreshRef={refreshRef} />
             <BannerCard secret={secret} log={log} />
             <BetaCard secret={secret} log={log} />
-            <StickyCard secret={secret} log={log} />
+            <DeviceBuildCard
+              secret={secret}
+              log={log}
+              label="Sticky"
+              namePlaceholder="Build name (e.g. Sticky Beta v1)"
+              infoUrl="/api/sticky/info"
+              uploadUrl="/api/sticky/upload"
+              baseUrl="/api/sticky"
+              description={
+                <>
+                  Upload the ESP32-S3 build served on the hidden{' '}
+                  <Link to="/sticky" className="font-medium text-brand-500 underline underline-offset-2">
+                    /sticky
+                  </Link>{' '}
+                  page. Uploading replaces the current build.
+                </>
+              }
+            />
+            <DeviceBuildCard
+              secret={secret}
+              log={log}
+              label="M5Paper"
+              namePlaceholder="Build name (e.g. M5Paper Beta v1)"
+              infoUrl="/api/device-build/m5paper/info"
+              uploadUrl="/api/device-build/m5paper/upload"
+              baseUrl="/api/device-build/m5paper"
+              description="Upload the M5Paper build offered in the homepage web flasher. Uploading replaces the current build."
+            />
+            <DeviceBuildCard
+              secret={secret}
+              log={log}
+              label="LilyGo T5"
+              namePlaceholder="Build name (e.g. LilyGo T5 Beta v1)"
+              infoUrl="/api/device-build/lilygo/info"
+              uploadUrl="/api/device-build/lilygo/upload"
+              baseUrl="/api/device-build/lilygo"
+              description="Upload the LilyGo T5 build offered in the homepage web flasher. Uploading replaces the current build."
+            />
             <LogCard entries={entries} />
           </div>
         )}

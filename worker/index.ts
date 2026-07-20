@@ -232,20 +232,36 @@ async function handleApi(
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
       case '/api/sticky/upload':
-        return handleStickyUpload(request, env, corsHeaders);
+        return handleDeviceBuildUpload(DEVICE_BUILDS.sticky, request, env, corsHeaders);
 
       case '/api/sticky':
-        if (request.method === 'PATCH') return handleStickyUpdate(request, env, corsHeaders);
-        if (request.method === 'DELETE') return handleStickyDelete(request, env, corsHeaders);
+        if (request.method === 'PATCH') return handleDeviceBuildUpdate(DEVICE_BUILDS.sticky, request, env, corsHeaders);
+        if (request.method === 'DELETE') return handleDeviceBuildDelete(DEVICE_BUILDS.sticky, request, env, corsHeaders);
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
       case '/api/sticky/info':
-        return handleStickyInfo(env, corsHeaders);
+        return handleDeviceBuildInfo(DEVICE_BUILDS.sticky, env, corsHeaders);
 
       case '/api/sticky/firmware':
-        return handleStickyFirmware(env, corsHeaders);
+        return handleDeviceBuildFirmware(DEVICE_BUILDS.sticky, env, corsHeaders);
 
       default:
+        // Device builds: /api/device-build/{device}[/upload|/info|/firmware]
+        if (url.pathname.startsWith('/api/device-build/')) {
+          const parts = url.pathname.replace('/api/device-build/', '').split('/');
+          const cfg = DEVICE_BUILDS[parts[0]];
+          if (!cfg) return json({ error: 'Unknown device' }, 404, corsHeaders);
+          const sub = parts[1] || '';
+          if (sub === 'upload') return handleDeviceBuildUpload(cfg, request, env, corsHeaders);
+          if (sub === 'info') return handleDeviceBuildInfo(cfg, env, corsHeaders);
+          if (sub === 'firmware') return handleDeviceBuildFirmware(cfg, env, corsHeaders);
+          if (sub === '') {
+            if (request.method === 'PATCH') return handleDeviceBuildUpdate(cfg, request, env, corsHeaders);
+            if (request.method === 'DELETE') return handleDeviceBuildDelete(cfg, request, env, corsHeaders);
+            return json({ error: 'Method not allowed' }, 405, corsHeaders);
+          }
+          return json({ error: 'Not found' }, 404, corsHeaders);
+        }
         // Dynamic routes: /api/beta/{id}/firmware
         if (url.pathname.startsWith('/api/beta/') && url.pathname.endsWith('/firmware')) {
           return handleBetaFirmware(url, env, corsHeaders);
@@ -2703,14 +2719,45 @@ async function handleBetaFirmware(
 
 // --- Sticky Beta Build ---
 //
-// A single admin-uploaded ESP32-S3 build for the Seeed reTerminal Sticky,
-// served only on the hidden /sticky page. Uploading replaces the previous
-// build in place; there is exactly one at a time.
+// A single admin-uploaded build per non-Xteink device (Sticky, M5Paper,
+// LilyGo T5). Sticky is served on the hidden /sticky page; the others are
+// offered as device options in the homepage flasher. Uploading replaces the
+// previous build in place; there is exactly one per device at a time.
 
-const STICKY_R2_KEY = 'builds/sticky/firmware.bin';
-const STICKY_META_KEY = 'sticky-build';
+interface DeviceBuildConfig {
+  r2Key: string;
+  metaKey: string;
+  defaultName: string;
+  filename: string;
+  label: string;
+}
 
-async function handleStickyUpload(
+const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
+  sticky: {
+    r2Key: 'builds/sticky/firmware.bin',
+    metaKey: 'sticky-build',
+    defaultName: 'Sticky Beta',
+    filename: 'sticky-firmware.bin',
+    label: 'Sticky',
+  },
+  m5paper: {
+    r2Key: 'builds/m5paper/firmware.bin',
+    metaKey: 'm5paper-build',
+    defaultName: 'M5Paper Beta',
+    filename: 'm5paper-firmware.bin',
+    label: 'M5Paper',
+  },
+  lilygo: {
+    r2Key: 'builds/lilygo/firmware.bin',
+    metaKey: 'lilygo-build',
+    defaultName: 'LilyGo T5 Beta',
+    filename: 'lilygo-firmware.bin',
+    label: 'LilyGo T5',
+  },
+};
+
+async function handleDeviceBuildUpload(
+  cfg: DeviceBuildConfig,
   request: Request,
   env: Env,
   headers: Record<string, string>
@@ -2729,12 +2776,12 @@ async function handleStickyUpload(
   if (!firmware || typeof firmware === 'string') {
     return json({ error: 'Firmware .bin file is required' }, 400, headers);
   }
-  const name = (typeof nameRaw === 'string' && nameRaw.trim()) ? nameRaw.trim() : 'Sticky Beta';
+  const name = (typeof nameRaw === 'string' && nameRaw.trim()) ? nameRaw.trim() : cfg.defaultName;
   const notes = (typeof notesRaw === 'string' ? notesRaw.trim() : '') || '';
 
   const data = await (firmware as File).arrayBuffer();
   const sha256 = await sha256Hex(data);
-  await env.FIRMWARE_BUCKET.put(STICKY_R2_KEY, data, {
+  await env.FIRMWARE_BUCKET.put(cfg.r2Key, data, {
     customMetadata: { sha256 },
   });
 
@@ -2745,12 +2792,13 @@ async function handleStickyUpload(
     firmwareSha256: sha256,
     uploadedAt: new Date().toISOString(),
   };
-  await env.BUILD_META.put(STICKY_META_KEY, JSON.stringify(build));
+  await env.BUILD_META.put(cfg.metaKey, JSON.stringify(build));
 
   return json({ build }, 201, headers);
 }
 
-async function handleStickyUpdate(
+async function handleDeviceBuildUpdate(
+  cfg: DeviceBuildConfig,
   request: Request,
   env: Env,
   headers: Record<string, string>
@@ -2759,9 +2807,9 @@ async function handleStickyUpdate(
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
-  const raw = await env.BUILD_META.get(STICKY_META_KEY);
+  const raw = await env.BUILD_META.get(cfg.metaKey);
   if (!raw) {
-    return json({ error: 'No Sticky build uploaded' }, 404, headers);
+    return json({ error: `No ${cfg.label} build uploaded` }, 404, headers);
   }
   const build = JSON.parse(raw) as { name: string; notes?: string };
 
@@ -2776,11 +2824,12 @@ async function handleStickyUpdate(
     build.notes = typeof body.notes === 'string' ? body.notes.trim() : '';
   }
 
-  await env.BUILD_META.put(STICKY_META_KEY, JSON.stringify(build));
+  await env.BUILD_META.put(cfg.metaKey, JSON.stringify(build));
   return json({ build }, 200, headers);
 }
 
-async function handleStickyDelete(
+async function handleDeviceBuildDelete(
+  cfg: DeviceBuildConfig,
   request: Request,
   env: Env,
   headers: Record<string, string>
@@ -2789,40 +2838,42 @@ async function handleStickyDelete(
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
-  const raw = await env.BUILD_META.get(STICKY_META_KEY);
+  const raw = await env.BUILD_META.get(cfg.metaKey);
   if (!raw) {
-    return json({ error: 'No Sticky build uploaded' }, 404, headers);
+    return json({ error: `No ${cfg.label} build uploaded` }, 404, headers);
   }
 
-  await env.FIRMWARE_BUCKET.delete(STICKY_R2_KEY);
-  await env.BUILD_META.delete(STICKY_META_KEY);
+  await env.FIRMWARE_BUCKET.delete(cfg.r2Key);
+  await env.BUILD_META.delete(cfg.metaKey);
   return json({ ok: true }, 200, headers);
 }
 
-async function handleStickyInfo(
+async function handleDeviceBuildInfo(
+  cfg: DeviceBuildConfig,
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const raw = await env.BUILD_META.get(STICKY_META_KEY);
+  const raw = await env.BUILD_META.get(cfg.metaKey);
   if (!raw) {
     return json({ build: null }, 200, headers);
   }
   return json({ build: JSON.parse(raw) }, 200, headers);
 }
 
-async function handleStickyFirmware(
+async function handleDeviceBuildFirmware(
+  cfg: DeviceBuildConfig,
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const object = await env.FIRMWARE_BUCKET.get(STICKY_R2_KEY);
+  const object = await env.FIRMWARE_BUCKET.get(cfg.r2Key);
   if (!object) {
-    return json({ error: 'No Sticky build uploaded' }, 404, headers);
+    return json({ error: `No ${cfg.label} build uploaded` }, 404, headers);
   }
   return new Response(object.body, {
     headers: {
       ...headers,
       'Content-Type': 'application/octet-stream',
-      'Content-Disposition': 'attachment; filename="sticky-firmware.bin"',
+      'Content-Disposition': `attachment; filename="${cfg.filename}"`,
       'Content-Length': String(object.size),
     },
   });

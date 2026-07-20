@@ -911,6 +911,20 @@ export async function fetchReleaseMeta() {
   return res.json();
 }
 
+// Admin-uploaded single builds for non-Xteink devices (m5paper, lilygo).
+export async function fetchDeviceBuildInfo(device) {
+  const res = await fetch(`/api/device-build/${device}/info`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.build || null;
+}
+
+export async function fetchDeviceBuildFirmware(device) {
+  const res = await fetch(`/api/device-build/${device}/firmware`);
+  if (!res.ok) throw new Error(`Failed to download firmware: ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 // --- File download helper ---
 
 export function downloadBlob(data, filename) {
