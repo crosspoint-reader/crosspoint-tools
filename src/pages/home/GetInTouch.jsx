@@ -1,6 +1,43 @@
+import { useState } from 'react'
 import { Button, Eyebrow } from '../../components/ui.jsx'
 
+const inputCls =
+  'w-full rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20'
+
 export default function GetInTouch() {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [message, setMessage] = useState('')
+  const [website, setWebsite] = useState('') // honeypot; humans never see it
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState(null) // { ok, msg }
+
+  async function onSubmit(e) {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true)
+    setStatus(null)
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, message, website }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setStatus({ ok: true, msg: "Message sent. We'll get back to you soon." })
+        setName('')
+        setEmail('')
+        setMessage('')
+      } else {
+        setStatus({ ok: false, msg: data.error || 'Something went wrong. Please try again.' })
+      }
+    } catch {
+      setStatus({ ok: false, msg: 'Something went wrong. Please try again.' })
+    }
+    setBusy(false)
+  }
+
   return (
     <section id="get-in-touch" className="relative scroll-mt-20 overflow-hidden border-t border-stone-200 bg-stone-50 py-16 sm:py-20">
       <div
@@ -18,14 +55,73 @@ export default function GetInTouch() {
           development</strong>, we&rsquo;d love to hear from you. Reach out and let&rsquo;s
           build something together.
         </p>
-        <div className="mt-8">
-          <Button as="a" href="mailto:hello@crosspointreader.com" variant="primary" className="px-4 py-2.5">
-            <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-            </svg>
-            Contact Us
-          </Button>
-        </div>
+
+        <form onSubmit={onSubmit} className="mx-auto mt-10 max-w-xl space-y-3 text-left">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              autoComplete="name"
+              required
+              maxLength={100}
+              className={inputCls}
+            />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Your email"
+              autoComplete="email"
+              required
+              maxLength={200}
+              className={inputCls}
+            />
+          </div>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="What's on your mind?"
+            required
+            minLength={10}
+            maxLength={5000}
+            rows={5}
+            className={`${inputCls} resize-none`}
+          />
+          {/* Honeypot: hidden from humans, filled by bots */}
+          <input
+            type="text"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="hidden"
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Button as="button" type="submit" variant="primary" className="px-5 py-2.5" disabled={busy}>
+              {busy ? 'Sending...' : 'Send Message'}
+            </Button>
+            <a
+              href="mailto:hello@crosspointreader.com"
+              className="text-sm font-medium text-stone-500 underline underline-offset-4 hover:text-stone-700"
+            >
+              or email us directly
+            </a>
+          </div>
+          {status && (
+            <p
+              role="status"
+              className={`rounded-lg px-4 py-3 text-sm/6 ${
+                status.ok ? 'bg-brand-50 text-brand-700' : 'bg-red-50 text-red-800'
+              }`}
+            >
+              {status.msg}
+            </p>
+          )}
+        </form>
       </div>
     </section>
   )

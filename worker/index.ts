@@ -170,6 +170,9 @@ async function handleApi(
       case '/api/kosync/register':
         return handleKosyncRegister(request, corsHeaders);
 
+      case '/api/contact':
+        return handleContact(request, env, corsHeaders);
+
       case '/api/fonts':
         return handleFontList(env, corsHeaders);
 
@@ -3090,4 +3093,66 @@ function json(data: unknown, status = 200, extraHeaders: Record<string, string> 
       ...extraHeaders,
     },
   });
+}
+
+
+// --- Contact form ------------------------------------------------------------
+//
+// Sends the message via the Cloudflare Email Sending binding. The `website`
+// field is a honeypot: humans never see it, bots fill it in, and we quietly
+// accept-and-drop those submissions.
+
+const CONTACT_TO = 'hello@crosspointreader.com';
+const CONTACT_FROM = { email: 'contact@crosspointreader.com', name: 'CrossPoint Contact Form' };
+
+async function handleContact(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+
+  let body: { name?: string; email?: string; message?: string; website?: string };
+  try {
+    body = await request.json() as typeof body;
+  } catch {
+    return json({ error: 'Invalid request body' }, 400, headers);
+  }
+
+  const name = (body.name || '').trim();
+  const email = (body.email || '').trim();
+  const message = (body.message || '').trim();
+
+  // Honeypot tripped: pretend success, send nothing.
+  if ((body.website || '').trim()) {
+    return json({ ok: true }, 200, headers);
+  }
+
+  if (!name || name.length > 100) {
+    return json({ error: 'Please tell us your name.' }, 400, headers);
+  }
+  if (!email || email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return json({ error: 'Please enter a valid email address.' }, 400, headers);
+  }
+  if (message.length < 10 || message.length > 5000) {
+    return json({ error: 'Message must be between 10 and 5000 characters.' }, 400, headers);
+  }
+
+  const text = `New contact form message\n\nFrom: ${name} <${email}>\n\n${message}`;
+
+  try {
+    await env.EMAIL.send({
+      to: CONTACT_TO,
+      from: CONTACT_FROM,
+      replyTo: email,
+      subject: `[crosspointreader.com] Message from ${name}`,
+      text,
+    });
+  } catch (err) {
+    return json({ error: 'Failed to send message. Please email us directly.' }, 502, headers);
+  }
+
+  return json({ ok: true }, 200, headers);
 }

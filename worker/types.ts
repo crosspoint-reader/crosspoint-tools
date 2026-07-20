@@ -1,4 +1,18 @@
+// Cloudflare Email Service binding (send-only). Kept as a local interface
+// until the installed workers-types ships an official one.
+export interface EmailSendBinding {
+  send(msg: {
+    to: string;
+    from: { email: string; name?: string } | string;
+    replyTo?: string;
+    subject: string;
+    text: string;
+    html?: string;
+  }): Promise<unknown>;
+}
+
 export interface Env {
+  EMAIL: EmailSendBinding;
   FIRMWARE_BUCKET: R2Bucket;
   BUILD_META: KVNamespace;
   ASSETS: Fetcher;

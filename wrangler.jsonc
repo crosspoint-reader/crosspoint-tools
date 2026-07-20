@@ -46,6 +46,10 @@
     "binding": "AI"
   },
 
+  // Email Sending (contact form). Domain onboarded via
+  // `wrangler email sending enable crosspointreader.com`.
+  "send_email": [{ "name": "EMAIL" }],
+
   "vars": {
     "REPO_URL": "https://github.com/crosspoint-reader/crosspoint-reader.git"
   }
