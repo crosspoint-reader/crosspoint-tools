@@ -233,7 +233,7 @@ export default function StickyPage() {
       <div className="mx-auto max-w-3xl px-6 py-12">
         <div className="flex flex-col items-center text-center">
           <img src="/logo.png" alt="" className="mx-auto size-10 rounded-lg" />
-          <Eyebrow className="mt-5">Hidden Tool</Eyebrow>
+          <Eyebrow className="mt-5">early access</Eyebrow>
           <h1 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
             Sticky Flasher
           </h1>

@@ -1062,7 +1062,7 @@ export default function AdminPage() {
               baseUrl="/api/sticky"
               description={
                 <>
-                  Upload the ESP32-S3 build served on the hidden{' '}
+                  Upload the ESP32-S3 build served on the{' '}
                   <Link to="/sticky" className="font-medium text-brand-500 underline underline-offset-2">
                     /sticky
                   </Link>{' '}
