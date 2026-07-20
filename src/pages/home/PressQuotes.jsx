@@ -1,9 +1,9 @@
 const QUOTES = [
   {
-    quote: 'This tiny, magnetic e-reader could stop you from doomscrolling',
-    src: '/press/techcrunch.svg',
-    alt: 'TechCrunch',
-    className: 'h-5 sm:h-6',
+    quote: 'reTerminal Sticky is built open — CrossPoint was the perfect fit for us since day 1.',
+    src: '/press/seeedstudio.png',
+    alt: 'Seeed Studio',
+    className: 'mt-1.5 h-4 sm:h-5',
   },
   {
     quote: 'The excellent CrossPoint Reader alternative firmware was the X4’s saving grace',
