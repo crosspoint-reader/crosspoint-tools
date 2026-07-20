@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Layout from '../components/Layout.jsx'
 import { Eyebrow } from '../components/ui.jsx'
 
-const DEFAULT_SERVER = 'https://sync.koreader.rocks:443'
+const DEFAULT_SERVER = 'https://sync.crosspointreader.com'
 
 const inputClass =
   'mt-1 w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20'

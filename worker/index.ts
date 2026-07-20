@@ -1039,7 +1039,7 @@ function handleLogout(request: Request): Response {
 // The default sync server the CrossPoint reader ships with. Users can point at
 // any public kosync-compatible server, but this is what the device uses out of
 // the box, so we pre-fill and default to it.
-const DEFAULT_KOSYNC_SERVER = 'https://sync.koreader.rocks:443';
+const DEFAULT_KOSYNC_SERVER = 'https://sync.crosspointreader.com';
 
 // Proxy kosync `/users/create` for the browser. We can't register client-side
 // because (a) public kosync servers don't send CORS headers, and (b) the kosync
@@ -1081,7 +1081,7 @@ async function handleKosyncRegister(
   try {
     base = new URL(serverInput);
   } catch {
-    return json({ error: 'Server must be a valid URL, e.g. https://sync.koreader.rocks' }, 400, headers);
+    return json({ error: 'Server must be a valid URL, e.g. https://sync.crosspointreader.com' }, 400, headers);
   }
   if (base.protocol !== 'https:' && base.protocol !== 'http:') {
     return json({ error: 'Server URL must use http or https.' }, 400, headers);
