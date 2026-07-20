@@ -343,9 +343,9 @@ export default function FlashTools() {
         <h2 className="max-w-[30ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
           Flash from your browser.
         </h2>
-        <p className="mt-4 max-w-[56ch] text-base/7 text-pretty text-stone-600">
-          Writes firmware over USB using the WebSerial API. Works in Chrome, Edge and Firefox on
-          desktop. Originally built by{' '}
+        <p className="mt-6 max-w-[58ch] font-serif text-xl/9 text-pretty text-stone-600">
+          Flash <strong className="font-medium text-stone-900">right from your browser</strong>,
+          over USB. Works in Chrome, Edge and Firefox on desktop. Originally built by{' '}
           <a
             href="https://github.com/daveallie"
             target="_blank"
@@ -354,8 +354,9 @@ export default function FlashTools() {
           >
             daveallie
           </a>
-          . CrossPoint is also a foundation to build on: the project has been forked over
-          1,000 times, with community alternatives worth exploring.
+          . CrossPoint is also a foundation to build on: the project has been{' '}
+          <strong className="font-medium text-stone-900">forked over 1,000 times</strong>, with
+          community alternatives worth exploring.
         </p>
 
         {/* Browser check */}

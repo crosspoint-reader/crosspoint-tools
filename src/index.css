@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:wght@400;500;700&family=Noto+Serif+Hebrew:wght@400;700&family=Noto+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:wght@400;500;700&family=Noto+Serif+Hebrew:wght@400;700&family=Noto+Sans:wght@400;500;600;700&family=Caveat:wght@500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -10,6 +10,7 @@
   --font-serif: "Lora", ui-serif, serif;
   --font-mono: "Geist Mono", ui-monospace, monospace;
   --font-eink: "Noto Serif", serif;
+  --font-hand: "Caveat", cursive;
 
   /* Forest green — the single accent color */
   --color-brand-50: #f0f5f3;

@@ -49,19 +49,32 @@ export default function UnlockSection() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 paper-grain opacity-[0.04]"
       />
-      <div className="relative mx-auto max-w-3xl px-6 text-center">
-        <h2 className="mx-auto max-w-[24ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
-          Have a locked device?
-        </h2>
-        <p className="mx-auto mt-4 max-w-[60ch] text-base/7 text-pretty text-stone-600">
-          International Xteink devices (including those from AliExpress) ship with USB flashing
-          disabled. We recommend using the SD flashing method to get CrossPoint on your device.
-          Please be aware that this does not unlock your USB flashing capabilities, but it does
-          allow flashing of custom firmware.
-        </p>
+      <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-start gap-12 px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:px-8">
+        <div>
+          <h2 className="max-w-[24ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
+            Have a locked device?
+          </h2>
+          <p className="mt-6 max-w-[58ch] font-serif text-xl/9 text-pretty text-stone-600">
+            Some international Xteink devices, including most from AliExpress, ship with{' '}
+            <strong className="font-medium text-stone-900">USB flashing disabled</strong>. The{' '}
+            <strong className="font-medium text-stone-900">SD card method</strong> gets
+            CrossPoint onto a locked device in a few minutes. It won&rsquo;t unlock USB
+            flashing, but it will run custom firmware.
+          </p>
+          <p className="mt-6 text-sm/6 text-pretty text-stone-500">
+            Stuck on a firmware that doesn&rsquo;t support SD flashing? Use the{' '}
+            <Link
+              to="/unlocker"
+              className="font-medium text-brand-600 underline decoration-brand-300 underline-offset-4 hover:text-brand-700 hover:decoration-brand-500"
+            >
+              OTA Unlocker Tool
+            </Link>
+            .
+          </p>
+        </div>
 
         {/* Primary path: SD card flashing */}
-        <div className="mx-auto mt-8 max-w-xl rounded-2xl bg-white p-6 text-left shadow-sm ring-1 ring-stone-950/5 sm:p-7">
+        <div className="rounded-2xl bg-white p-6 text-left shadow-sm ring-1 ring-stone-950/5 sm:p-7">
           <h3 className="font-display text-sm font-semibold text-stone-900">Flash from SD card</h3>
           <p className="mt-1 text-xs text-stone-400">Recommended for X3 and X4, even on stock firmware.</p>
           <ol className="mt-5 space-y-4">
@@ -88,31 +101,19 @@ export default function UnlockSection() {
             </button>
             <p className="mt-2 text-xs text-stone-400">{status}</p>
           </div>
-          <p className="mt-6 border-t border-stone-200 pt-5 text-center text-sm/6 font-semibold text-red-600">
-            BEFORE YOU FLASH:{' '}
+          <p className="mt-6 border-t border-stone-200 pt-5 text-sm/6 text-red-700">
+            <span className="font-semibold">Before you flash:</span> check the{' '}
             <a
               href="https://brickclub.pages.dev/"
               target="_blank"
               rel="noopener"
-              className="text-red-600 underline decoration-red-300 underline-offset-2 hover:text-red-700 hover:decoration-red-500"
+              className="font-semibold text-red-700 underline decoration-red-300 underline-offset-2 hover:text-red-800 hover:decoration-red-500"
             >
-              CLICK HERE FOR THE LIST OF APPROVED &amp; FLAGGED FIRMWARE
+              list of approved and flagged firmware
             </a>
-            . FLASHING UNAPPROVED FIRMWARE CAN PERMANENTLY BRICK YOUR DEVICE
+            . Flashing unapproved firmware can <span className="font-semibold">permanently brick your device</span>.
           </p>
         </div>
-
-        {/* Secondary, deprioritized: OTA Unlocker */}
-        <p className="relative mx-auto mt-8 max-w-[60ch] text-sm/6 text-pretty text-stone-500">
-          Stuck on a firmware that doesn't support SD flashing? Use the{' '}
-          <Link
-            to="/unlocker"
-            className="font-medium text-brand-600 underline decoration-brand-300 underline-offset-4 hover:text-brand-700 hover:decoration-brand-500"
-          >
-            OTA Unlocker Tool
-          </Link>
-          .
-        </p>
       </div>
     </section>
   )

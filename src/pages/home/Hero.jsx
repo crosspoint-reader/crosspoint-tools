@@ -31,10 +31,11 @@ export default function Hero({ onOpenBuy }) {
           <h1 className="max-w-[18ch] font-display text-5xl/[1.05] font-semibold tracking-tight text-balance text-stone-900 sm:text-7xl/[1.05]">
             Read without limits.
           </h1>
-          <p className="mt-6 max-w-[48ch] text-lg/8 text-pretty text-stone-600">
-            CrossPoint is e-reader software built in the open by the people who use it. Get it
-            for the Xteink X3 and X4, the Sticky from Seeed Studio, the M5Paper, the LilyGo
-            T5, and more devices with every release.
+          <p className="mt-6 max-w-[48ch] font-serif text-xl/9 text-pretty text-stone-600">
+            CrossPoint is <strong className="font-medium text-stone-900">the best way to read
+            on the go</strong>, built in the open, by the community. Get it for the Xteink X3
+            and X4, the Sticky from Seeed Studio, the M5Paper, the LilyGo T5, and more devices
+            with every release.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-3">
@@ -48,8 +49,28 @@ export default function Hero({ onOpenBuy }) {
               <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007Z" />
               </svg>
-              Buy an Xteink X3/X4
+              Shop Devices
             </Button>
+
+            {/* Hand-drawn annotation pointing back at the shop button */}
+            <div className="hidden items-center gap-1.5 sm:flex" aria-hidden="true">
+              <svg
+                className="mt-3 w-10 shrink-0 text-stone-400"
+                viewBox="0 0 40 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M38 20 C 30 22, 18 20, 5 8" />
+                <path d="M5 8 l 0.5 7" />
+                <path d="M5 8 l 7.5 0.5" />
+              </svg>
+              <span className="mt-4 max-w-[18ch] -rotate-2 font-hand text-lg/6 font-medium text-stone-500">
+                Buying from us helps support development
+              </span>
+            </div>
           </div>
 
           {/* Secondary links */}

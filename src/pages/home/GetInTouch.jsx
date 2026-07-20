@@ -11,9 +11,11 @@ export default function GetInTouch() {
         <h2 className="mx-auto max-w-[24ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
           Interested in collaborating with us?
         </h2>
-        <p className="mx-auto mt-4 max-w-[52ch] text-base/7 text-pretty text-stone-600">
-          Whether you're interested in partnering, sponsorship, or custom development, we'd love to
-          hear from you. Reach out and let's build something together.
+        <p className="mx-auto mt-6 max-w-[52ch] font-serif text-xl/9 text-pretty text-stone-600">
+          Whether you&rsquo;re interested in{' '}
+          <strong className="font-medium text-stone-900">partnering, sponsorship, or custom
+          development</strong>, we&rsquo;d love to hear from you. Reach out and let&rsquo;s
+          build something together.
         </p>
         <div className="mt-8">
           <Button as="a" href="mailto:hello@crosspointreader.com" variant="primary" className="px-4 py-2.5">
