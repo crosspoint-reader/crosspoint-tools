@@ -3102,7 +3102,7 @@ function json(data: unknown, status = 200, extraHeaders: Record<string, string> 
 // field is a honeypot: humans never see it, bots fill it in, and we quietly
 // accept-and-drop those submissions.
 
-const CONTACT_TO = 'hello@crosspointreader.com';
+const CONTACT_TO = 'crosspoint@jmitch.com';
 const CONTACT_FROM = { email: 'contact@crosspointreader.com', name: 'CrossPoint Contact Form' };
 
 async function handleContact(
