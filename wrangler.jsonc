@@ -39,6 +39,7 @@
 
   // Secrets (set via `wrangler secret put`):
   //   GITHUB_WEBHOOK_SECRET - for verifying webhook payloads
+  //   CONTACT_CHAT_WEBHOOK - Google Chat incoming-webhook URL for contact form messages
   //   GITHUB_TOKEN - optional, for private repo access
 
   // Workers AI binding

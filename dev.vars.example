@@ -4,3 +4,4 @@ GITHUB_WEBHOOK_SECRET=your-webhook-secret-here
 # GITHUB_ACTIONS_REF=main
 # WEBHOOK_BASE_URL=https://your-tunnel-or-dev-host
 # ALLOW_INSECURE_DEV_WEBHOOKS=true
+CONTACT_CHAT_WEBHOOK=https://chat.googleapis.com/v1/spaces/XXXX/messages?key=...&token=...

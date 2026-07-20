@@ -3142,6 +3142,26 @@ async function handleContact(
 
   const text = `New contact form message\n\nFrom: ${name} <${email}>\n\n${message}`;
 
+  // Primary delivery: post straight into the Google Chat space via its
+  // incoming webhook (no email routing involved). Email send stays as a
+  // best-effort backup; the submission succeeds if either lands.
+  let delivered = false;
+
+  if (env.CONTACT_CHAT_WEBHOOK) {
+    try {
+      const res = await fetch(env.CONTACT_CHAT_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: `📬 *New contact form message*\n*From:* ${name} <${email}>\n\n${message}`,
+        }),
+      });
+      if (res.ok) delivered = true;
+    } catch {
+      // fall through to email
+    }
+  }
+
   try {
     await env.EMAIL.send({
       to: CONTACT_TO,
@@ -3150,7 +3170,12 @@ async function handleContact(
       subject: `[crosspointreader.com] Message from ${name}`,
       text,
     });
-  } catch (err) {
+    delivered = true;
+  } catch {
+    // webhook may already have delivered
+  }
+
+  if (!delivered) {
     return json({ error: 'Failed to send message. Please email us directly.' }, 502, headers);
   }
 

@@ -13,6 +13,8 @@ export interface EmailSendBinding {
 
 export interface Env {
   EMAIL: EmailSendBinding;
+  // Google Chat incoming-webhook URL for contact form messages (secret)
+  CONTACT_CHAT_WEBHOOK?: string;
   FIRMWARE_BUCKET: R2Bucket;
   BUILD_META: KVNamespace;
   ASSETS: Fetcher;
