@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eyebrow } from '../../components/ui.jsx'
 
@@ -20,17 +21,57 @@ const RELEASES = [
   },
 ]
 
-const STATS = [
-  ['200+', 'contributors around the world'],
-  ['1,200+', 'community forks built on CrossPoint'],
-  ['152', 'changes in the last major release'],
+// Live numbers come from /api/stats. These are the last known good values and
+// stand in until the fetch resolves — and stay put if it never does.
+const FALLBACK_STATS = {
+  contributors: 192,
+  forks: 1219,
+  changes: 168,
+  downloads: 70547,
+}
+
+const STAT_LABELS = [
+  ['contributors', 'contributors around the world'],
+  ['forks', 'community forks built on CrossPoint'],
+  ['changes', 'changes in the last major release'],
+  ['downloads', 'devices running CrossPoint'],
 ]
+
+function useCommunityStats() {
+  const [stats, setStats] = useState(FALLBACK_STATS)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/stats')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.status))))
+      .then((data) => {
+        if (cancelled) return
+        // Only take keys that came back as numbers, so a partial or malformed
+        // response can't blank out a tile.
+        setStats((prev) => {
+          const next = { ...prev }
+          for (const key of Object.keys(prev)) {
+            if (typeof data[key] === 'number') next[key] = data[key]
+          }
+          return next
+        })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return stats
+}
 
 function LittleThing({ children }) {
   return <strong className="font-medium text-stone-900">{children}</strong>
 }
 
 export default function Rhythm() {
+  const stats = useCommunityStats()
+
   return (
     <section className="relative overflow-hidden border-t border-stone-200 bg-stone-50 py-20 sm:py-28">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 paper-grain opacity-[0.04]" />
@@ -76,11 +117,13 @@ export default function Rhythm() {
         </ol>
 
         {/* Community stats */}
-        <dl className="mt-16 grid grid-cols-1 gap-8 border-t border-stone-200 pt-10 sm:grid-cols-3">
-          {STATS.map(([num, label]) => (
-            <div key={label}>
+        <dl className="mt-16 grid grid-cols-2 gap-8 border-t border-stone-200 pt-10 lg:grid-cols-4">
+          {STAT_LABELS.map(([key, label]) => (
+            <div key={key}>
               <dt className="sr-only">{label}</dt>
-              <dd className="font-display text-5xl font-semibold tracking-tight text-stone-900">{num}</dd>
+              <dd className="font-display text-5xl font-semibold tracking-tight text-stone-900">
+                {stats[key].toLocaleString('en-US')}
+              </dd>
               <dd className="mt-1 text-sm text-stone-500">{label}</dd>
             </div>
           ))}

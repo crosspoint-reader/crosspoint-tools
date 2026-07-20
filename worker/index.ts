@@ -248,6 +248,9 @@ async function handleApi(
       case '/api/sticky/firmware':
         return handleDeviceBuildFirmware(DEVICE_BUILDS.sticky, env, corsHeaders);
 
+      case '/api/stats':
+        return handleCommunityStats(env, corsHeaders);
+
       default:
         // Device builds: /api/device-build/{device}[/upload|/info|/firmware]
         if (url.pathname.startsWith('/api/device-build/')) {
@@ -1252,6 +1255,132 @@ async function getSubscriberEmail(request: Request): Promise<string | null> {
 */
 
 // --- Font List (dynamic from upstream repo) ---
+
+// ---------------------------------------------------------------------------
+// Community stats (front page)
+// ---------------------------------------------------------------------------
+
+const STATS_CACHE_KEY = 'community-stats';
+const STATS_LAST_GOOD_KEY = 'community-stats:last';
+const STATS_TTL = 6 * 60 * 60; // 6 hours
+
+interface CommunityStats {
+  contributors: number;
+  forks: number;
+  changes: number;
+  downloads: number;
+  fetchedAt: string;
+}
+
+interface GhRelease {
+  tag_name: string;
+  draft: boolean;
+  prerelease: boolean;
+  assets: Array<{ download_count: number }>;
+}
+
+/**
+ * Total contributors. The list endpoint has no count field, so ask for a single
+ * item per page and read the page number off the `rel="last"` Link header —
+ * one request instead of paginating through ~200 entries. anon=1 includes
+ * commit emails that were never matched to a GitHub account.
+ */
+async function fetchContributorCount(headers: Record<string, string>): Promise<number> {
+  const res = await fetch(
+    `https://api.github.com/repos/${UPSTREAM_REPO}/contributors?per_page=1&anon=1`,
+    { headers }
+  );
+  if (!res.ok) throw new Error(`contributors: ${res.status}`);
+  const link = res.headers.get('link') || '';
+  const last = link.match(/[?&]page=(\d+)>;\s*rel="last"/);
+  if (last) return parseInt(last[1], 10);
+  // No Link header means everything fit on one page.
+  const first = await res.json() as unknown[];
+  return first.length;
+}
+
+/**
+ * Commits in the last major release. Patch releases aren't a "major release",
+ * so the boundaries are the newest two x.y.0 tags (currently 1.3.0...1.4.0).
+ * `total_commits` is exact even though the `commits` array caps at 250.
+ */
+async function fetchReleaseChangeCount(
+  releases: GhRelease[],
+  headers: Record<string, string>
+): Promise<number> {
+  const minors = releases.filter(r => /^\d+\.\d+\.0$/.test(r.tag_name));
+  if (minors.length < 2) throw new Error('not enough minor releases to compare');
+  const [newer, older] = minors;
+  const res = await fetch(
+    `https://api.github.com/repos/${UPSTREAM_REPO}/compare/${older.tag_name}...${newer.tag_name}?per_page=1`,
+    { headers }
+  );
+  if (!res.ok) throw new Error(`compare: ${res.status}`);
+  const cmp = await res.json() as { total_commits?: number };
+  if (typeof cmp.total_commits !== 'number') throw new Error('compare: no total_commits');
+  return cmp.total_commits;
+}
+
+async function computeCommunityStats(env: Env): Promise<CommunityStats> {
+  const ghHeaders: Record<string, string> = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'CrossPoint-Tools',
+  };
+  if (env.GITHUB_TOKEN) {
+    ghHeaders.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
+  }
+
+  const [contributors, repoRes, releasesRes] = await Promise.all([
+    fetchContributorCount(ghHeaders),
+    fetch(`https://api.github.com/repos/${UPSTREAM_REPO}`, { headers: ghHeaders }),
+    fetch(`https://api.github.com/repos/${UPSTREAM_REPO}/releases?per_page=100`, { headers: ghHeaders }),
+  ]);
+
+  if (!repoRes.ok) throw new Error(`repo: ${repoRes.status}`);
+  if (!releasesRes.ok) throw new Error(`releases: ${releasesRes.status}`);
+
+  const repo = await repoRes.json() as { forks_count: number };
+  const allReleases = await releasesRes.json() as GhRelease[];
+  const releases = allReleases.filter(r => !r.draft && !r.prerelease);
+  if (releases.length === 0) throw new Error('no published releases');
+
+  // Downloads of the biggest release, not the lifetime total: users re-download
+  // the firmware on every update, so summing counts the same person many times.
+  const downloads = Math.max(
+    ...releases.map(r => r.assets.reduce((sum, a) => sum + a.download_count, 0))
+  );
+
+  return {
+    contributors,
+    forks: repo.forks_count,
+    changes: await fetchReleaseChangeCount(releases, ghHeaders),
+    downloads,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+async function handleCommunityStats(
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const cached = await env.BUILD_META.get(STATS_CACHE_KEY);
+  if (cached) return json(JSON.parse(cached), 200, headers);
+
+  try {
+    const stats = await computeCommunityStats(env);
+    const body = JSON.stringify(stats);
+    await env.BUILD_META.put(STATS_CACHE_KEY, body, { expirationTtl: STATS_TTL });
+    // Never-expiring copy so a GitHub outage is invisible to visitors.
+    await env.BUILD_META.put(STATS_LAST_GOOD_KEY, body);
+    return json(stats, 200, headers);
+  } catch (err) {
+    console.error('Community stats fetch failed:', err);
+    const lastGood = await env.BUILD_META.get(STATS_LAST_GOOD_KEY);
+    if (lastGood) return json(JSON.parse(lastGood), 200, headers);
+    // No cache to fall back on; the client keeps its own hardcoded numbers.
+    return json({ error: 'Stats unavailable' }, 503, headers);
+  }
+}
 
 const FONT_SOURCE_PATH = 'lib/EpdFont/builtinFonts/source';
 const UPSTREAM_REPO = 'crosspoint-reader/crosspoint-reader';
