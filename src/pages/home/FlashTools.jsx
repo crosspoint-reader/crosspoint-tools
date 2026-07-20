@@ -131,6 +131,24 @@ export default function FlashTools() {
   // Admin-uploaded build for non-Xteink devices (m5paper, lilygo)
   const [deviceBuild, setDeviceBuild] = useState(null)
 
+  // Which non-Xteink devices have a build uploaded; their cards stay hidden
+  // from the device grid until one exists.
+  const [deviceAvailability, setDeviceAvailability] = useState({})
+
+  useEffect(() => {
+    let cancelled = false
+    Object.keys(DEVICE_BUILD_MODELS).forEach((id) => {
+      fetchDeviceBuildInfo(id)
+        .then((b) => {
+          if (!cancelled && b) setDeviceAvailability((a) => ({ ...a, [id]: true }))
+        })
+        .catch(() => {})
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // Nightly changelog + AI summary
   const [changelog, setChangelog] = useState({ status: 'idle', commits: [] })
   const [summary, setSummary] = useState(null)
@@ -405,7 +423,7 @@ export default function FlashTools() {
               <h3 className="font-display text-sm font-semibold text-stone-900">Select your device</h3>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {MODELS.map((m) => (
+              {MODELS.filter((m) => !DEVICE_BUILD_MODELS[m.id] || deviceAvailability[m.id]).map((m) => (
                 <button
                   key={m.id}
                   type="button"
