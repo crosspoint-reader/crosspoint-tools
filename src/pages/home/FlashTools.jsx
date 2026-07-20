@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Eyebrow } from '../../components/ui.jsx'
 import {
   CrossPointFlasher,
   fetchReleaseFirmware,
@@ -367,7 +368,8 @@ export default function FlashTools() {
   return (
     <section id="flash-tools" className="relative scroll-mt-20 border-t border-stone-200 py-16 sm:py-20">
       <div className="mx-auto max-w-3xl px-6">
-        <h2 className="max-w-[30ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
+        <Eyebrow>get CrossPoint</Eyebrow>
+        <h2 className="mt-2 max-w-[30ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
           Flash from your browser.
         </h2>
         <p className="mt-6 max-w-[58ch] font-serif text-xl/9 text-pretty text-stone-600">
@@ -530,6 +532,25 @@ export default function FlashTools() {
                             Release Notes
                           </a>
                         )}
+                        {/* Hand-drawn annotation: reassurance at the moment of hesitation */}
+                        <div className="hidden items-center gap-1.5 sm:flex" aria-hidden="true">
+                          <svg
+                            className="w-8 shrink-0 text-stone-400"
+                            viewBox="0 0 32 20"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M30 16 C 22 18, 12 16, 4 8" />
+                            <path d="M4 8 l1 6" />
+                            <path d="M4 8 l6 0.5" />
+                          </svg>
+                          <span className="-rotate-2 font-hand text-lg/6 font-medium text-stone-500">
+                            takes about two minutes
+                          </span>
+                        </div>
                       </div>
                       <p className="mt-2 text-xs text-stone-400">
                         If you are coming from Stock or another firmware you may need to flash

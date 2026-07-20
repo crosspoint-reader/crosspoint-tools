@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Eyebrow } from '../../components/ui.jsx'
 
 const PHOTO_COUNT = 18
 
@@ -16,7 +17,8 @@ export default function Community() {
   return (
     <section className="relative border-t border-stone-200 bg-stone-50 py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <h2 className="max-w-[32ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
+        <Eyebrow>spotted in the wild</Eyebrow>
+        <h2 className="mt-2 max-w-[32ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
           CrossPoint community shots.
         </h2>
       </div>

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Eyebrow } from '../../components/ui.jsx'
 
 const RELEASES = [
   {
@@ -34,7 +35,8 @@ export default function Rhythm() {
     <section className="relative overflow-hidden border-t border-stone-200 bg-stone-50 py-20 sm:py-28">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 paper-grain opacity-[0.04]" />
       <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
-        <h2 className="max-w-[26ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
+        <Eyebrow>always getting better</Eyebrow>
+        <h2 className="mt-2 max-w-[26ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
           A new release every month.
         </h2>
         <p className="mt-4 max-w-[56ch] text-base/7 text-pretty text-stone-600">
@@ -61,6 +63,14 @@ export default function Rhythm() {
                 </span>
               </div>
               <p className="mt-2.5 text-sm/6 text-pretty text-stone-600">{r.blurb}</p>
+              {r.upcoming && (
+                <Link
+                  to="/insider"
+                  className="mt-3 inline-block -rotate-1 font-hand text-lg/6 font-medium text-brand-600 hover:text-brand-700"
+                >
+                  try it tonight on nightly &rarr;
+                </Link>
+              )}
             </li>
           ))}
         </ol>

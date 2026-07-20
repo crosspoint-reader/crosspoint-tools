@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Eyebrow } from '../../components/ui.jsx'
 
 function EinkShot({ src, sizeClass = 'eink-s-55 sm:eink-s-60' }) {
   return (
@@ -19,7 +20,7 @@ function Em({ children }) {
 
 // Editorial story blocks: a headline and one flowing serif paragraph with
 // bolded phrases, no checklists.
-function Story({ title, children, reversed = false, shot }) {
+function Story({ eyebrow, title, children, reversed = false, shot }) {
   return (
     <div
       className={`mt-24 grid items-center gap-12 first:mt-0 lg:gap-16 ${
@@ -28,7 +29,8 @@ function Story({ title, children, reversed = false, shot }) {
     >
       {reversed && <div className="relative order-last mx-auto lg:order-first">{shot}</div>}
       <div>
-        <h3 className="max-w-[22ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
+        {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
+        <h3 className="mt-2 max-w-[22ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
           {title}
         </h3>
         <p className="mt-6 max-w-[58ch] font-serif text-xl/9 text-pretty text-stone-600">{children}</p>
@@ -43,6 +45,7 @@ export default function Features() {
     <section className="eink relative border-t border-stone-200 bg-white py-20 sm:py-28">
       <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
         <Story
+          eyebrow="the reading experience"
           title="Typography done properly."
           shot={<EinkShot src="/screenshots/feature-reader.png" />}
         >
@@ -55,6 +58,7 @@ export default function Features() {
 
         <Story
           reversed
+          eyebrow="make it yours"
           title="Bring your own fonts."
           shot={<EinkShot src="/screenshots/feature-settings-font-selection.png" />}
         >
@@ -70,6 +74,7 @@ export default function Features() {
         </Story>
 
         <Story
+          eyebrow="no cables needed"
           title="Books move over WiFi."
           shot={<EinkShot src="/screenshots/feature-transfer.png" />}
         >
@@ -98,6 +103,7 @@ export default function Features() {
 
         <Story
           reversed
+          eyebrow="always in sync"
           title="Never lose your page."
           shot={<EinkShot src="/screenshots/feature-bookmarks.png" />}
         >

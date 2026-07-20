@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Button } from '../../components/ui.jsx'
+import { Button, Eyebrow } from '../../components/ui.jsx'
 
 // E-ink device frame: screen contents come from a firmware screenshot so the
 // mockups render pixel-identical to the real UI.
@@ -28,7 +28,8 @@ export default function Hero({ onOpenBuy }) {
 
       <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-6 py-16 lg:grid-cols-[1fr_auto] lg:gap-16 lg:px-8 lg:py-24">
         <div>
-          <h1 className="max-w-[18ch] font-display text-5xl/[1.05] font-semibold tracking-tight text-balance text-stone-900 sm:text-7xl/[1.05]">
+          <Eyebrow>built by readers, for readers</Eyebrow>
+          <h1 className="mt-2 max-w-[18ch] font-display text-5xl/[1.05] font-semibold tracking-tight text-balance text-stone-900 sm:text-7xl/[1.05]">
             Read without limits.
           </h1>
           <p className="mt-6 max-w-[48ch] font-serif text-xl/9 text-pretty text-stone-600">
@@ -118,6 +119,29 @@ export default function Hero({ onOpenBuy }) {
           {/* main device: home screen (Lyra theme, pixel-accurate port) */}
           <div className="eink eink-s-55 sm:eink-s-60 relative">
             <EinkShot src="/screenshots/hero-home.png" screenClass="is-home" x3 />
+          </div>
+
+          {/* Hand-drawn annotation: these are real firmware screenshots */}
+          <div
+            className="pointer-events-none absolute -bottom-9 left-1/2 hidden w-max -translate-x-1/2 items-start gap-1.5 lg:flex"
+            aria-hidden="true"
+          >
+            <svg
+              className="mt-0.5 w-5 shrink-0 -scale-x-100 text-stone-400"
+              viewBox="0 0 20 32"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M14 30 C 8 24, 6 14, 9 3" />
+              <path d="M9 3 l-5 6" />
+              <path d="M9 3 l3 7" />
+            </svg>
+            <span className="rotate-1 font-hand text-lg/6 font-medium text-stone-500">
+              actual firmware screenshots, not mockups
+            </span>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { Button } from '../../components/ui.jsx'
+import { Button, Eyebrow } from '../../components/ui.jsx'
 
 export default function GetInTouch() {
   return (
@@ -8,7 +8,8 @@ export default function GetInTouch() {
         className="pointer-events-none absolute inset-0 paper-grain opacity-[0.04]"
       />
       <div className="relative mx-auto max-w-3xl px-6 text-center">
-        <h2 className="mx-auto max-w-[24ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
+        <Eyebrow>say hello</Eyebrow>
+        <h2 className="mx-auto mt-2 max-w-[24ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
           Interested in collaborating with us?
         </h2>
         <p className="mx-auto mt-6 max-w-[52ch] font-serif text-xl/9 text-pretty text-stone-600">

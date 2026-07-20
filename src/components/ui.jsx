@@ -20,10 +20,10 @@ export function Button({ as = 'a', variant = 'outline', className = '', children
   )
 }
 
+// Handwritten margin-note eyebrow, matching the hero's hand-drawn annotations.
 export function Eyebrow({ children, className = '' }) {
   return (
-    <p className={`flex items-center gap-x-2.5 text-xs font-semibold tracking-[0.15em] text-brand-600 uppercase ${className}`}>
-      <span aria-hidden="true" className="h-px w-6 bg-brand-500/60" />
+    <p className={`inline-block -rotate-1 font-hand text-xl/6 font-medium text-brand-600 ${className}`}>
       {children}
     </p>
   )
