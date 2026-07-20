@@ -105,6 +105,7 @@ export const INTERVAL_PRESETS = [
   { value: 'cyrillic', label: 'Cyrillic' },
   { value: 'vietnamese', label: 'Vietnamese' },
   { value: 'hebrew', label: 'Hebrew' },
+  { value: 'arabic', label: 'Arabic', note: '(Farsi, Urdu)' },
   { value: 'armenian', label: 'Armenian' },
   { value: 'georgian', label: 'Georgian' },
   { value: 'ethiopic', label: 'Ethiopic' },

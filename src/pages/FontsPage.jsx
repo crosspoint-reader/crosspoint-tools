@@ -690,6 +690,13 @@ export default function FontsPage() {
                       (✓).
                       <br />
                       <br />
+                      <strong className="text-white">Arabic</strong>: Covers Arabic, Farsi, and
+                      Urdu letterforms (including Persian/Urdu-specific letters and presentation
+                      forms). Note: correct joined rendering depends on the reader&rsquo;s
+                      text-shaping pipeline, not just glyph coverage; isolated codepoints alone
+                      may render disconnected.
+                      <br />
+                      <br />
                       <strong className="text-white">Note on Fallback Fonts</strong>: Fallback fonts
                       only fill missing characters. The main family is always checked first, then
                       your fallback family 1, your fallback family 2, and finally the builder's

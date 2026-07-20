@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 
-const PHOTO_COUNT = 16
+const PHOTO_COUNT = 18
 
 export default function Community() {
   // Shuffle once per mount, exactly like the old inline script did.
