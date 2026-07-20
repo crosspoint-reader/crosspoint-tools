@@ -1,0 +1,216 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:wght@400;500;700&family=Noto+Serif+Hebrew:wght@400;700&family=Noto+Sans:wght@400;500;600;700&family=Caveat:wght@500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Inter for body/UI, Lora for headlines (the original CrossPoint serif),
+     Geist Mono for technical text. */
+  --font-sans: "InterVariable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans--font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  --font-display: "Lora", ui-serif, serif;
+  --font-serif: "Lora", ui-serif, serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --font-eink: "Noto Serif", serif;
+  --font-hand: "Caveat", cursive;
+
+  /* Forest green — the single accent color */
+  --color-brand-50: #f0f5f3;
+  --color-brand-100: #d6e5de;
+  --color-brand-200: #b3cfc2;
+  --color-brand-300: #8fb9a6;
+  --color-brand-400: #69917d;
+  --color-brand-500: #4a7a62;
+  --color-brand-600: #3d6652;
+  --color-brand-700: #315243;
+  --color-brand-800: #253e33;
+  --color-brand-900: #1a2c24;
+  --color-brand-950: #101c16;
+
+  /* Royalty.dev funding gold */
+  --color-royalty: #b8953a;
+  --color-royalty-dark: #9a7a2e;
+}
+
+html { color-scheme: light; }
+
+/* Paper grain — subtle fractal-noise texture, the recurring Free-Ink surface.
+   Apply with a low opacity utility (e.g. opacity-[0.05]). */
+@utility paper-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+/* Dot-matrix field — the recurring e-ink texture. Color comes from currentColor. */
+@utility dot-field {
+  background-image: radial-gradient(currentColor 1px, transparent 1.5px);
+  background-size: 14px 14px;
+  background-position: center;
+}
+
+@utility dot-field-sm {
+  background-image: radial-gradient(currentColor 1px, transparent 1.2px);
+  background-size: 9px 9px;
+  background-position: center;
+}
+
+/* Faint engineering grid */
+@utility blueprint-grid {
+  background-image:
+    linear-gradient(to right, currentColor 1px, transparent 1px),
+    linear-gradient(to bottom, currentColor 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Slow marquee for logo/tech strips */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@utility animate-ticker {
+  animation: ticker 38s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticker { animation: none; }
+}
+
+/* ============================================================
+   E-INK DEVICE MOCKUP: renders firmware UI (Lyra theme)
+   Base canvas: 480×800. Scale with --eink-scale CSS variable.
+   ============================================================ */
+
+.eink {
+  --eink-scale: 1;
+  --eink-paper: #f5f4ef;
+  --eink-ink: #1a1a1a;
+  --eink-dim: #8a8782;
+  --eink-sel: #d9d6ce;
+  --eink-rule: #0f0f0f;
+}
+
+.eink-device {
+  width: calc(496px * var(--eink-scale));
+  height: calc(820px * var(--eink-scale));
+  background: var(--eink-paper);
+  border-radius: calc(10px * var(--eink-scale));
+  padding: calc(10px * var(--eink-scale));
+  padding-bottom: calc(12px * var(--eink-scale));
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.06),
+    0 20px 40px -16px rgba(0,0,0,0.15),
+    0 50px 80px -30px rgba(0,0,0,0.18);
+  position: relative;
+}
+
+/* The actual 480×800 e-ink display */
+.eink-screen {
+  width: calc(480px * var(--eink-scale));
+  height: calc(800px * var(--eink-scale));
+  background: var(--eink-paper);
+  color: var(--eink-ink);
+  position: relative;
+  overflow: hidden;
+  font-family: 'Noto Sans', sans-serif;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+  box-shadow: inset 0 0 0 calc(1px * var(--eink-scale)) rgba(0,0,0,0.08);
+}
+.eink-screen * { box-sizing: border-box; }
+
+/* X3 variant: 528×792 panel (X4 is the 480×800 default). Add alongside
+   .eink-device / .eink-screen when the screenshot is an X3 capture. */
+.eink-device-x3 {
+  width: calc(544px * var(--eink-scale));
+  height: calc(812px * var(--eink-scale));
+}
+.eink-screen-x3 {
+  width: calc(528px * var(--eink-scale));
+  height: calc(792px * var(--eink-scale));
+}
+
+/* Bare screen (no device bezel) used for cutouts */
+.eink-bare {
+  width: calc(480px * var(--eink-scale));
+  height: calc(800px * var(--eink-scale));
+  background: var(--eink-paper);
+  color: var(--eink-ink);
+  position: relative;
+  overflow: hidden;
+  font-family: 'Noto Sans', sans-serif;
+  border-radius: calc(4px * var(--eink-scale));
+  outline: 1px solid rgba(0,0,0,0.08);
+  outline-offset: -1px;
+}
+
+/* Scale multipliers via utility classes */
+.eink-s-35 { --eink-scale: 0.35; }
+.eink-s-40 { --eink-scale: 0.40; }
+.eink-s-45 { --eink-scale: 0.45; }
+.eink-s-50 { --eink-scale: 0.50; }
+.eink-s-55 { --eink-scale: 0.55; }
+.eink-s-60 { --eink-scale: 0.60; }
+.eink-s-65 { --eink-scale: 0.65; }
+.eink-s-70 { --eink-scale: 0.70; }
+
+/* Subtle paper speckle for authenticity */
+.eink-screen::before,
+.eink-bare::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+    radial-gradient(rgba(0,0,0,0.02) 1px, transparent 1px);
+  background-size: calc(3px * var(--eink-scale)) calc(3px * var(--eink-scale)),
+                   calc(7px * var(--eink-scale)) calc(7px * var(--eink-scale));
+  pointer-events: none;
+  opacity: 0.6;
+  mix-blend-mode: multiply;
+  z-index: 10;
+}
+
+/* Community photo marquee: seamless horizontal auto-scroll */
+.marquee {
+  overflow: hidden;
+  width: 100%;
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 4%, black 96%, transparent);
+          mask-image: linear-gradient(90deg, transparent, black 4%, black 96%, transparent);
+}
+.marquee-track {
+  display: flex;
+  gap: 1rem;
+  width: max-content;
+  animation: marquee-scroll 80s linear infinite;
+}
+.marquee:hover .marquee-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track { animation: none; }
+}
+@keyframes marquee-scroll {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(calc(-50% - 0.5rem), 0, 0); }
+}
+.marquee-item {
+  flex-shrink: 0;
+  width: clamp(240px, 32vw, 360px);
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ebe7dd;
+  outline: 1px solid rgba(0,0,0,0.06);
+  outline-offset: -1px;
+}
+.marquee-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* Placeholder styling for slots awaiting real photos */
+.marquee-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Noto Sans', sans-serif;
+  font-size: 0.875rem;
+  color: #8a8782;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
