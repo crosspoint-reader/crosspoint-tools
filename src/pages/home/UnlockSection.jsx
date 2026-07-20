@@ -47,7 +47,7 @@ export default function UnlockSection() {
     <section id="unlock-tool" className="relative scroll-mt-20 overflow-hidden border-t border-stone-200 bg-stone-50 py-16 sm:py-20">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 blueprint-grid text-stone-300/30 [mask-image:radial-gradient(60%_80%_at_50%_0%,black,transparent)]"
+        className="pointer-events-none absolute inset-0 paper-grain opacity-[0.04]"
       />
       <div className="relative mx-auto max-w-3xl px-6 text-center">
         <h2 className="mx-auto max-w-[24ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
@@ -63,7 +63,7 @@ export default function UnlockSection() {
         {/* Primary path: SD card flashing */}
         <div className="mx-auto mt-8 max-w-xl rounded-2xl bg-white p-6 text-left shadow-sm ring-1 ring-stone-950/5 sm:p-7">
           <h3 className="font-display text-sm font-semibold text-stone-900">Flash from SD card</h3>
-          <p className="mt-1 font-mono text-xs text-stone-400">Recommended for X3 and X4, even on stock firmware.</p>
+          <p className="mt-1 text-xs text-stone-400">Recommended for X3 and X4, even on stock firmware.</p>
           <ol className="mt-5 space-y-4">
             {steps.map((content, i) => (
               <li key={i} className="flex gap-3">
@@ -97,8 +97,8 @@ export default function UnlockSection() {
               className="text-red-600 underline decoration-red-300 underline-offset-2 hover:text-red-700 hover:decoration-red-500"
             >
               CLICK HERE FOR THE LIST OF APPROVED &amp; FLAGGED FIRMWARE
-            </a>{' '}
-            &mdash; FLASHING UNAPPROVED FIRMWARE CAN PERMANENTLY BRICK YOUR DEVICE
+            </a>
+            . FLASHING UNAPPROVED FIRMWARE CAN PERMANENTLY BRICK YOUR DEVICE
           </p>
         </div>
 

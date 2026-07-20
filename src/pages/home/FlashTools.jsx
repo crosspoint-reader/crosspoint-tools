@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Eyebrow } from '../../components/ui.jsx'
+import { Link } from 'react-router-dom'
 import {
   CrossPointFlasher,
   fetchReleaseFirmware,
@@ -340,8 +340,7 @@ export default function FlashTools() {
   return (
     <section id="flash-tools" className="relative scroll-mt-20 border-t border-stone-200 py-16 sm:py-20">
       <div className="mx-auto max-w-3xl px-6">
-        <Eyebrow>Web flasher</Eyebrow>
-        <h2 className="mt-4 max-w-[30ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
+        <h2 className="max-w-[30ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
           Flash from your browser.
         </h2>
         <p className="mt-4 max-w-[56ch] text-base/7 text-pretty text-stone-600">
@@ -355,7 +354,8 @@ export default function FlashTools() {
           >
             daveallie
           </a>
-          .
+          . CrossPoint is also a foundation to build on: the project has been forked over
+          1,000 times, with community alternatives worth exploring.
         </p>
 
         {/* Browser check */}
@@ -374,7 +374,7 @@ export default function FlashTools() {
               <StepBadge n={1} active={!!model} />
               <h3 className="font-display text-sm font-semibold text-stone-900">Select your device</h3>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {MODELS.map((m) => (
                 <button
                   key={m.id}
@@ -387,6 +387,14 @@ export default function FlashTools() {
                   <div className="mt-0.5 font-mono text-xs text-stone-400">{m.res}</div>
                 </button>
               ))}
+              <Link
+                to="/sticky"
+                className={cardClass(false)}
+                style={running ? { pointerEvents: 'none' } : undefined}
+              >
+                <div className="text-sm font-semibold text-stone-900">Seeed Studio Sticky</div>
+                <div className="mt-0.5 font-mono text-xs text-stone-400">Sticky flasher</div>
+              </Link>
             </div>
           </div>
 

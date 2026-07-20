@@ -1,15 +1,14 @@
-import { Button, Eyebrow } from '../../components/ui.jsx'
+import { Button } from '../../components/ui.jsx'
 
 export default function GetInTouch() {
   return (
     <section id="get-in-touch" className="relative scroll-mt-20 overflow-hidden border-t border-stone-200 bg-stone-50 py-16 sm:py-20">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 dot-field text-stone-300/40 [mask-image:radial-gradient(70%_100%_at_50%_100%,black,transparent)]"
+        className="pointer-events-none absolute inset-0 paper-grain opacity-[0.04]"
       />
       <div className="relative mx-auto max-w-3xl px-6 text-center">
-        <Eyebrow className="justify-center">Get in touch</Eyebrow>
-        <h2 className="mx-auto mt-4 max-w-[24ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
+        <h2 className="mx-auto max-w-[24ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
           Interested in collaborating with us?
         </h2>
         <p className="mx-auto mt-4 max-w-[52ch] text-base/7 text-pretty text-stone-600">

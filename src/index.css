@@ -31,6 +31,13 @@
 
 html { color-scheme: light; }
 
+/* Paper grain — subtle fractal-noise texture, the recurring Free-Ink surface.
+   Apply with a low opacity utility (e.g. opacity-[0.05]). */
+@utility paper-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
 /* Dot-matrix field — the recurring e-ink texture. Color comes from currentColor. */
 @utility dot-field {
   background-image: radial-gradient(currentColor 1px, transparent 1.5px);

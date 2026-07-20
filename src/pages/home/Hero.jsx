@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Button, Eyebrow } from '../../components/ui.jsx'
+import { Button } from '../../components/ui.jsx'
 
 // E-ink device frame: screen contents come from a firmware screenshot so the
 // mockups render pixel-identical to the real UI.
@@ -13,53 +13,47 @@ function EinkShot({ src, screenClass = '', x3 = false }) {
   )
 }
 
-const PRESS = [
-  { src: '/press/techcrunch.svg', alt: 'TechCrunch', className: 'h-7 sm:h-9' },
-  { src: '/press/theverge.svg', alt: 'The Verge', className: 'h-9 sm:h-11' },
-  { src: '/press/lifehacker.svg', alt: 'Lifehacker', className: 'h-6 sm:h-8' },
-]
-
 export default function Hero({ onOpenBuy }) {
   return (
     <section className="eink relative overflow-hidden">
-      {/* faint dot-matrix field + soft brand wash behind the hero */}
+      {/* soft brand wash + faint paper grain behind the hero */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-linear-to-br from-stone-50 via-white to-brand-50/50"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 dot-field text-stone-300/60 [mask-image:radial-gradient(120%_90%_at_50%_0%,black,transparent_75%)]"
+        className="pointer-events-none absolute inset-0 paper-grain opacity-[0.05]"
       />
 
       <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-6 py-16 lg:grid-cols-[1fr_auto] lg:gap-16 lg:px-8 lg:py-24">
         <div>
-          <Eyebrow>Open-source E-Ink firmware</Eyebrow>
-          <h1 className="mt-4 max-w-[18ch] font-display text-5xl/[1.05] font-semibold tracking-tight text-balance text-stone-900 sm:text-6xl/[1.05]">
-            The best way to&nbsp;read on your Xteink.
+          <h1 className="max-w-[18ch] font-display text-5xl/[1.05] font-semibold tracking-tight text-balance text-stone-900 sm:text-7xl/[1.05]">
+            Read without limits.
           </h1>
-          <p className="mt-6 max-w-[52ch] text-lg/7 text-pretty text-stone-600">
-            Community-built firmware that replaces the stock software on Xteink X3 and X4
-            e-readers. More features, more control, fully open-source.
+          <p className="mt-6 max-w-[48ch] text-lg/8 text-pretty text-stone-600">
+            CrossPoint is e-reader software built in the open by the people who use it. Get it
+            for the Xteink X3 and X4, the Sticky from Seeed Studio, the M5Paper, the LilyGo
+            T5, and more devices with every release.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-3">
             <Button as="a" href="#flash-tools" variant="primary" className="px-4 py-2.5">
               <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
               </svg>
-              Flash Firmware
+              Get CrossPoint
             </Button>
             <Button as="button" type="button" variant="outline" className="px-4 py-2.5" onClick={onOpenBuy}>
               <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007Z" />
               </svg>
-              Buy X3/X4 Developer Edition
+              Buy an Xteink X3/X4
             </Button>
           </div>
 
           {/* Secondary links */}
-          <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-sm text-stone-400">
+          <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-stone-400">
             <Link
               to="/debug"
               className="inline-flex items-center gap-1.5 font-medium no-underline underline-offset-4 hover:text-stone-700 hover:underline"
@@ -107,25 +101,6 @@ export default function Hero({ onOpenBuy }) {
         </div>
       </div>
 
-      {/* As featured on: press logo strip */}
-      <div className="relative border-t border-stone-200/70">
-        <div className="mx-auto max-w-7xl px-6 pt-12 pb-12 lg:px-8">
-          <p className="text-center font-mono text-xs font-medium tracking-[0.2em] text-stone-400 uppercase">
-            As featured on
-          </p>
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-14 gap-y-8 sm:gap-x-20">
-            {PRESS.map((p) => (
-              <img
-                key={p.alt}
-                src={p.src}
-                alt={p.alt}
-                className={`${p.className} w-auto opacity-40 [filter:brightness(0)] transition-opacity hover:opacity-70`}
-                loading="lazy"
-              />
-            ))}
-          </div>
-        </div>
-      </div>
     </section>
   )
 }

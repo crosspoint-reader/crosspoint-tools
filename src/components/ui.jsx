@@ -22,7 +22,7 @@ export function Button({ as = 'a', variant = 'outline', className = '', children
 
 export function Eyebrow({ children, className = '' }) {
   return (
-    <p className={`flex items-center gap-x-2.5 font-mono text-xs font-medium tracking-wide text-brand-600 uppercase ${className}`}>
+    <p className={`flex items-center gap-x-2.5 text-xs font-semibold tracking-[0.15em] text-brand-600 uppercase ${className}`}>
       <span aria-hidden="true" className="h-px w-6 bg-brand-500/60" />
       {children}
     </p>

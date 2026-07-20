@@ -16,7 +16,6 @@ const COLUMNS = [
     title: 'Tools',
     links: [
       { name: 'Font Builder', href: '/fonts', route: true },
-      { name: 'Theme Builder', href: '/theme-builder', route: true },
       { name: 'Advanced flash controls', href: '/debug', route: true },
       { name: 'Unlock Tool', href: '/#unlock-tool' },
       { name: 'Register for KoSync', href: '/kosync', route: true },
@@ -46,14 +45,14 @@ export default function Footer() {
               </span>
             </Link>
             <p className="mt-4 max-w-[34ch] text-sm/6 text-stone-500">
-              Community-built open-source firmware for Xteink e-readers. More features, more
-              control, fully open-source.
+              E-reader software built in the open. Get it for the Xteink X3 and X4, Seeed
+              Studio Sticky, M5Paper, LilyGo T5, and more.
             </p>
           </div>
 
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <h3 className="font-mono text-xs font-medium tracking-wide text-stone-400 uppercase">
+              <h3 className="text-xs font-semibold tracking-[0.15em] text-stone-400 uppercase">
                 {col.title}
               </h3>
               <ul role="list" className="mt-4 space-y-3">
@@ -83,10 +82,10 @@ export default function Footer() {
         </div>
 
         <div className="mt-14 flex flex-col gap-y-4 border-t border-stone-200 pt-8 sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-mono text-xs text-stone-400">
+          <p className="text-xs text-stone-400">
             CrossPoint Reader is open-source under the MIT license.
           </p>
-          <p className="font-mono text-xs text-stone-400">
+          <p className="text-xs text-stone-400">
             Built by the community, for the community.
           </p>
         </div>
