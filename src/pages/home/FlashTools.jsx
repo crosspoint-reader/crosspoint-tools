@@ -146,6 +146,7 @@ const DEVICE_INSTALLS = {
     flashMode: 'dio',
     flashFreq: '80m',
     preserveNvs: true,
+    resetAfterReconnect: true,
     after: 'The device restarts automatically. If the screen stays blank, unplug and reconnect USB.',
   },
   m5paper: {
@@ -518,6 +519,7 @@ export default function FlashTools() {
         baudrate: install.baudrate,
         expectedChip: MODEL_CHIPS[model],
         deviceName: install.name,
+        resetAfterReconnect: install.resetAfterReconnect,
       })
       await flasher.repairBootRegion(CROSSPOINT_PARTITION_TABLE, {
         bootloaderData,

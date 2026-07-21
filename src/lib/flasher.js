@@ -435,13 +435,17 @@ export class CrossPointFlasher {
   // device must identify as. connect() aborts on a mismatch so firmware for one
   // board can't be written to another (e.g. Seeed's S3 build onto a C3 Xteink).
   // deviceName is only used to build a helpful error message.
-  constructor(port = null, { baudrate = 115200, expectedChip = null, deviceName = null } = {}) {
+  // resetAfterReconnect repeats the normal-boot reset after closing and
+  // reopening the port. The Sticky needs this delayed second pulse after a
+  // flash, matching Seeed's Playground behavior.
+  constructor(port = null, { baudrate = 115200, expectedChip = null, deviceName = null, resetAfterReconnect = false } = {}) {
     this.espLoader = null;
     this.layout = null;
     this.port = port;
     this.baudrate = baudrate;
     this.expectedChip = expectedChip;
     this.deviceName = deviceName;
+    this.resetAfterReconnect = resetAfterReconnect;
   }
 
   // Must be called synchronously inside a user gesture (click handler) before any awaits.
@@ -500,6 +504,37 @@ export class CrossPointFlasher {
     } catch {}
     await this.espLoader.transport.disconnect();
     this.espLoader = null;
+    if (!skipReset && this.resetAfterReconnect) {
+      await this.resetPortAfterReconnect();
+    }
+  }
+
+  async resetPortAfterReconnect() {
+    // Seeed waits for the Sticky's USB serial device to settle, reopens the
+    // already-authorized port, then pulses EN through RTS. Reopening can race
+    // USB enumeration, so retry briefly instead of treating the first failure
+    // as a failed flash.
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const deadline = Date.now() + 10000;
+    let opened = false;
+    while (!opened) {
+      try {
+        await this.port.open({ baudRate: 115200 });
+        opened = true;
+      } catch (err) {
+        if (Date.now() >= deadline) throw new Error(`Firmware was written, but the Sticky could not be reopened for its final reset: ${err.message}`);
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    }
+
+    try {
+      await this.port.setSignals({ dataTerminalReady: false, requestToSend: true });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } finally {
+      await this.port.close();
+    }
   }
 
   async readLayout() {
