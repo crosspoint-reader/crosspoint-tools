@@ -2580,6 +2580,7 @@ async function handleAccessoryCreate(
     id,
     title: title.trim(),
     link: linkVal,
+    comingSoon: formData.get('comingSoon') === 'true',
     category: readAccessoryCategory(formData) || 'accessory',
     createdAt: new Date().toISOString(),
   };
@@ -2628,6 +2629,10 @@ async function handleAccessoryUpdate(
       return json({ error: 'Product link must be a valid http(s) URL' }, 400, headers);
     }
     accessory.link = linkVal;
+  }
+  const comingSoon = formData.get('comingSoon');
+  if (comingSoon !== null) {
+    accessory.comingSoon = comingSoon === 'true';
   }
   const category = readAccessoryCategory(formData);
   if (category) {

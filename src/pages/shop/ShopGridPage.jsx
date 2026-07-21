@@ -35,10 +35,16 @@ function SearchIcon() {
 function ProductCard({ item }) {
   const imgUrl = accessoryImageUrl(item)
   const clickable = !!item.link
+  const comingSoon = !!item.comingSoon || !item.link
 
   const body = (
     <>
       <div className="relative aspect-square w-full border-b border-stone-100 bg-white">
+        {comingSoon && (
+          <span className="absolute top-3 left-3 z-10 rounded-full bg-stone-900/80 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-white uppercase">
+            Coming soon
+          </span>
+        )}
         {imgUrl ? (
           <img
             src={imgUrl}
@@ -63,7 +69,7 @@ function ProductCard({ item }) {
         >
           {clickable ? (
             <>
-              Buy Now <span aria-hidden="true">&rarr;</span>
+              {comingSoon ? 'Learn More' : 'Buy Now'} <span aria-hidden="true">&rarr;</span>
             </>
           ) : (
             'Coming soon'

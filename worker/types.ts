@@ -138,6 +138,9 @@ export interface Accessory {
   title: string;
   // Empty string = no purchase link yet; rendered as a "coming soon" card.
   link: string;
+  // Marks the item "coming soon" even when a link is set; the link then
+  // renders as an "Explore Device" CTA instead of "Buy Now".
+  comingSoon?: boolean;
   // Which shop page the item appears on. Absent on legacy entries; treat
   // undefined as 'accessory'.
   category?: 'device' | 'accessory';

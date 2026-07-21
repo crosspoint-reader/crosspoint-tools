@@ -328,6 +328,7 @@ function accessoryImageUrl(a) {
 function AccessoriesCard({ secret, log }) {
   const [title, setTitle] = useState('')
   const [link, setLink] = useState('')
+  const [comingSoon, setComingSoon] = useState(false)
   const [category, setCategory] = useState('accessory')
   const [image, setImage] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -360,6 +361,7 @@ function AccessoriesCard({ secret, log }) {
       const formData = new FormData()
       formData.append('title', title.trim())
       formData.append('link', link.trim())
+      formData.append('comingSoon', String(comingSoon))
       formData.append('category', category)
       if (image) formData.append('image', image)
 
@@ -374,6 +376,7 @@ function AccessoriesCard({ secret, log }) {
         log('Accessory added: ' + r.data.accessory.title)
         setTitle('')
         setLink('')
+        setComingSoon(false)
         setImage(null)
         if (imageInputRef.current) imageInputRef.current.value = ''
         loadAccessories()
@@ -442,6 +445,7 @@ function AccessoriesCard({ secret, log }) {
         next[a.id] = {
           title: a.title,
           link: a.link || '',
+          comingSoon: !!a.comingSoon,
           category: a.category || 'accessory',
           image: null,
         }
@@ -462,6 +466,7 @@ function AccessoriesCard({ secret, log }) {
       const formData = new FormData()
       formData.append('title', edit.title.trim())
       formData.append('link', edit.link.trim())
+      formData.append('comingSoon', String(edit.comingSoon))
       formData.append('category', edit.category)
       if (edit.image) formData.append('image', edit.image)
 
@@ -526,6 +531,15 @@ function AccessoriesCard({ secret, log }) {
           placeholder="Product link (https://..., empty = coming soon)"
           className={inputCls}
         />
+        <label className="flex items-center gap-2 text-sm text-stone-700">
+          <input
+            type="checkbox"
+            checked={comingSoon}
+            onChange={(e) => setComingSoon(e.target.checked)}
+            className="size-4 rounded border-stone-300 text-brand-500 focus:ring-brand-500/20"
+          />
+          Coming soon (link shows as &ldquo;Learn More&rdquo;)
+        </label>
         <div className="flex gap-2">
           <label className="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
             <span className="truncate">{image ? image.name : 'Choose image...'}</span>
@@ -583,6 +597,7 @@ function AccessoriesCard({ secret, log }) {
                         </span>
                       </div>
                       <div className="truncate text-xs text-stone-400">
+                        {a.comingSoon && <span className="text-amber-600">coming soon &middot; </span>}
                         {a.link ? (
                           <a
                             href={a.link}
@@ -657,6 +672,15 @@ function AccessoriesCard({ secret, log }) {
                       onChange={(e) => setEditField(a.id, 'link', e.target.value)}
                       className={inputCls}
                     />
+                    <label className="flex items-center gap-2 text-sm text-stone-700">
+                      <input
+                        type="checkbox"
+                        checked={edit.comingSoon}
+                        onChange={(e) => setEditField(a.id, 'comingSoon', e.target.checked)}
+                        className="size-4 rounded border-stone-300 text-brand-500 focus:ring-brand-500/20"
+                      />
+                      Coming soon (link shows as &ldquo;Learn More&rdquo;)
+                    </label>
                     <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-xs text-stone-500 hover:border-stone-400 hover:text-stone-700">
                       <span className="truncate">
                         {edit.image ? edit.image.name : 'Replace image (optional)...'}
