@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eyebrow } from '../../components/ui.jsx'
+import { trackFirmwareAction } from '../../lib/analytics.js'
 
 // Locked device CTA: anchor #unlock-tool is linked publicly, keep it.
 export default function UnlockSection() {
@@ -24,6 +25,12 @@ export default function UnlockSection() {
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
+      trackFirmwareAction('download', {
+        device: 'x3 or x4 unspecified',
+        channel: 'stable',
+        version: res.headers.get('X-Firmware-Version') || 'latest',
+        source: 'sd card button',
+      })
       setStatus('Saved as update.bin. Copy it to your SD card root.')
     } catch (err) {
       setStatus(`Error: ${err.message}`)

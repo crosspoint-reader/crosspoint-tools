@@ -771,6 +771,7 @@ async function handleReleaseFirmware(
   }
 
   const release = await res.json() as {
+    tag_name: string;
     assets: Array<{ name: string; browser_download_url: string }>;
   };
   const firmwareAsset = release.assets.find(a => a.name.endsWith('firmware.bin'));
@@ -791,6 +792,7 @@ async function handleReleaseFirmware(
       ...headers,
       'Content-Type': 'application/octet-stream',
       'Content-Disposition': 'attachment; filename="firmware.bin"',
+      'X-Firmware-Version': release.tag_name,
     },
   });
 }

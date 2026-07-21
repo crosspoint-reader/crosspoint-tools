@@ -16,6 +16,7 @@ import {
   fetchFlashAsset,
 } from '../../lib/flasher.js'
 import { renderMarkdown } from './markdown.js'
+import { trackFirmwareAction } from '../../lib/analytics.js'
 
 // ---------- small presentational bits ----------
 
@@ -188,7 +189,7 @@ export default function FlashTools() {
 
   // Firmware version info (per selected device model)
   const [crosspoint, setCrosspoint] = useState({ text: 'Loading...', enabled: false, tag: null, notesUrl: null })
-  const [nightly, setNightly] = useState({ text: 'Loading...', enabled: false })
+  const [nightly, setNightly] = useState({ text: 'Loading...', enabled: false, version: null })
   const [stock, setStock] = useState({
     en: { text: 'Loading...', enabled: false },
     ch: { text: 'Loading...', enabled: false },
@@ -273,7 +274,7 @@ export default function FlashTools() {
       }
     }
     setCrosspoint({ text: 'Loading...', enabled: false, tag: null, notesUrl: null })
-    setNightly({ text: 'Loading...', enabled: false })
+    setNightly({ text: 'Loading...', enabled: false, version: null })
     setStock({ en: { text: 'Loading...', enabled: false }, ch: { text: 'Loading...', enabled: false } })
     ;(async () => {
       const [meta, buildMeta] = await Promise.all([fetchReleaseMeta(), fetchBuildMeta()])
@@ -290,9 +291,13 @@ export default function FlashTools() {
       }
 
       if (buildMeta && buildMeta.status === 'success') {
-        setNightly({ text: `${buildMeta.version} - ${fmtDate(buildMeta.buildDate)}`, enabled: true })
+        setNightly({
+          text: `${buildMeta.version} - ${fmtDate(buildMeta.buildDate)}`,
+          enabled: true,
+          version: buildMeta.version,
+        })
       } else {
-        setNightly({ text: 'No build available', enabled: false })
+        setNightly({ text: 'No build available', enabled: false, version: null })
       }
 
       for (const lang of ['en', 'ch']) {
@@ -361,6 +366,27 @@ export default function FlashTools() {
     setFw(id)
   }
 
+  function firmwareAnalyticsDetails(action, source = 'web flasher') {
+    if (action === 'crosspoint') {
+      return { device: model, channel: 'stable', version: crosspoint.tag, source }
+    }
+    if (action === 'nightly') {
+      return { device: model, channel: 'nightly', version: nightly.version, source }
+    }
+    if (action === 'stock-en' || action === 'stock-ch') {
+      const lang = action === 'stock-en' ? 'en' : 'ch'
+      return { device: model, channel: action, version: stock[lang].text, source }
+    }
+    if (action === 'device') {
+      return { device: model, channel: 'beta', version: deviceBuild?.name, source }
+    }
+    if (action.startsWith('beta-')) {
+      const beta = betaBuilds.find((build) => `beta-${build.id}` === action)
+      return { device: model, channel: 'beta', version: beta?.version || beta?.name, source }
+    }
+    return { device: model, channel: 'custom', version: 'custom', source }
+  }
+
   // --- Flash actions ---
   async function runFlash(action) {
     if (running) return
@@ -424,6 +450,8 @@ export default function FlashTools() {
     setPercent(0)
     setProgress({ title, steps, states: [...states], status: downloadMsg ? { kind: 'info', text: downloadMsg } : null })
 
+    const analyticsDetails = firmwareAnalyticsDetails(action)
+
     try {
       let firmware
       if (action === 'crosspoint') {
@@ -443,6 +471,8 @@ export default function FlashTools() {
         firmware = await fetchBetaFirmware(action.replace('beta-', ''))
       }
 
+      if (action !== 'custom') trackFirmwareAction('download', analyticsDetails)
+
       setProgress((p) => ({ ...p, status: null }))
 
       const flasher = new CrossPointFlasher(serialPort, {
@@ -459,6 +489,8 @@ export default function FlashTools() {
           setPercent((current / total) * 100)
         },
       })
+
+      trackFirmwareAction('flash', analyticsDetails)
 
       setProgress((p) => ({
         ...p,
@@ -499,6 +531,8 @@ export default function FlashTools() {
       status: { kind: 'info', text: 'Downloading firmware...' },
     })
 
+    const analyticsDetails = firmwareAnalyticsDetails(action)
+
     try {
       let firmware
       if (action === 'custom') {
@@ -506,6 +540,7 @@ export default function FlashTools() {
         firmware = new Uint8Array(await customFile.arrayBuffer())
       } else {
         firmware = await fetchDeviceBuildFirmware(model)
+        trackFirmwareAction('download', analyticsDetails)
       }
       const bootloaderData = await fetchFlashAsset(install.bootloader, `${install.name} bootloader`)
       const partitionTableData = install.partitions
@@ -539,6 +574,8 @@ export default function FlashTools() {
           setPercent((current / total) * 100)
         },
       })
+
+      trackFirmwareAction('flash', analyticsDetails)
 
       setProgress((p) => ({ ...p, status: { kind: 'ok', text: `Installed! ${install.after}` } }))
     } catch (err) {

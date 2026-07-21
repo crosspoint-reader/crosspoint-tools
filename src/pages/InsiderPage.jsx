@@ -13,6 +13,7 @@ import {
   fetchCustomFirmware,
   downloadBlob,
 } from '../lib/flasher.js'
+import { trackFirmwareAction } from '../lib/analytics.js'
 import {
   formatDate,
   formatSize,
@@ -151,6 +152,13 @@ export default function InsiderPage() {
       states[0] = 'running'
       setFlashStates([...states])
       const firmware = await fetchEarlyAccessFirmware()
+      const analyticsDetails = {
+        device: deviceModel,
+        channel: 'nightly',
+        version: meta?.version,
+        source: 'insider flasher',
+      }
+      trackFirmwareAction('download', analyticsDetails)
       states[0] = 'done'
       setFlashStates([...states])
 
@@ -165,6 +173,7 @@ export default function InsiderPage() {
           if (step === 'Flash firmware') setFlashPct((current / total) * 100)
         },
       })
+      trackFirmwareAction('flash', analyticsDetails)
       setFlashResult({ ok: true })
     } catch (err) {
       const failIdx = states.findIndex((s) => s === 'running')
@@ -388,6 +397,13 @@ export default function InsiderPage() {
       states[0] = 'running'
       setCfFlashStates([...states])
       const firmware = await fetchCustomFirmware()
+      const analyticsDetails = {
+        device: deviceModel,
+        channel: 'custom font build',
+        version: cfBuild?.version || 'custom',
+        source: 'insider flasher',
+      }
+      trackFirmwareAction('download', analyticsDetails)
       states[0] = 'done'
       setCfFlashStates([...states])
 
@@ -402,6 +418,7 @@ export default function InsiderPage() {
           if (step === 'Flash firmware') setCfFlashPct((current / total) * 100)
         },
       })
+      trackFirmwareAction('flash', analyticsDetails)
       setCfFlashResult({ ok: true })
     } catch (err) {
       const failIdx = states.findIndex((s) => s === 'running')
@@ -416,6 +433,12 @@ export default function InsiderPage() {
     try {
       const firmware = await fetchCustomFirmware()
       downloadBlob(firmware, 'crosspoint-custom.bin')
+      trackFirmwareAction('download', {
+        device: deviceModel || 'x3 or x4 unspecified',
+        channel: 'custom font build',
+        version: cfBuild?.version || 'custom',
+        source: 'insider download button',
+      })
     } catch (err) {
       alert(err.message)
     }
