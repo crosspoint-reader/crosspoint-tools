@@ -427,14 +427,13 @@ export default function RoadmapPage() {
               </div>
               <p className="mt-3 text-sm font-medium text-stone-900">Fill the gaps the stock firmware leaves.</p>
               <ul className="mt-3 space-y-1.5 text-sm text-stone-600">
-                <li>• Stock firmware already does it well? We won't duplicate it.</li>
-                <li>• Another popular fork solves it well? We defer rather than fragment.</li>
+                <li>• Stock firmware already does it well? We should hit that bar or surpass it.</li>
+                <li>
+                  • Another popular fork solves it well? We generally defer — unless it's part of the core reading
+                  experience (e.g. stats).
+                </li>
                 <li>• Doesn't improve reading or long-term maintainability? Out of scope.</li>
               </ul>
-              <p className="mt-3 text-xs text-stone-500">
-                <strong className="font-medium text-stone-700">Language priority:</strong> English first, then
-                languages where stock firmware fails or forks haven't addressed gaps.
-              </p>
             </div>
           </div>
 
@@ -471,8 +470,9 @@ export default function RoadmapPage() {
               <p className="mt-1 text-sm text-stone-700">
                 <strong className="font-semibold text-stone-900">New themes</strong> (theming surface is frozen) and{' '}
                 <strong className="font-semibold text-stone-900">new external network connectors</strong> (sync
-                engines, cloud storage, OPDS extensions, remote file access). Open a Discussion first if you're
-                unsure.
+                engines, cloud storage, OPDS extensions, remote file access). Our own open-source CrossPoint KOSync
+                server now handles syncing to third-party systems like Hardcover at the API level instead of
+                bloating the firmware. Open a Discussion first if you're unsure.
               </p>
             </div>
           </div>
@@ -502,8 +502,6 @@ export default function RoadmapPage() {
                     ['E-Ink Driver Refinement', 'Fewer full-screen flashes, better ghosting management.'],
                     ['Reading UX', 'Bookmarks, progress, button mapping, navigation.'],
                     ['Library Management', 'Simple, intuitive local-collection organization.'],
-                    ['Local Transfer', 'Pull-based loading via web server or widely-used standards.'],
-                    ['Reference Tools', 'Local, offline dictionary lookup.'],
                     [
                       'Memory, Flash & Code Quality',
                       'Refactors that reduce resource use, even without a user-visible feature.',
@@ -530,12 +528,15 @@ export default function RoadmapPage() {
                 </div>
                 <ul className="mt-4 space-y-3 text-sm">
                   {[
-                    ['Interactive Apps', 'No notepads, calculators, or games.'],
-                    ['Writing / Authoring Tools', 'Input hardware and RAM are wrong for this.'],
-                    ['Active Connectivity', 'No RSS, news aggregators, or web browsers.'],
-                    ['Media Playback', 'No audio players or audiobooks.'],
-                    ['Complex Annotation', 'No typed-out notes.'],
-                    ['Stock-firmware duplication', "If it already works well, we don't reimplement it."],
+                    ['Interactive Apps', 'No notepads, calculators, or games. These belong in other forks.'],
+                    [
+                      'Writing / Authoring Tools',
+                      'Input hardware and RAM are wrong for this; other forks already explore this space.',
+                    ],
+                    [
+                      'Active Connectivity',
+                      'No RSS, news aggregators, or web browsers. Background Wi-Fi drains the battery and complicates the single-core CPU.',
+                    ],
                     [
                       'PDF Rendering',
                       'Fixed layout makes for a poor e-ink reading experience on this hardware class.',
@@ -571,7 +572,9 @@ export default function RoadmapPage() {
                   </>,
                   <>
                     Does another popular CrossPoint fork already handle this well?{' '}
-                    <span className="text-stone-500">If yes, we usually defer.</span>
+                    <span className="text-stone-500">
+                      If yes, we generally defer — unless it's part of the core reading experience (e.g. stats).
+                    </span>
                   </>,
                   <>
                     Does it improve the core reading experience, or reduce memory / flash / code complexity?{' '}
@@ -596,8 +599,8 @@ export default function RoadmapPage() {
               </ol>
               <blockquote className="mt-5 border-l-4 border-brand-400 pl-4 font-serif text-sm text-stone-300 italic">
                 <strong className="font-semibold text-white not-italic">Note to contributors:</strong> CrossPoint is
-                intentionally narrow. "It would be cool if..." features are not enough; the bar is "this fixes
-                something the stock firmware does poorly, or it makes the firmware leaner and easier to maintain."
+                intentionally narrow. "It would be cool if..." features are not enough; the bar is "this hits or
+                surpasses what the stock firmware offers, or it makes the firmware leaner and easier to maintain."
               </blockquote>
             </div>
           </div>
@@ -678,8 +681,9 @@ export default function RoadmapPage() {
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-stone-600">
-                  Catalogue what stock (and other popular forks) handle poorly: RTL text, underserved languages,
-                  rendering edge cases, accessibility, input quirks.
+                  Catalogue what the stock firmware (and other popular forks) handle poorly or not at all: RTL text
+                  (Arabic, Hebrew, Persian), languages that need shaping, complex layout, or non-Latin font work
+                  nobody is handling well today, rendering edge cases, accessibility, input quirks.
                 </p>
                 <p className="mt-3 text-xs text-stone-500">
                   <strong className="font-semibold text-stone-700">Status:</strong>{' '}
@@ -753,7 +757,7 @@ export default function RoadmapPage() {
                   <li>• Distributed automatically based on impact and tenure.</li>
                   <li>
                     • Over <strong className="font-semibold text-stone-900">$600</strong> raised in the first few
-                    days of opening funding.
+                    hours of opening funding.
                   </li>
                   <li>
                     • Scoring methodology is published at{' '}
