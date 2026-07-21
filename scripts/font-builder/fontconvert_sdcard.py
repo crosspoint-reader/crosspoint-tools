@@ -306,6 +306,10 @@ def _extract_pairpos_subtable(subtable, glyph_to_cp, raw_kern):
                         raw_kern[key] = raw_kern.get(key, 0) + xa
 
 
+class FontBuildError(Exception):
+    """A build failure with a message suitable for showing to the end user."""
+
+
 def extract_kerning_fonttools(font_path, codepoints, ppem):
     """Extract kerning pairs from a font file using fonttools.
 
@@ -729,7 +733,13 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     source_fontfiles.extend(fallback_fontfiles or [])
     for idx, cps in enumerate(source_codepoints):
         if cps:
-            kern_map.update(extract_kerning_fonttools(source_fontfiles[idx], cps, ppem))
+            try:
+                kern_map.update(extract_kerning_fonttools(source_fontfiles[idx], cps, ppem))
+            except Exception as e:
+                raise FontBuildError(
+                    f"The font file '{os.path.basename(source_fontfiles[idx])}' appears to be "
+                    f"corrupt or malformed and could not be processed ({e}). "
+                    f"Try re-exporting the font or uploading a different file.") from e
     # SMP codepoints (> U+FFFF) cannot be stored in the uint16 kern codepoint
     # field; drop them before class derivation to avoid a downstream
     # struct.error when packing the binary kern tables.
@@ -1086,4 +1096,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except FontBuildError as e:
+        # The workflow greps for this prefix to report the message to the user.
+        print(f"BUILD ERROR: {e}", file=sys.stderr)
+        sys.exit(1)

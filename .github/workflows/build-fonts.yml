@@ -105,6 +105,7 @@ jobs:
 
       - name: Run fontconvert_sdcard.py
         run: |
+          set -o pipefail
           mkdir -p out
           mapfile -t STYLE_ARGS < /tmp/style_args.txt
           DEFAULT_FALLBACK_DIR="scripts/font-builder/default-fallback-fonts"
@@ -187,10 +188,15 @@ jobs:
         if: failure()
         run: |
           LOG_TAIL=$(tail -c 4000 /tmp/build.log 2>/dev/null | jq -Rs . || echo '""')
+          # Surface a user-facing message if the builder emitted one.
+          ERROR_MSG=$(grep -o 'BUILD ERROR: .*' /tmp/build.log 2>/dev/null | tail -n1 | sed 's/^BUILD ERROR: //')
+          if [ -z "$ERROR_MSG" ]; then
+            ERROR_MSG="Build failed. See GitHub Actions logs."
+          fi
           payload=$(jq -nc \
             --arg buildId "$BUILD_ID" \
             --arg status "failed" \
-            --arg error "Build failed. See GitHub Actions logs." \
+            --arg error "$ERROR_MSG" \
             --argjson log "$LOG_TAIL" \
             '{buildId: $buildId, status: $status, error: $error, log: $log}')
           curl -sf -X POST "${WEBHOOK_BASE_URL}/api/font-build/status-update" \
