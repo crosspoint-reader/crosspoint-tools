@@ -146,7 +146,7 @@ const DEVICE_INSTALLS = {
     flashMode: 'dio',
     flashFreq: '80m',
     preserveNvs: true,
-    after: 'Press and hold the power button (top right) to boot CrossPoint.',
+    after: 'The device restarts automatically. If the screen stays blank, unplug and reconnect USB.',
   },
   m5paper: {
     name: 'M5Paper',

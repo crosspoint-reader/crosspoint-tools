@@ -479,13 +479,18 @@ export class CrossPointFlasher {
 
   async disconnect(skipReset = false) {
     if (!this.espLoader) return;
-    // Release DTR before the reset pulse: through a USB-UART bridge DTR straps
-    // GPIO0, and resetting with it asserted drops the chip into ROM download
-    // mode ("waiting for download") instead of booting the app. On boards with
-    // a self-holding power latch (Sticky) that state is unrecoverable from the
-    // device itself — the power button drives the latch, not EN.
+    // Keep GPIO0 high (DTR released), then drive EN low -> high with RTS. The
+    // esptool-js HardReset implementation only releases RTS; it does not assert
+    // it first, so calling after('hard_reset') alone may not produce a reset
+    // edge. The explicit 100 ms pulse matches Seeed's Sticky Playground.
     try { await this.espLoader.transport.setDTR(false); } catch {}
-    await this.espLoader.after(skipReset ? 'no_reset_stub' : 'hard_reset');
+    if (skipReset) {
+      await this.espLoader.after('no_reset_stub');
+    } else {
+      await this.espLoader.transport.setRTS(true);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await this.espLoader.after('hard_reset');
+    }
     // Clear both control lines before close so the port doesn't glitch EN/IO0
     // into a download-mode reset as the OS releases the device.
     try {
