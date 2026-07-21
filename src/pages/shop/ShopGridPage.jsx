@@ -13,14 +13,6 @@ export function accessoryCategory(a) {
   return a.category || 'accessory'
 }
 
-function hostname(link) {
-  try {
-    return new URL(link).hostname.replace(/^www\./, '')
-  } catch {
-    return ''
-  }
-}
-
 function SearchIcon() {
   return (
     <svg
@@ -42,7 +34,6 @@ function SearchIcon() {
 
 function ProductCard({ item }) {
   const imgUrl = accessoryImageUrl(item)
-  const site = hostname(item.link)
   const clickable = !!item.link
 
   const body = (
@@ -72,7 +63,7 @@ function ProductCard({ item }) {
         >
           {clickable ? (
             <>
-              View {site ? 'on ' + site : 'product'} <span aria-hidden="true">&rarr;</span>
+              Buy Now <span aria-hidden="true">&rarr;</span>
             </>
           ) : (
             'Coming soon'

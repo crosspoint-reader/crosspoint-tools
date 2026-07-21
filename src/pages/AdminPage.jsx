@@ -54,6 +54,22 @@ function XIcon() {
   )
 }
 
+function ArrowUpIcon() {
+  return (
+    <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 15.75 7.5-7.5 7.5 7.5" />
+    </svg>
+  )
+}
+
+function ArrowDownIcon() {
+  return (
+    <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+    </svg>
+  )
+}
+
 // --- Current build status ----------------------------------------------
 
 function BuildStatusCard({ log, refreshRef }) {
@@ -388,6 +404,35 @@ function AccessoriesCard({ secret, log }) {
     }
   }
 
+  async function moveItem(id, delta) {
+    const index = items.findIndex((a) => a.id === id)
+    const target = index + delta
+    if (index < 0 || target < 0 || target >= items.length) return
+
+    const next = [...items]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setItems(next)
+
+    try {
+      const res = await fetch('/api/accessories/order', {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer ' + secret,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ids: next.map((a) => a.id) }),
+      })
+      if (!res.ok) {
+        const r = await readJsonResponse(res)
+        log('Reorder failed: ' + describeFailure(r))
+        loadAccessories()
+      }
+    } catch (err) {
+      log('Reorder error: ' + err.message)
+      loadAccessories()
+    }
+  }
+
   function toggleEdit(a) {
     setEdits((prev) => {
       const next = { ...prev }
@@ -507,7 +552,7 @@ function AccessoriesCard({ secret, log }) {
 
       {items.length > 0 && (
         <div className="mt-4 divide-y divide-stone-100">
-          {items.map((a) => {
+          {items.map((a, i) => {
             const edit = edits[a.id]
             const imgUrl = accessoryImageUrl(a)
             return (
@@ -555,6 +600,24 @@ function AccessoriesCard({ secret, log }) {
                     </div>
                   </div>
                   <div className="ml-2 flex shrink-0 gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => moveItem(a.id, -1)}
+                      disabled={i === 0}
+                      className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-stone-400"
+                      title="Move up"
+                    >
+                      <ArrowUpIcon />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveItem(a.id, 1)}
+                      disabled={i === items.length - 1}
+                      className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-stone-400"
+                      title="Move down"
+                    >
+                      <ArrowDownIcon />
+                    </button>
                     <button
                       type="button"
                       onClick={() => toggleEdit(a)}

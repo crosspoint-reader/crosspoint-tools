@@ -239,6 +239,10 @@ async function handleApi(
         if (request.method === 'POST') return handleAccessoryCreate(request, env, corsHeaders);
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
+      case '/api/accessories/order':
+        if (request.method === 'PUT') return handleAccessoriesReorder(request, env, corsHeaders);
+        return json({ error: 'Method not allowed' }, 405, corsHeaders);
+
       case '/api/sticky/upload':
         return handleDeviceBuildUpload(DEVICE_BUILDS.sticky, request, env, corsHeaders);
 
@@ -2641,6 +2645,38 @@ async function handleAccessoryUpdate(
 
   await saveAccessories(env, list);
   return json({ accessory }, 200, headers);
+}
+
+// Replace the list order with the given id sequence. Items missing from the
+// payload (e.g. added concurrently) keep their position at the front.
+async function handleAccessoriesReorder(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const body = await request.json() as { ids?: unknown };
+  if (!Array.isArray(body.ids) || !body.ids.every(id => typeof id === 'string')) {
+    return json({ error: 'ids must be an array of item ids' }, 400, headers);
+  }
+
+  const list = await getAccessories(env);
+  const byId = new Map(list.map(a => [a.id, a]));
+  const ordered: Accessory[] = [];
+  for (const id of body.ids as string[]) {
+    const item = byId.get(id);
+    if (item) {
+      ordered.push(item);
+      byId.delete(id);
+    }
+  }
+  const reordered = [...byId.values(), ...ordered];
+
+  await saveAccessories(env, reordered);
+  return json({ accessories: reordered }, 200, headers);
 }
 
 async function handleAccessoryDelete(
