@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
-import { trackFirmwareAction } from '../lib/analytics.js'
 
 // Download .bin modal: device picker + firmware picker (from /api/catalog) → download.
 
@@ -110,12 +109,6 @@ export default function DownloadModal({ open, onClose }) {
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
-      trackFirmwareAction('download', {
-        device: model,
-        channel: selected.channel,
-        version: res.headers.get('X-Firmware-Version') || selected.version || selected.name,
-        source: 'download modal',
-      })
       setStatus({ text: 'Saved as update.bin', error: false })
     } catch (err) {
       console.error(err)
