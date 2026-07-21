@@ -44,7 +44,7 @@ function ProductCard({ item }) {
             src={imgUrl}
             alt={item.title}
             loading="lazy"
-            className={`size-full object-contain p-4 transition ${clickable ? 'group-hover:scale-[1.02]' : ''}`}
+            className={`size-full object-cover transition ${clickable ? 'group-hover:scale-[1.02]' : ''}`}
           />
         ) : (
           <div className="flex size-full items-center justify-center text-sm text-stone-400">

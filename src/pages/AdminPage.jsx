@@ -500,8 +500,7 @@ function AccessoriesCard({ secret, log }) {
         <Link to="/accessories" className="font-medium text-brand-500 underline underline-offset-2">
           /accessories
         </Link>{' '}
-        pages (devices also feed the homepage buy modal). Leave the link empty to show an item as
-        &ldquo;coming soon&rdquo;.
+        pages. Leave the link empty to show an item as &ldquo;coming soon&rdquo;.
       </p>
 
       <div className="mt-3 space-y-2">

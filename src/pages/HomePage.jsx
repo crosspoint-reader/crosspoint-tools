@@ -1,6 +1,4 @@
-import { useState } from 'react'
 import Layout from '../components/Layout.jsx'
-import BuyModal from '../components/BuyModal.jsx'
 import Hero from './home/Hero.jsx'
 import PressQuotes from './home/PressQuotes.jsx'
 import Features from './home/Features.jsx'
@@ -11,11 +9,9 @@ import Community from './home/Community.jsx'
 import GetInTouch from './home/GetInTouch.jsx'
 
 export default function HomePage() {
-  const [buyOpen, setBuyOpen] = useState(false)
-
   return (
     <Layout>
-      <Hero onOpenBuy={() => setBuyOpen(true)} />
+      <Hero />
       <PressQuotes />
       <Features />
       <EveryLanguage />
@@ -23,7 +19,6 @@ export default function HomePage() {
       <FlashTools />
       <Community />
       <GetInTouch />
-      <BuyModal open={buyOpen} onClose={() => setBuyOpen(false)} />
     </Layout>
   )
 }
