@@ -32,7 +32,7 @@ function SearchIcon() {
   )
 }
 
-function ProductCard({ item }) {
+function ProductCard({ item, ctaLabel }) {
   const imgUrl = accessoryImageUrl(item)
   const clickable = !!item.link
   const comingSoon = !!item.comingSoon || !item.link
@@ -69,7 +69,7 @@ function ProductCard({ item }) {
         >
           {clickable ? (
             <>
-              {comingSoon ? 'Learn More' : 'Buy Now'} <span aria-hidden="true">&rarr;</span>
+              {comingSoon ? 'Learn More' : ctaLabel} <span aria-hidden="true">&rarr;</span>
             </>
           ) : (
             'Coming soon'
@@ -98,7 +98,15 @@ function ProductCard({ item }) {
 }
 
 // Amazon-style product grid with optional search, shared by /devices and /accessories.
-export default function ShopGridPage({ category, eyebrow, title, intro, emptyText, showSearch = true }) {
+export default function ShopGridPage({
+  category,
+  eyebrow,
+  title,
+  intro,
+  emptyText,
+  showSearch = true,
+  ctaLabel = 'Buy Now',
+}) {
   const [items, setItems] = useState(null) // null = loading
   const [query, setQuery] = useState('')
 
@@ -163,7 +171,7 @@ export default function ShopGridPage({ category, eyebrow, title, intro, emptyTex
         ) : filtered.length > 0 ? (
           <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((a) => (
-              <ProductCard key={a.id} item={a} />
+              <ProductCard key={a.id} item={a} ctaLabel={ctaLabel} />
             ))}
           </div>
         ) : (

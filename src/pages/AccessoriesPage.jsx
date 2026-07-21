@@ -8,6 +8,7 @@ export default function AccessoriesPage() {
       title="Accessories"
       intro="Recommended products for your device — cases, cables, storage, and other gear that pairs well with CrossPoint readers."
       emptyText="No accessories listed yet. Check back soon."
+      ctaLabel="Get It Here"
     />
   )
 }
