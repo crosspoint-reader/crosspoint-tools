@@ -134,9 +134,18 @@ const MODEL_CHIPS = {
 const DEVICE_INSTALLS = {
   sticky: {
     name: 'Seeed Sticky',
+    // These are the exact four-part package settings used by Seeed's
+    // CrossPoint Playground. Keeping the packaged PT (instead of generating
+    // it client-side) makes both flashers perform the same non-destructive
+    // sector writes.
     bootloader: '/firmware/sticky-bootloader.bin',
+    partitions: '/firmware/sticky-partitions.bin',
     bootloaderOffset: 0x0,
     baudrate: 921600,
+    flashSize: '16MB',
+    flashMode: 'dio',
+    flashFreq: '80m',
+    preserveNvs: true,
     after: 'Press and hold the power button (top right) to boot CrossPoint.',
   },
   m5paper: {
@@ -498,6 +507,9 @@ export default function FlashTools() {
         firmware = await fetchDeviceBuildFirmware(model)
       }
       const bootloaderData = await fetchFlashAsset(install.bootloader, `${install.name} bootloader`)
+      const partitionTableData = install.partitions
+        ? await fetchFlashAsset(install.partitions, `${install.name} partition table`)
+        : null
       const otadataData = await fetchFlashAsset('/firmware/sticky-boot-app0.bin', 'boot_app0')
 
       setProgress((p) => ({ ...p, status: null }))
@@ -510,8 +522,13 @@ export default function FlashTools() {
       await flasher.repairBootRegion(CROSSPOINT_PARTITION_TABLE, {
         bootloaderData,
         bootloaderOffset: install.bootloaderOffset,
+        partitionTableData,
         firmwareData: firmware,
         otadataData,
+        preserveNvs: install.preserveNvs,
+        flashSize: install.flashSize,
+        flashMode: install.flashMode,
+        flashFreq: install.flashFreq,
         onStepChange: (idx, name, status) => {
           states[idx] = status
           setProgress((p) => (p ? { ...p, states: [...states] } : p))

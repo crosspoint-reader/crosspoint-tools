@@ -729,7 +729,20 @@ export class CrossPointFlasher {
   // bootloaderOffset: where the chip's ROM expects the 2nd-stage bootloader —
   // 0x0 on ESP32-C3/S3, 0x1000 on the classic ESP32 (M5Paper). Writing at the
   // wrong offset leaves the board unbootable until reflashed.
-  async repairBootRegion(table, { bootloaderData = null, bootloaderOffset = 0x0, firmwareData = null, otadataData = null, onStepChange, onProgress, skipReset = false } = {}) {
+  async repairBootRegion(table, {
+    bootloaderData = null,
+    bootloaderOffset = 0x0,
+    partitionTableData = null,
+    firmwareData = null,
+    otadataData = null,
+    preserveNvs = false,
+    flashSize = 'keep',
+    flashMode = 'keep',
+    flashFreq = 'keep',
+    onStepChange,
+    onProgress,
+    skipReset = false,
+  } = {}) {
     const nvs = table.find((p) => p.type === 'data-nvs');
     const otadata = table.find((p) => p.type === 'data-ota');
     const app0 = table.find((p) => p.type === 'app-ota_0');
@@ -750,6 +763,14 @@ export class CrossPointFlasher {
     }
     if (otadataData && otadataData.length > otadata.size) {
       throw new Error(`otadata image too large: ${otadataData.length} bytes won't fit in otadata (${otadata.size} bytes).`);
+    }
+    if (partitionTableData) {
+      if (partitionTableData.length > 0x1000) {
+        throw new Error(`Partition table image is too large: ${partitionTableData.length} bytes (maximum 4096).`);
+      }
+      if (!matchesPartitionTable(parsePartitionTable(partitionTableData), table)) {
+        throw new Error('Packaged partition table does not match the expected device layout.');
+      }
     }
 
     const writeLabel = 'Write ' + [
@@ -774,12 +795,15 @@ export class CrossPointFlasher {
     if (bootloaderData) {
       fileArray.push({ data: this.espLoader.ui8ToBstr(bootloaderData), address: bootloaderOffset });
     }
-    fileArray.push({ data: this.espLoader.ui8ToBstr(buildPartitionTableBinary(table)), address: 0x8000 });
-    // Blank (all 0xFF) NVS and otadata: both regions hold leftover garbage
-    // after an overwrite, and erased flash is the state firmware knows how
-    // to initialize from (otadata all-0xFF = boot app0 by IDF default).
-    // An explicit otadataData image (boot_app0.bin) overrides the blank.
-    fileArray.push({ data: this.espLoader.ui8ToBstr(new Uint8Array(nvs.size).fill(0xFF)), address: nvs.offset });
+    const partitionBinary = partitionTableData || buildPartitionTableBinary(table);
+    fileArray.push({ data: this.espLoader.ui8ToBstr(partitionBinary), address: 0x8000 });
+    // Repair flows normally blank NVS and otadata because erased flash is the
+    // state firmware knows how to initialize from. A packaged install can
+    // preserve NVS to reproduce an upstream four-part image exactly. An
+    // explicit otadataData image (boot_app0.bin) overrides blank otadata.
+    if (!preserveNvs) {
+      fileArray.push({ data: this.espLoader.ui8ToBstr(new Uint8Array(nvs.size).fill(0xFF)), address: nvs.offset });
+    }
     if (otadataData) {
       fileArray.push({ data: this.espLoader.ui8ToBstr(otadataData), address: otadata.offset });
     } else {
@@ -790,7 +814,7 @@ export class CrossPointFlasher {
     }
     await this.espLoader.writeFlash({
       fileArray,
-      flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep',
+      flashSize, flashMode, flashFreq,
       eraseAll: false, compress: true,
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Write boot region', written, total); },
     });
