@@ -356,7 +356,7 @@ export default function FlashTools() {
     }
 
     if (install) {
-      await runDeviceInstall(install, serialPort)
+      await runDeviceInstall(install, action, serialPort)
       return
     }
 
@@ -453,8 +453,8 @@ export default function FlashTools() {
   // Full boot-region install for the non-Xteink devices (see DEVICE_INSTALLS).
   // Same flow the standalone Sticky page used: bootloader + partition table +
   // boot_app0 otadata + firmware in one write, then a serial hard reset.
-  async function runDeviceInstall(install, serialPort) {
-    const buildName = deviceBuild?.name || `${install.name} Beta`
+  async function runDeviceInstall(install, action, serialPort) {
+    const buildName = action === 'custom' ? 'Custom Firmware' : deviceBuild?.name || `${install.name} Beta`
     const steps = [
       'Connect to device',
       'Write bootloader + partition table + firmware',
@@ -474,7 +474,13 @@ export default function FlashTools() {
     })
 
     try {
-      const firmware = await fetchDeviceBuildFirmware(model)
+      let firmware
+      if (action === 'custom') {
+        if (!customFile) throw new Error('No file selected')
+        firmware = new Uint8Array(await customFile.arrayBuffer())
+      } else {
+        firmware = await fetchDeviceBuildFirmware(model)
+      }
       const bootloaderData = await fetchFlashAsset(install.bootloader, `${install.name} bootloader`)
       const otadataData = await fetchFlashAsset('/firmware/sticky-boot-app0.bin', 'boot_app0')
 
@@ -590,6 +596,12 @@ export default function FlashTools() {
                     </div>
                     <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
                   </button>
+                  {model === 'sticky' && (
+                    <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
+                      <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
+                      <div className="mt-0.5 font-mono text-xs text-stone-400">Upload file</div>
+                    </button>
+                  )}
                 </div>
               ) : (
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -851,7 +863,11 @@ export default function FlashTools() {
                   {fw === 'custom' && (
                     <div>
                       <div className="text-sm font-semibold text-stone-900">Custom Firmware</div>
-                      <p className="mt-1 text-xs text-stone-400">Upload a .bin file to flash to the OTA partition.</p>
+                      <p className="mt-1 text-xs text-stone-400">
+                        {DEVICE_INSTALLS[model]
+                          ? 'Upload a firmware .bin. Writes the full boot region (bootloader + partition table + firmware).'
+                          : 'Upload a .bin file to flash to the OTA partition.'}
+                      </p>
                       <div className="mt-4 flex gap-2">
                         <label className="flex flex-1 cursor-pointer items-center justify-center rounded-md border border-dashed border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
                           <span>{customFile ? customFile.name : 'Choose file...'}</span>
