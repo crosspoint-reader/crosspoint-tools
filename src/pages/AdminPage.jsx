@@ -311,13 +311,12 @@ function accessoryImageUrl(a) {
 
 function AccessoriesCard({ secret, log }) {
   const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
   const [link, setLink] = useState('')
   const [category, setCategory] = useState('accessory')
   const [image, setImage] = useState(null)
   const [busy, setBusy] = useState(false)
   const [items, setItems] = useState([])
-  // Per-item edit panels: { [id]: { title, description, link, image } }
+  // Per-item edit panels: { [id]: { title, link, category, image } }
   const [edits, setEdits] = useState({})
   const imageInputRef = useRef(null)
 
@@ -344,7 +343,6 @@ function AccessoriesCard({ secret, log }) {
     try {
       const formData = new FormData()
       formData.append('title', title.trim())
-      formData.append('description', description.trim())
       formData.append('link', link.trim())
       formData.append('category', category)
       if (image) formData.append('image', image)
@@ -359,7 +357,6 @@ function AccessoriesCard({ secret, log }) {
       if (r.ok) {
         log('Accessory added: ' + r.data.accessory.title)
         setTitle('')
-        setDescription('')
         setLink('')
         setImage(null)
         if (imageInputRef.current) imageInputRef.current.value = ''
@@ -399,7 +396,6 @@ function AccessoriesCard({ secret, log }) {
       } else {
         next[a.id] = {
           title: a.title,
-          description: a.description || '',
           link: a.link || '',
           category: a.category || 'accessory',
           image: null,
@@ -420,7 +416,6 @@ function AccessoriesCard({ secret, log }) {
     try {
       const formData = new FormData()
       formData.append('title', edit.title.trim())
-      formData.append('description', edit.description.trim())
       formData.append('link', edit.link.trim())
       formData.append('category', edit.category)
       if (edit.image) formData.append('image', edit.image)
@@ -480,13 +475,6 @@ function AccessoriesCard({ secret, log }) {
           <option value="accessory">Accessory</option>
           <option value="device">Device</option>
         </select>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Short description of why you recommend it"
-          rows={3}
-          className={`${inputCls} resize-none`}
-        />
         <input
           type="url"
           value={link}
@@ -601,12 +589,6 @@ function AccessoriesCard({ secret, log }) {
                       <option value="accessory">Accessory</option>
                       <option value="device">Device</option>
                     </select>
-                    <textarea
-                      value={edit.description}
-                      onChange={(e) => setEditField(a.id, 'description', e.target.value)}
-                      rows={2}
-                      className={`${inputCls} resize-none`}
-                    />
                     <input
                       type="url"
                       value={edit.link}

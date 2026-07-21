@@ -67,9 +67,6 @@ function ProductCard({ item }) {
         >
           {item.title}
         </h3>
-        {item.description && (
-          <p className="mt-1.5 line-clamp-3 text-sm/5 text-stone-500">{item.description}</p>
-        )}
         <span
           className={`mt-auto pt-3 text-xs font-medium ${clickable ? 'text-brand-600' : 'text-stone-400'}`}
         >
@@ -134,11 +131,7 @@ export default function ShopGridPage({ category, eyebrow, title, intro, emptyTex
     if (!items) return []
     const q = query.trim().toLowerCase()
     if (!q) return items
-    return items.filter(
-      (a) =>
-        a.title.toLowerCase().includes(q) ||
-        (a.description || '').toLowerCase().includes(q)
-    )
+    return items.filter((a) => a.title.toLowerCase().includes(q))
   }, [items, query])
 
   return (

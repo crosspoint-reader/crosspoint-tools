@@ -2556,7 +2556,6 @@ async function handleAccessoryCreate(
 
   const formData = await request.formData();
   const title = formData.get('title');
-  const description = formData.get('description');
   const link = formData.get('link');
 
   if (!title || typeof title !== 'string' || !title.trim()) {
@@ -2576,7 +2575,6 @@ async function handleAccessoryCreate(
   const accessory: Accessory = {
     id,
     title: title.trim(),
-    description: (typeof description === 'string' ? description.trim() : '') || '',
     link: linkVal,
     category: readAccessoryCategory(formData) || 'accessory',
     createdAt: new Date().toISOString(),
@@ -2612,7 +2610,6 @@ async function handleAccessoryUpdate(
 
   const formData = await request.formData();
   const title = formData.get('title');
-  const description = formData.get('description');
   const link = formData.get('link');
 
   if (title !== null) {
@@ -2620,9 +2617,6 @@ async function handleAccessoryUpdate(
       return json({ error: 'Title cannot be empty' }, 400, headers);
     }
     accessory.title = title.trim();
-  }
-  if (description !== null && typeof description === 'string') {
-    accessory.description = description.trim();
   }
   if (link !== null) {
     const linkVal = typeof link === 'string' ? link.trim() : '';

@@ -32,7 +32,6 @@ export default function BuyModal({ open, onClose }) {
             .filter((a) => a.category === 'device')
             .map((a) => ({
               name: a.title,
-              note: a.description,
               href: a.link || undefined,
               disabled: !a.link,
             }))

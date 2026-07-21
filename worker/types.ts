@@ -136,7 +136,6 @@ export interface BetaBuild {
 export interface Accessory {
   id: string;
   title: string;
-  description: string;
   // Empty string = no purchase link yet; rendered as a "coming soon" card.
   link: string;
   // Which shop page the item appears on. Absent on legacy entries; treat
