@@ -14,6 +14,8 @@ const KosyncPage = lazy(() => import('./pages/KosyncPage.jsx'))
 const UnlockerPage = lazy(() => import('./pages/UnlockerPage.jsx'))
 const ContactPage = lazy(() => import('./pages/ContactPage.jsx'))
 const UnlockPage = lazy(() => import('./pages/UnlockPage.jsx'))
+const AccessoriesPage = lazy(() => import('./pages/AccessoriesPage.jsx'))
+const DevicesPage = lazy(() => import('./pages/DevicesPage.jsx'))
 
 // Old static-site URLs that must keep working.
 const HTML_REDIRECTS = {
@@ -83,6 +85,8 @@ export default function App() {
           <Route path="/unlocker" element={<UnlockerPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/unlock" element={<UnlockPage />} />
+          <Route path="/accessories" element={<AccessoriesPage />} />
+          <Route path="/devices" element={<DevicesPage />} />
           {Object.entries(HTML_REDIRECTS).map(([from, to]) => (
             <Route key={from} path={from} element={<Navigate to={to} replace />} />
           ))}

@@ -1,8 +1,11 @@
+import { useEffect, useState } from 'react'
 import Modal from './Modal.jsx'
 
-// Device picker that links out to the Xteink store for the unlocked developer edition.
+// Device picker that links out to purchase pages. Devices are managed from the
+// admin panel (shop items with category "device"); the hardcoded list below is
+// only a fallback while the admin list is empty or still loading.
 
-const DEVICES = [
+const FALLBACK_DEVICES = [
   { name: 'Xteink X4', note: 'Developer Edition', href: 'https://go.sjv.io/2RV5N7' },
   { name: 'Xteink X4 Pro', note: 'Developer Edition', href: 'https://go.sjv.io/xJXY9d' },
   { name: 'Xteink X3', note: 'Developer Edition', href: 'https://go.sjv.io/m4oEmM' },
@@ -14,13 +17,44 @@ const DEVICES = [
 ]
 
 export default function BuyModal({ open, onClose }) {
+  const [adminDevices, setAdminDevices] = useState(null)
+
+  useEffect(() => {
+    if (!open || adminDevices !== null) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/accessories')
+        const data = await res.json()
+        if (cancelled) return
+        setAdminDevices(
+          (data.accessories || [])
+            .filter((a) => a.category === 'device')
+            .map((a) => ({
+              name: a.title,
+              note: a.description,
+              href: a.link || undefined,
+              disabled: !a.link,
+            }))
+        )
+      } catch {
+        if (!cancelled) setAdminDevices([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, adminDevices])
+
+  const devices = adminDevices && adminDevices.length > 0 ? adminDevices : FALLBACK_DEVICES
+
   return (
     <Modal open={open} onClose={onClose} title="Buy CrossPoint Supported Devices">
       <div className="space-y-5">
         <div>
           <div className="text-sm font-semibold text-stone-900">Select your device</div>
           <div className="mt-3 grid grid-cols-2 gap-3">
-            {DEVICES.map((d) =>
+            {devices.map((d) =>
               d.disabled ? (
                 <div
                   key={d.name}
@@ -43,7 +77,7 @@ export default function BuyModal({ open, onClose }) {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
                     </svg>
                   </div>
-                  <div className="mt-0.5 text-xs text-stone-400">{d.note}</div>
+                  {d.note && <div className="mt-0.5 text-xs text-stone-400">{d.note}</div>}
                 </a>
               )
             )}

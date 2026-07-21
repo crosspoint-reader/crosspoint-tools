@@ -133,6 +133,21 @@ export interface BetaBuild {
   source?: BetaSource;
 }
 
+export interface Accessory {
+  id: string;
+  title: string;
+  description: string;
+  // Empty string = no purchase link yet; rendered as a "coming soon" card.
+  link: string;
+  // Which shop page the item appears on. Absent on legacy entries; treat
+  // undefined as 'accessory'.
+  category?: 'device' | 'accessory';
+  createdAt: string;
+  // Set when an image has been uploaded; bumped on replacement so the
+  // frontend can cache-bust /api/accessories/{id}/image?v={imageUpdatedAt}.
+  imageUpdatedAt?: string;
+}
+
 export interface GitHubPushEvent {
   ref: string;
   after: string;

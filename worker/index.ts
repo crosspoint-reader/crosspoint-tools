@@ -1,4 +1,4 @@
-import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource } from './types';
+import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, Accessory } from './types';
 
 const ROYALTY_REPO_ID = 'SoFriendly/crosspoint-tools';
 
@@ -234,6 +234,11 @@ async function handleApi(
         if (request.method === 'PUT') return handleBannerUpdate(request, env, corsHeaders);
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
+      case '/api/accessories':
+        if (request.method === 'GET') return handleAccessoriesList(env, corsHeaders);
+        if (request.method === 'POST') return handleAccessoryCreate(request, env, corsHeaders);
+        return json({ error: 'Method not allowed' }, 405, corsHeaders);
+
       case '/api/sticky/upload':
         return handleDeviceBuildUpload(DEVICE_BUILDS.sticky, request, env, corsHeaders);
 
@@ -264,6 +269,19 @@ async function handleApi(
             return json({ error: 'Method not allowed' }, 405, corsHeaders);
           }
           return json({ error: 'Not found' }, 404, corsHeaders);
+        }
+        // Dynamic routes: /api/accessories/{id}/image and /api/accessories/{id}
+        if (url.pathname.startsWith('/api/accessories/')) {
+          if (url.pathname.endsWith('/image')) {
+            return handleAccessoryImage(url, env, corsHeaders);
+          }
+          if (request.method === 'PATCH') {
+            return handleAccessoryUpdate(request, url, env, corsHeaders);
+          }
+          if (request.method === 'DELETE') {
+            return handleAccessoryDelete(request, url, env, corsHeaders);
+          }
+          return json({ error: 'Method not allowed' }, 405, corsHeaders);
         }
         // Dynamic routes: /api/beta/{id}/firmware
         if (url.pathname.startsWith('/api/beta/') && url.pathname.endsWith('/firmware')) {
@@ -2467,6 +2485,216 @@ async function handleBannerUpdate(
   };
   await env.BUILD_META.put(BANNER_KEY, JSON.stringify(banner));
   return json(banner, 200, headers);
+}
+
+// --- Accessories ---
+//
+// Admin-curated product recommendations shown on /accessories. Metadata lives
+// in KV as a single list; images live in R2 under accessories/{id}/image.
+
+const ACCESSORIES_KEY = 'accessories';
+const MAX_ACCESSORY_IMAGE_BYTES = 5 * 1024 * 1024;
+
+async function getAccessories(env: Env): Promise<Accessory[]> {
+  const raw = await env.BUILD_META.get(ACCESSORIES_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
+async function saveAccessories(env: Env, list: Accessory[]): Promise<void> {
+  await env.BUILD_META.put(ACCESSORIES_KEY, JSON.stringify(list));
+}
+
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const u = new URL(value);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function readAccessoryCategory(formData: FormData): 'device' | 'accessory' | null {
+  const category = formData.get('category');
+  if (category === 'device' || category === 'accessory') return category;
+  return null;
+}
+
+// Pull the optional image out of a create/update form. Returns null when no
+// file was attached, or an error string for a non-image/oversized upload.
+function readAccessoryImage(formData: FormData): { file: File } | { error: string } | null {
+  const image = formData.get('image');
+  if (!image || typeof image === 'string') return null;
+  const file = image as File;
+  if (!file.type.startsWith('image/')) return { error: 'Upload must be an image file' };
+  if (file.size > MAX_ACCESSORY_IMAGE_BYTES) return { error: 'Image must be under 5 MB' };
+  return { file };
+}
+
+async function storeAccessoryImage(env: Env, id: string, file: File): Promise<void> {
+  const data = await file.arrayBuffer();
+  await env.FIRMWARE_BUCKET.put(`accessories/${id}/image`, data, {
+    customMetadata: { contentType: file.type },
+  });
+}
+
+async function handleAccessoriesList(
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const list = await getAccessories(env);
+  return json({ accessories: list }, 200, headers);
+}
+
+async function handleAccessoryCreate(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const formData = await request.formData();
+  const title = formData.get('title');
+  const description = formData.get('description');
+  const link = formData.get('link');
+
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    return json({ error: 'Title is required' }, 400, headers);
+  }
+  // Link is optional: items without one render as disabled "coming soon" cards.
+  const linkVal = typeof link === 'string' ? link.trim() : '';
+  if (linkVal && !isValidHttpUrl(linkVal)) {
+    return json({ error: 'Product link must be a valid http(s) URL' }, 400, headers);
+  }
+  const img = readAccessoryImage(formData);
+  if (img && 'error' in img) {
+    return json({ error: img.error }, 400, headers);
+  }
+
+  const id = `acc-${Date.now().toString(36)}`;
+  const accessory: Accessory = {
+    id,
+    title: title.trim(),
+    description: (typeof description === 'string' ? description.trim() : '') || '',
+    link: linkVal,
+    category: readAccessoryCategory(formData) || 'accessory',
+    createdAt: new Date().toISOString(),
+  };
+  if (img) {
+    await storeAccessoryImage(env, id, img.file);
+    accessory.imageUpdatedAt = new Date().toISOString();
+  }
+
+  const list = await getAccessories(env);
+  list.unshift(accessory);
+  await saveAccessories(env, list);
+
+  return json({ accessory }, 201, headers);
+}
+
+async function handleAccessoryUpdate(
+  request: Request,
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const id = url.pathname.replace('/api/accessories/', '');
+  const list = await getAccessories(env);
+  const accessory = list.find(a => a.id === id);
+  if (!accessory) {
+    return json({ error: 'Accessory not found' }, 404, headers);
+  }
+
+  const formData = await request.formData();
+  const title = formData.get('title');
+  const description = formData.get('description');
+  const link = formData.get('link');
+
+  if (title !== null) {
+    if (typeof title !== 'string' || !title.trim()) {
+      return json({ error: 'Title cannot be empty' }, 400, headers);
+    }
+    accessory.title = title.trim();
+  }
+  if (description !== null && typeof description === 'string') {
+    accessory.description = description.trim();
+  }
+  if (link !== null) {
+    const linkVal = typeof link === 'string' ? link.trim() : '';
+    if (linkVal && !isValidHttpUrl(linkVal)) {
+      return json({ error: 'Product link must be a valid http(s) URL' }, 400, headers);
+    }
+    accessory.link = linkVal;
+  }
+  const category = readAccessoryCategory(formData);
+  if (category) {
+    accessory.category = category;
+  }
+
+  const img = readAccessoryImage(formData);
+  if (img && 'error' in img) {
+    return json({ error: img.error }, 400, headers);
+  }
+  if (img) {
+    await storeAccessoryImage(env, id, img.file);
+    accessory.imageUpdatedAt = new Date().toISOString();
+  }
+
+  await saveAccessories(env, list);
+  return json({ accessory }, 200, headers);
+}
+
+async function handleAccessoryDelete(
+  request: Request,
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const id = url.pathname.replace('/api/accessories/', '');
+  const list = await getAccessories(env);
+  const filtered = list.filter(a => a.id !== id);
+  if (filtered.length === list.length) {
+    return json({ error: 'Accessory not found' }, 404, headers);
+  }
+
+  await env.FIRMWARE_BUCKET.delete(`accessories/${id}/image`);
+  await saveAccessories(env, filtered);
+
+  return json({ ok: true }, 200, headers);
+}
+
+async function handleAccessoryImage(
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  // Path: /api/accessories/{id}/image
+  const id = url.pathname.replace('/api/accessories/', '').replace('/image', '');
+
+  const object = await env.FIRMWARE_BUCKET.get(`accessories/${id}/image`);
+  if (!object) {
+    return json({ error: 'Image not found' }, 404, headers);
+  }
+
+  return new Response(object.body, {
+    headers: {
+      ...headers,
+      'Content-Type': object.customMetadata?.contentType || 'application/octet-stream',
+      'Content-Length': String(object.size),
+      // Replacements bump imageUpdatedAt, which the frontend uses as a ?v=
+      // cache-buster, so long-lived caching is safe here.
+      'Cache-Control': 'public, max-age=86400',
+    },
+  });
 }
 
 // --- Beta Testing ---

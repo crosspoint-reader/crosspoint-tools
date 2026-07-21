@@ -300,6 +300,362 @@ function BannerCard({ secret, log }) {
   )
 }
 
+// --- Accessories ------------------------------------------------------------
+// Recommended products shown on the public /accessories page.
+
+function accessoryImageUrl(a) {
+  return a.imageUpdatedAt
+    ? '/api/accessories/' + a.id + '/image?v=' + encodeURIComponent(a.imageUpdatedAt)
+    : null
+}
+
+function AccessoriesCard({ secret, log }) {
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [link, setLink] = useState('')
+  const [category, setCategory] = useState('accessory')
+  const [image, setImage] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [items, setItems] = useState([])
+  // Per-item edit panels: { [id]: { title, description, link, image } }
+  const [edits, setEdits] = useState({})
+  const imageInputRef = useRef(null)
+
+  const loadAccessories = useCallback(async () => {
+    try {
+      const res = await fetch('/api/accessories')
+      const data = await res.json()
+      setItems(data.accessories || [])
+    } catch {
+      // ignore, matches other cards
+    }
+  }, [])
+
+  useEffect(() => {
+    loadAccessories()
+  }, [loadAccessories])
+
+  const addDisabled = busy || !title.trim()
+
+  async function addAccessory() {
+    if (addDisabled) return
+    setBusy(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('title', title.trim())
+      formData.append('description', description.trim())
+      formData.append('link', link.trim())
+      formData.append('category', category)
+      if (image) formData.append('image', image)
+
+      const res = await fetch('/api/accessories', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + secret },
+        body: formData,
+      })
+      const r = await readJsonResponse(res)
+
+      if (r.ok) {
+        log('Accessory added: ' + r.data.accessory.title)
+        setTitle('')
+        setDescription('')
+        setLink('')
+        setImage(null)
+        if (imageInputRef.current) imageInputRef.current.value = ''
+        loadAccessories()
+      } else {
+        log('Accessory add failed: ' + describeFailure(r))
+      }
+    } catch (err) {
+      log('Accessory add error: ' + err.message)
+    }
+
+    setBusy(false)
+  }
+
+  async function deleteAccessory(id, itemTitle) {
+    if (!window.confirm('Delete accessory "' + itemTitle + '"?')) return
+
+    try {
+      const res = await fetch('/api/accessories/' + id, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + secret },
+      })
+      if (res.ok) {
+        log('Deleted accessory: ' + itemTitle)
+        loadAccessories()
+      }
+    } catch (err) {
+      log('Delete failed: ' + err.message)
+    }
+  }
+
+  function toggleEdit(a) {
+    setEdits((prev) => {
+      const next = { ...prev }
+      if (next[a.id]) {
+        delete next[a.id]
+      } else {
+        next[a.id] = {
+          title: a.title,
+          description: a.description || '',
+          link: a.link || '',
+          category: a.category || 'accessory',
+          image: null,
+        }
+      }
+      return next
+    })
+  }
+
+  function setEditField(id, field, value) {
+    setEdits((prev) => ({ ...prev, [id]: { ...prev[id], [field]: value } }))
+  }
+
+  async function saveEdit(id) {
+    const edit = edits[id]
+    if (!edit || !edit.title.trim()) return
+
+    try {
+      const formData = new FormData()
+      formData.append('title', edit.title.trim())
+      formData.append('description', edit.description.trim())
+      formData.append('link', edit.link.trim())
+      formData.append('category', edit.category)
+      if (edit.image) formData.append('image', edit.image)
+
+      const res = await fetch('/api/accessories/' + id, {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + secret },
+        body: formData,
+      })
+      const r = await readJsonResponse(res)
+
+      if (r.ok) {
+        log('Updated accessory: ' + r.data.accessory.title)
+        setEdits((prev) => {
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
+        loadAccessories()
+      } else {
+        log('Accessory update failed: ' + describeFailure(r))
+      }
+    } catch (err) {
+      log('Accessory update error: ' + err.message)
+    }
+  }
+
+  return (
+    <Card>
+      <CardTitle>Shop</CardTitle>
+      <p className="mt-1 text-xs text-stone-400">
+        Products listed on the{' '}
+        <Link to="/devices" className="font-medium text-brand-500 underline underline-offset-2">
+          /devices
+        </Link>{' '}
+        and{' '}
+        <Link to="/accessories" className="font-medium text-brand-500 underline underline-offset-2">
+          /accessories
+        </Link>{' '}
+        pages (devices also feed the homepage buy modal). Leave the link empty to show an item as
+        &ldquo;coming soon&rdquo;.
+      </p>
+
+      <div className="mt-3 space-y-2">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Product title (e.g. USB-C magnetic cable)"
+            className={`${inputCls} flex-1`}
+          />
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className={`${inputCls} w-auto shrink-0`}
+          >
+            <option value="accessory">Accessory</option>
+            <option value="device">Device</option>
+          </select>
+        </div>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Short description of why you recommend it"
+          rows={3}
+          className={`${inputCls} resize-none`}
+        />
+        <input
+          type="url"
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+          placeholder="Product link (https://..., empty = coming soon)"
+          className={inputCls}
+        />
+        <div className="flex gap-2">
+          <label className="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
+            <span className="truncate">{image ? image.name : 'Choose image...'}</span>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => setImage(e.target.files[0] || null)}
+            />
+          </label>
+          <Button
+            as="button"
+            variant="primary"
+            className="shrink-0"
+            onClick={addAccessory}
+            disabled={addDisabled}
+          >
+            {busy ? 'Adding...' : 'Add'}
+          </Button>
+        </div>
+      </div>
+
+      {items.length > 0 && (
+        <div className="mt-4 divide-y divide-stone-100">
+          {items.map((a) => {
+            const edit = edits[a.id]
+            const imgUrl = accessoryImageUrl(a)
+            return (
+              <div key={a.id} className="py-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    {imgUrl ? (
+                      <img
+                        src={imgUrl}
+                        alt=""
+                        className="size-10 shrink-0 rounded-md bg-stone-100 object-cover ring-1 ring-stone-950/5"
+                      />
+                    ) : (
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-stone-100 text-xs text-stone-400">
+                        —
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <div className="truncate text-sm font-medium text-stone-700">{a.title}</div>
+                        <span
+                          className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-medium ${
+                            a.category === 'device'
+                              ? 'bg-brand-50 text-brand-700'
+                              : 'bg-stone-100 text-stone-500'
+                          }`}
+                        >
+                          {a.category === 'device' ? 'device' : 'accessory'}
+                        </span>
+                      </div>
+                      <div className="truncate text-xs text-stone-400">
+                        {a.link ? (
+                          <a
+                            href={a.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-stone-600"
+                          >
+                            {a.link}
+                          </a>
+                        ) : (
+                          'No link — shown as coming soon'
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="ml-2 flex shrink-0 gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => toggleEdit(a)}
+                      className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+                      title="Edit"
+                    >
+                      <PencilIcon />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteAccessory(a.id, a.title)}
+                      className="rounded-md p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                      title="Delete"
+                    >
+                      <XIcon />
+                    </button>
+                  </div>
+                </div>
+                {edit && (
+                  <div className="mt-2 space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={edit.title}
+                        onChange={(e) => setEditField(a.id, 'title', e.target.value)}
+                        className={`${inputCls} flex-1`}
+                      />
+                      <select
+                        value={edit.category}
+                        onChange={(e) => setEditField(a.id, 'category', e.target.value)}
+                        className={`${inputCls} w-auto shrink-0`}
+                      >
+                        <option value="accessory">Accessory</option>
+                        <option value="device">Device</option>
+                      </select>
+                    </div>
+                    <textarea
+                      value={edit.description}
+                      onChange={(e) => setEditField(a.id, 'description', e.target.value)}
+                      rows={2}
+                      className={`${inputCls} resize-none`}
+                    />
+                    <input
+                      type="url"
+                      value={edit.link}
+                      onChange={(e) => setEditField(a.id, 'link', e.target.value)}
+                      className={inputCls}
+                    />
+                    <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-xs text-stone-500 hover:border-stone-400 hover:text-stone-700">
+                      <span className="truncate">
+                        {edit.image ? edit.image.name : 'Replace image (optional)...'}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => setEditField(a.id, 'image', e.target.files[0] || null)}
+                      />
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => saveEdit(a.id)}
+                        className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleEdit(a)}
+                        className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {items.length === 0 && <p className="mt-3 text-xs text-stone-400">No shop items yet</p>}
+    </Card>
+  )
+}
+
 // --- Beta testing ----------------------------------------------------------
 
 function BetaCard({ secret, log }) {
@@ -1051,6 +1407,7 @@ export default function AdminPage() {
             <BuildStatusCard log={log} refreshRef={refreshRef} />
             <TriggerBuildCard secret={secret} log={log} refreshRef={refreshRef} />
             <BannerCard secret={secret} log={log} />
+            <AccessoriesCard secret={secret} log={log} />
             <BetaCard secret={secret} log={log} />
             <DeviceBuildCard
               secret={secret}

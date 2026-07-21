@@ -22,6 +22,13 @@ const COLUMNS = [
     ],
   },
   {
+    title: 'Shop',
+    links: [
+      { name: 'Devices', href: '/devices', route: true },
+      { name: 'Accessories', href: '/accessories', route: true },
+    ],
+  },
+  {
     title: 'Project',
     links: [
       { name: 'GitHub', href: GITHUB },
@@ -36,7 +43,7 @@ export default function Footer() {
   return (
     <footer className="border-t border-stone-200 bg-stone-100/50">
       <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
-        <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 lg:grid-cols-6">
           <div className="col-span-2">
             <Link to="/" aria-label="Homepage" className="flex items-center gap-x-2.5">
               <img src="/logo.png" alt="" className="size-7 rounded-md" />

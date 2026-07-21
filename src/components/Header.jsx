@@ -1,13 +1,28 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 // Each item carries a short label (md–xl viewports) and a full one (xl+).
+// Items with `items` render as a dropdown on desktop and a group on mobile.
 const NAV = [
   { name: 'Font Builder', short: 'Fonts', href: '/fonts', route: true },
-  { name: 'Docs', short: 'Docs', href: '/docs', route: true },
-  { name: 'Roadmap', short: 'Roadmap', href: '/roadmap', route: true },
+  {
+    name: 'Resources',
+    short: 'Resources',
+    items: [
+      { name: 'Docs', href: '/docs', route: true },
+      { name: 'Roadmap', href: '/roadmap', route: true },
+    ],
+  },
+  {
+    name: 'Shop',
+    short: 'Shop',
+    items: [
+      { name: 'Devices', href: '/devices', route: true },
+      { name: 'Accessories', href: '/accessories', route: true },
+    ],
+  },
   { name: 'Get In Touch', short: 'Contact', href: '/contact', route: true },
-  { name: 'Have a locked device?', short: 'Locked?', href: '/unlock', route: true },
+  { name: 'Unlock My Device', short: 'Unlock', href: '/unlock', route: true },
 ]
 
 const FUND_URL = 'https://app.royalty.dev/crosspoint-reader/crosspoint-reader'
@@ -18,6 +33,57 @@ function NavLabel({ item }) {
       <span className="xl:hidden">{item.short}</span>
       <span className="hidden xl:inline">{item.name}</span>
     </>
+  )
+}
+
+function NavDropdown({ item }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [open])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex items-center gap-x-1 text-sm font-medium whitespace-nowrap text-stone-600 transition hover:text-stone-900"
+      >
+        <NavLabel item={item} />
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+          className={`size-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-2 w-44 rounded-xl bg-white p-1.5 shadow-lg ring-1 ring-stone-950/5">
+          {item.items.map((sub) => (
+            <Link
+              key={sub.name}
+              to={sub.href}
+              onClick={() => setOpen(false)}
+              className="block rounded-lg px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 hover:text-stone-900"
+            >
+              {sub.name}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -59,6 +125,9 @@ export default function Header() {
         {/* Nav links: short labels from md, full labels from xl */}
         <div className="hidden min-w-0 items-center gap-x-4 md:flex lg:gap-x-6 xl:gap-x-7">
           {NAV.map((item) => {
+            if (item.items) {
+              return <NavDropdown key={item.name} item={item} />
+            }
             const cls =
               'text-sm font-medium whitespace-nowrap text-stone-600 transition hover:text-stone-900'
             return item.route ? (
@@ -99,6 +168,25 @@ export default function Header() {
             {NAV.map((item) => {
               const cls =
                 'block rounded-md px-3 py-2.5 text-base font-medium text-stone-700 hover:bg-stone-100'
+              if (item.items) {
+                return (
+                  <div key={item.name} className="pt-1">
+                    <div className="px-3 pt-2 pb-1 text-xs font-semibold tracking-[0.15em] text-stone-400 uppercase">
+                      {item.name}
+                    </div>
+                    {item.items.map((sub) => (
+                      <Link
+                        key={sub.name}
+                        to={sub.href}
+                        onClick={() => setOpen(false)}
+                        className={cls}
+                      >
+                        {sub.name}
+                      </Link>
+                    ))}
+                  </div>
+                )
+              }
               return item.route ? (
                 <Link key={item.name} to={item.href} onClick={() => setOpen(false)} className={cls}>
                   {item.name}
