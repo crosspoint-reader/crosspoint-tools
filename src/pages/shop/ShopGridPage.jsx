@@ -38,16 +38,16 @@ function ProductCard({ item }) {
 
   const body = (
     <>
-      <div className="aspect-square w-full bg-stone-100">
+      <div className="relative aspect-square w-full border-b border-stone-100 bg-white">
         {imgUrl ? (
           <img
             src={imgUrl}
             alt={item.title}
             loading="lazy"
-            className={`size-full object-cover transition ${clickable ? 'group-hover:scale-[1.02]' : ''}`}
+            className={`absolute inset-0 size-full object-contain p-6 transition ${clickable ? 'group-hover:scale-[1.02]' : ''}`}
           />
         ) : (
-          <div className="flex size-full items-center justify-center text-sm text-stone-400">
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-stone-400">
             No image
           </div>
         )}
