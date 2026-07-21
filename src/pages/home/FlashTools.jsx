@@ -147,7 +147,7 @@ const DEVICE_INSTALLS = {
     flashFreq: '80m',
     preserveNvs: true,
     resetAfterReconnect: true,
-    after: 'The device restarts automatically. If the screen stays blank, unplug and reconnect USB.',
+    after: 'Press and hold the power button (top right) until the device boots.',
   },
   m5paper: {
     name: 'M5Paper',
