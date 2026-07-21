@@ -154,7 +154,7 @@ export default function InsiderPage() {
       states[0] = 'done'
       setFlashStates([...states])
 
-      const flasher = new CrossPointFlasher(serialPort)
+      const flasher = new CrossPointFlasher(serialPort, { expectedChip: 'ESP32-C3', deviceName: 'Xteink' })
       await flasher.flashFirmware(firmware, {
         skipReset: true,
         onStepChange: (idx, name, status) => {
@@ -391,7 +391,7 @@ export default function InsiderPage() {
       states[0] = 'done'
       setCfFlashStates([...states])
 
-      const flasher = new CrossPointFlasher(serialPort)
+      const flasher = new CrossPointFlasher(serialPort, { expectedChip: 'ESP32-C3', deviceName: 'Xteink' })
       await flasher.flashFirmware(firmware, {
         skipReset: true,
         onStepChange: (idx, name, status) => {

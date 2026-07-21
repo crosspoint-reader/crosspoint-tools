@@ -431,11 +431,17 @@ export class CrossPointFlasher {
   // baudrate only matters for devices behind a real USB-UART bridge; native
   // USB (USB-Serial-JTAG / CDC) ignores it. esptool-js connects at 115200
   // (the ROM baud) and switches up after the stub loads.
-  constructor(port = null, { baudrate = 115200 } = {}) {
+  // expectedChip: esptool CHIP_NAME (e.g. 'ESP32-C3', 'ESP32-S3') the selected
+  // device must identify as. connect() aborts on a mismatch so firmware for one
+  // board can't be written to another (e.g. Seeed's S3 build onto a C3 Xteink).
+  // deviceName is only used to build a helpful error message.
+  constructor(port = null, { baudrate = 115200, expectedChip = null, deviceName = null } = {}) {
     this.espLoader = null;
     this.layout = null;
     this.port = port;
     this.baudrate = baudrate;
+    this.expectedChip = expectedChip;
+    this.deviceName = deviceName;
   }
 
   // Must be called synchronously inside a user gesture (click handler) before any awaits.
@@ -458,6 +464,17 @@ export class CrossPointFlasher {
       transport, baudrate: this.baudrate, romBaudrate: 115200, enableTracing: false,
     });
     await this.espLoader.main();
+
+    const chipName = this.espLoader.chip?.CHIP_NAME;
+    if (this.expectedChip && chipName && chipName !== this.expectedChip) {
+      const label = this.deviceName ? `the ${this.deviceName}` : 'the selected device';
+      // Release the port without a reset pulse; we never touched flash.
+      try { await this.disconnect(true); } catch {}
+      throw new Error(
+        `Connected device is an ${chipName}, but ${label} uses an ${this.expectedChip}. ` +
+        'Wrong device selected? Flashing was aborted before anything was written.'
+      );
+    }
   }
 
   async disconnect(skipReset = false) {

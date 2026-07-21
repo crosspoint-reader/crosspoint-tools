@@ -107,6 +107,19 @@ const MODELS = [
   { id: 'lilygo', name: 'LilyGo T5', res: '540 × 960' },
 ]
 
+// esptool chip identity each device must report before we write anything.
+// Stops firmware for one board from landing on another (e.g. the Sticky's
+// ESP32-S3 build onto an ESP32-C3 Xteink). Sticky and LilyGo share a chip,
+// so this can't tell those two apart — but it fences off the Xteinks and
+// the M5Paper.
+const MODEL_CHIPS = {
+  x4: 'ESP32-C3',
+  x3: 'ESP32-C3',
+  sticky: 'ESP32-S3',
+  m5paper: 'ESP32',
+  lilygo: 'ESP32-S3',
+}
+
 // Non-Xteink devices flash a single admin-uploaded build instead of the
 // release/nightly/stock catalog, and always through the full boot-region
 // install (bootloader + partition table + otadata + firmware): their stock
@@ -422,7 +435,10 @@ export default function FlashTools() {
 
       setProgress((p) => ({ ...p, status: null }))
 
-      const flasher = new CrossPointFlasher(serialPort)
+      const flasher = new CrossPointFlasher(serialPort, {
+        expectedChip: MODEL_CHIPS[model],
+        deviceName: MODELS.find((m) => m.id === model)?.name,
+      })
       await flasher.flashFirmware(firmware, {
         skipReset,
         onStepChange: (idx, name, status) => {
@@ -486,7 +502,11 @@ export default function FlashTools() {
 
       setProgress((p) => ({ ...p, status: null }))
 
-      const flasher = new CrossPointFlasher(serialPort, { baudrate: install.baudrate })
+      const flasher = new CrossPointFlasher(serialPort, {
+        baudrate: install.baudrate,
+        expectedChip: MODEL_CHIPS[model],
+        deviceName: install.name,
+      })
       await flasher.repairBootRegion(CROSSPOINT_PARTITION_TABLE, {
         bootloaderData,
         bootloaderOffset: install.bootloaderOffset,
