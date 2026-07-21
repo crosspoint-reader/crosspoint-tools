@@ -465,23 +465,21 @@ function AccessoriesCard({ secret, log }) {
       </p>
 
       <div className="mt-3 space-y-2">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Product title (e.g. USB-C magnetic cable)"
-            className={`${inputCls} flex-1`}
-          />
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className={`${inputCls} w-auto shrink-0`}
-          >
-            <option value="accessory">Accessory</option>
-            <option value="device">Device</option>
-          </select>
-        </div>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Product title (e.g. USB-C magnetic cable)"
+          className={inputCls}
+        />
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className={inputCls}
+        >
+          <option value="accessory">Accessory</option>
+          <option value="device">Device</option>
+        </select>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -589,22 +587,20 @@ function AccessoriesCard({ secret, log }) {
                 </div>
                 {edit && (
                   <div className="mt-2 space-y-2">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={edit.title}
-                        onChange={(e) => setEditField(a.id, 'title', e.target.value)}
-                        className={`${inputCls} flex-1`}
-                      />
-                      <select
-                        value={edit.category}
-                        onChange={(e) => setEditField(a.id, 'category', e.target.value)}
-                        className={`${inputCls} w-auto shrink-0`}
-                      >
-                        <option value="accessory">Accessory</option>
-                        <option value="device">Device</option>
-                      </select>
-                    </div>
+                    <input
+                      type="text"
+                      value={edit.title}
+                      onChange={(e) => setEditField(a.id, 'title', e.target.value)}
+                      className={inputCls}
+                    />
+                    <select
+                      value={edit.category}
+                      onChange={(e) => setEditField(a.id, 'category', e.target.value)}
+                      className={inputCls}
+                    >
+                      <option value="accessory">Accessory</option>
+                      <option value="device">Device</option>
+                    </select>
                     <textarea
                       value={edit.description}
                       onChange={(e) => setEditField(a.id, 'description', e.target.value)}
