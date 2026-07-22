@@ -520,7 +520,7 @@ export default function FlashTools() {
     const states = steps.map(() => 'pending')
 
     setRunning(true)
-    setRestart({ text: install.after })
+    setRestart({ text: install.after, canReset: model === 'sticky' })
     setPercent(0)
     setProgress({
       title: `Installing ${buildName}...`,
@@ -580,6 +580,31 @@ export default function FlashTools() {
     }
 
     setRunning(false)
+  }
+
+  async function resetStickyDevice() {
+    if (running) return
+    setRunning(true)
+    try {
+      await CrossPointFlasher.resetDevice()
+      setProgress((p) =>
+        p
+          ? {
+              ...p,
+              status: {
+                kind: 'ok',
+                text: 'Restart signal sent. Press and hold the power button (top right) if needed.',
+              },
+            }
+          : p,
+      )
+    } catch (err) {
+      if (err.name !== 'NotFoundError') {
+        setProgress((p) => (p ? { ...p, status: { kind: 'err', text: `Restart failed: ${err.message}` } } : p))
+      }
+    } finally {
+      setRunning(false)
+    }
   }
 
   const selectedBeta = fw?.startsWith('beta-') ? betaBuilds.find((b) => `beta-${b.id}` === fw) : null
@@ -995,7 +1020,19 @@ export default function FlashTools() {
               <div className="font-display text-sm font-semibold text-stone-700">After flashing</div>
               {restart.text ? (
                 // Non-Xteink full install: device-specific instructions from DEVICE_INSTALLS
-                <p className="mt-1 text-sm/6 text-stone-500">{restart.text}</p>
+                <div>
+                  <p className="mt-1 text-sm/6 text-stone-500">{restart.text}</p>
+                  {restart.canReset && (
+                    <button
+                      type="button"
+                      onClick={resetStickyDevice}
+                      disabled={running}
+                      className="mt-3 rounded-md bg-stone-800 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Restart device
+                    </button>
+                  )}
+                </div>
               ) : restart.unplug ? (
                 // X3 + CrossPoint/beta/custom: no serial reset, device must be power-cycled by unplugging USB
                 <p className="mt-1 text-sm/6 text-stone-500">

@@ -494,6 +494,26 @@ export class CrossPointFlasher {
     return await navigator.serial.requestPort(filters ? { filters } : {});
   }
 
+  // User-triggered Sticky reset matching Seeed's "Reset device" control. A
+  // fresh port selection matters after USB re-enumeration: the SerialPort used
+  // for flashing may no longer represent the interface the browser can reset.
+  static async resetDevice() {
+    const port = await CrossPointFlasher.requestPort(null);
+    await stopSerialMonitor();
+    let opened = false;
+    try {
+      await port.open({ baudRate: 115200 });
+      opened = true;
+      await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    } finally {
+      if (opened) {
+        try { await port.close(); } catch {}
+      }
+    }
+  }
+
   async connect() {
     const port = this.port || await CrossPointFlasher.requestPort();
     this.port = port;
