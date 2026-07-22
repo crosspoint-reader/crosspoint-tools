@@ -4,6 +4,41 @@
  */
 
 let ESPLoader, Transport;
+let activeSerialMonitor = null;
+
+function startSerialMonitor(port) {
+  if (!port.readable) throw new Error('Serial monitor stream is unavailable after reopening the Sticky.');
+
+  const monitor = { port, reader: null, active: true, done: null };
+  activeSerialMonitor = monitor;
+  monitor.done = (async () => {
+    while (monitor.active && port.readable) {
+      const reader = port.readable.getReader();
+      monitor.reader = reader;
+      try {
+        while (monitor.active) {
+          const { done } = await reader.read();
+          if (done) break;
+        }
+      } catch {
+        // A USB disconnect or a later flash ends this reader.
+      } finally {
+        try { reader.releaseLock(); } catch {}
+        if (monitor.reader === reader) monitor.reader = null;
+      }
+    }
+  })();
+}
+
+async function stopSerialMonitor() {
+  const monitor = activeSerialMonitor;
+  if (!monitor) return;
+  activeSerialMonitor = null;
+  monitor.active = false;
+  try { await monitor.reader?.cancel(); } catch {}
+  try { await monitor.done; } catch {}
+  try { await monitor.port.close(); } catch {}
+}
 
 export async function loadEsptool() {
   if (ESPLoader) return;
@@ -462,6 +497,9 @@ export class CrossPointFlasher {
   async connect() {
     const port = this.port || await CrossPointFlasher.requestPort();
     this.port = port;
+    // Seeed leaves its post-flash monitor connected. Release a retained
+    // monitor before starting another esptool session.
+    await stopSerialMonitor();
     await loadEsptool();
     const transport = new Transport(port, false);
     this.espLoader = new ESPLoader({
@@ -528,12 +566,15 @@ export class CrossPointFlasher {
     }
 
     try {
+      // Match Seeed: begin draining the 115200-baud monitor before the final
+      // reset and leave the connection open after the reset signal.
+      startSerialMonitor(this.port);
       await this.port.setSignals({ dataTerminalReady: false, requestToSend: true });
       await new Promise((resolve) => setTimeout(resolve, 100));
       await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    } finally {
-      await this.port.close();
+    } catch (err) {
+      await stopSerialMonitor();
+      throw err;
     }
   }
 
