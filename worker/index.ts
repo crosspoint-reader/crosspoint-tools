@@ -838,6 +838,17 @@ const STOCK_CHECK_URLS: Record<string, Record<string, string>> = {
   },
 };
 
+// Stock firmware bundled as a static asset for models with no upstream
+// update API (the X4 Pro has none). Served through the /api/firmware/stock
+// route rather than fetched directly by the page: content-filter extensions
+// can throttle or block direct *.bin URLs, and this keeps every firmware
+// download on the same /api path.
+const STATIC_STOCK: Record<string, Record<string, { assetPath: string; version: string }>> = {
+  x4pro: {
+    en: { assetPath: '/firmware/x4pro-stock-en.bin', version: 'V.0.0.7' },
+  },
+};
+
 type StockFetchResult =
   | { ok: true; data: { version: string; download_url: string } }
   | { ok: false; reason: 'unknown_model' | 'upstream_unreachable' };
@@ -863,6 +874,11 @@ async function handleStockFirmwareInfo(
 ): Promise<Response> {
   const model = url.searchParams.get('model') || 'x4';
   const lang = url.searchParams.get('lang') || 'en';
+
+  const pinned = STATIC_STOCK[model]?.[lang];
+  if (pinned) {
+    return json({ version: pinned.version, downloadUrl: null, model, lang }, 200, headers);
+  }
 
   const result = await fetchStockFirmwareInfo(model, lang);
   if (!result.ok) {
@@ -916,6 +932,22 @@ async function handleStockFirmware(
 ): Promise<Response> {
   const model = url.searchParams.get('model') || 'x4';
   const lang = url.searchParams.get('lang') || 'en';
+
+  const pinned = STATIC_STOCK[model]?.[lang];
+  if (pinned) {
+    const assetRes = await env.ASSETS.fetch(new URL(pinned.assetPath, url.origin));
+    if (!assetRes.ok) {
+      return json({ error: 'Bundled stock firmware missing' }, 502, headers);
+    }
+    return new Response(assetRes.body, {
+      headers: {
+        ...headers,
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${model}-${lang}-firmware.bin"`,
+        'X-Firmware-Version': pinned.version,
+      },
+    });
+  }
 
   // Determine the current upstream version first so we never serve a stale
   // cache. The info endpoint always reports the live upstream version, so if

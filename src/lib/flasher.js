@@ -950,29 +950,13 @@ export async function fetchReleaseFirmware(model = 'x4') {
   return new Uint8Array(await res.arrayBuffer());
 }
 
-// Stock firmware pinned as a static asset for models without an upstream
-// Xteink update API (the X4 Pro has none). Version is the build captured
-// from the device, so bumping it means replacing the asset and this entry.
-const STATIC_STOCK_FIRMWARE = {
-  x4pro: {
-    en: { path: '/firmware/x4pro-stock-en.bin', version: 'V.0.0.7' },
-  },
-};
-
 export async function fetchStockFirmware(model, lang) {
-  const pinned = STATIC_STOCK_FIRMWARE[model]?.[lang];
-  if (pinned) {
-    const data = await fetchFlashAsset(pinned.path, 'stock firmware');
-    return { data, version: pinned.version };
-  }
   const res = await fetch(`/api/firmware/stock?model=${model}&lang=${lang}`);
   if (!res.ok) throw new Error(`Failed to download stock firmware: ${res.status}`);
   return { data: new Uint8Array(await res.arrayBuffer()), version: res.headers.get('X-Firmware-Version') || '' };
 }
 
 export async function fetchStockFirmwareInfo(model, lang) {
-  const pinned = STATIC_STOCK_FIRMWARE[model]?.[lang];
-  if (pinned) return { version: pinned.version, model, lang };
   const res = await fetch(`/api/firmware/stock/info?model=${model}&lang=${lang}`);
   if (!res.ok) return null;
   return res.json();
