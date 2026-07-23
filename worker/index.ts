@@ -3151,6 +3151,13 @@ const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
     filename: 'lilygo-firmware.bin',
     label: 'LilyGo T5',
   },
+  x4pro: {
+    r2Key: 'builds/x4pro/firmware.bin',
+    metaKey: 'x4pro-build',
+    defaultName: 'X4 Pro Beta',
+    filename: 'x4pro-firmware.bin',
+    label: 'X4 Pro',
+  },
 };
 
 async function handleDeviceBuildUpload(

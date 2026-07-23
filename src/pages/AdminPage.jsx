@@ -1494,6 +1494,16 @@ export default function AdminPage() {
             <DeviceBuildCard
               secret={secret}
               log={log}
+              label="X4 Pro"
+              namePlaceholder="Build name (e.g. X4 Pro Beta v1)"
+              infoUrl="/api/device-build/x4pro/info"
+              uploadUrl="/api/device-build/x4pro/upload"
+              baseUrl="/api/device-build/x4pro"
+              description="Upload the Xteink X4 Pro build offered in the homepage web flasher. Flashes to the OTA partition like the other Xteink devices. Uploading replaces the current build."
+            />
+            <DeviceBuildCard
+              secret={secret}
+              log={log}
               label="M5Paper"
               namePlaceholder="Build name (e.g. M5Paper Beta v1)"
               infoUrl="/api/device-build/m5paper/info"

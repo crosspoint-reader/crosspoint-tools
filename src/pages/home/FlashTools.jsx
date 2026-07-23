@@ -102,6 +102,7 @@ function StepsList({ steps, states, percent }) {
 
 const MODELS = [
   { id: 'x4', name: 'Xteink X4', res: '480 × 800' },
+  { id: 'x4pro', name: 'Xteink X4 Pro', res: '480 × 800' },
   { id: 'x3', name: 'Xteink X3', res: '528 × 792' },
   { id: 'sticky', name: 'Seeed Sticky', res: '480 × 800' },
   { id: 'm5paper', name: 'M5Paper', res: '540 × 960' },
@@ -115,6 +116,7 @@ const MODELS = [
 // the M5Paper.
 const MODEL_CHIPS = {
   x4: 'ESP32-C3',
+  x4pro: 'ESP32-S3',
   x3: 'ESP32-C3',
   sticky: 'ESP32-S3',
   m5paper: 'ESP32',
@@ -166,6 +168,12 @@ const DEVICE_INSTALLS = {
   },
 }
 
+// Models flashed from a single admin-uploaded build (/api/device-build/{id})
+// instead of the release/nightly/stock catalog. The DEVICE_INSTALLS subset
+// needs the full boot-region install; the X4 Pro is Xteink-class hardware and
+// flashes through the normal OTA-slot flow.
+const DEVICE_BUILD_MODELS = ['x4pro', ...Object.keys(DEVICE_INSTALLS)]
+
 // Vendor-level port filters for the non-Xteink devices: Espressif (0x303A,
 // any PID — USB-Serial-JTAG, ROM download mode, TinyUSB CDC), Seeed (0x2886)
 // for stock Sticky firmware, and the Silicon Labs / WCH USB-UART bridges
@@ -198,7 +206,7 @@ export default function FlashTools() {
   // Beta builds from /api (buttons inserted before "Custom .bin")
   const [betaBuilds, setBetaBuilds] = useState([])
 
-  // Admin-uploaded build for non-Xteink devices (m5paper, lilygo)
+  // Admin-uploaded build for DEVICE_BUILD_MODELS (sticky, m5paper, lilygo, x4pro)
   const [deviceBuild, setDeviceBuild] = useState(null)
 
   // Stable release publish date, shown on the Xteink cards (both flash the
@@ -223,7 +231,7 @@ export default function FlashTools() {
 
   useEffect(() => {
     let cancelled = false
-    Object.keys(DEVICE_INSTALLS).forEach((id) => {
+    DEVICE_BUILD_MODELS.forEach((id) => {
       fetchDeviceBuildInfo(id)
         .then((b) => {
           if (!cancelled && b) setDeviceAvailability((a) => ({ ...a, [id]: b }))
@@ -262,7 +270,7 @@ export default function FlashTools() {
   useEffect(() => {
     if (!model) return
     let cancelled = false
-    if (DEVICE_INSTALLS[model]) {
+    if (DEVICE_BUILD_MODELS.includes(model)) {
       setDeviceBuild(null)
       fetchDeviceBuildInfo(model)
         .then((b) => {
@@ -422,7 +430,7 @@ export default function FlashTools() {
       'stock-en': 'Flashing English Firmware...',
       'stock-ch': 'Flashing Chinese Firmware...',
       custom: 'Flashing Custom Firmware...',
-      device: `Flashing ${DEVICE_INSTALLS[model]?.name || 'Device'} Beta...`,
+      device: `Flashing ${MODELS.find((m) => m.id === model)?.name || 'Device'} Beta...`,
     }
     const title = action.startsWith('beta-') ? 'Flashing Beta Firmware...' : titles[action]
 
@@ -624,7 +632,7 @@ export default function FlashTools() {
               <h3 className="font-display text-sm font-semibold text-stone-900">Select your device</h3>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {MODELS.filter((m) => !DEVICE_INSTALLS[m.id] || deviceAvailability[m.id]).map((m) => (
+              {MODELS.filter((m) => !DEVICE_BUILD_MODELS.includes(m.id) || deviceAvailability[m.id]).map((m) => (
                 <button
                   key={m.id}
                   type="button"
@@ -638,7 +646,7 @@ export default function FlashTools() {
                       // Device builds show their upload date; Xteink cards show
                       // the stable release date; resolution is the fallback
                       // while either is still loading.
-                      const date = DEVICE_INSTALLS[m.id]
+                      const date = DEVICE_BUILD_MODELS.includes(m.id)
                         ? deviceAvailability[m.id]?.uploadedAt
                         : releaseDate
                       return date ? `Updated ${fmtDate(date)}` : m.res
@@ -656,7 +664,7 @@ export default function FlashTools() {
                 <StepBadge n={2} active={!!fw} />
                 <h3 className="font-display text-sm font-semibold text-stone-900">Choose firmware</h3>
               </div>
-              {DEVICE_INSTALLS[model] ? (
+              {DEVICE_BUILD_MODELS.includes(model) ? (
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <button
                     type="button"
@@ -902,7 +910,7 @@ export default function FlashTools() {
                     </div>
                   )}
 
-                  {/* Device build panel (M5Paper / LilyGo) */}
+                  {/* Device build panel (Sticky / M5Paper / LilyGo / X4 Pro) */}
                   {fw === 'device' && deviceBuild && (
                     <div>
                       <div className="text-sm font-semibold text-stone-900">{deviceBuild.name}</div>
@@ -926,8 +934,10 @@ export default function FlashTools() {
                         Flash {deviceBuild.name}
                       </button>
                       <p className="mt-2 text-xs text-stone-400">
-                        Beta build for the {DEVICE_INSTALLS[model]?.name}. Writes the bootloader,
-                        partition table, and firmware.
+                        Beta build for the {MODELS.find((m) => m.id === model)?.name}.{' '}
+                        {DEVICE_INSTALLS[model]
+                          ? 'Writes the bootloader, partition table, and firmware.'
+                          : 'Flashes to the OTA partition.'}
                       </p>
                     </div>
                   )}
