@@ -277,6 +277,18 @@ export default function FlashTools() {
           if (!cancelled) setDeviceBuild(b)
         })
         .catch(() => {})
+      // The X4 Pro also offers a pinned stock build (static asset) alongside
+      // the admin-uploaded build; there is no Chinese variant.
+      if (model === 'x4pro') {
+        setStock({ en: { text: 'Loading...', enabled: false }, ch: { text: 'Unavailable', enabled: false } })
+        fetchStockFirmwareInfo(model, 'en').then((info) => {
+          if (cancelled) return
+          setStock((s) => ({
+            ...s,
+            en: info ? { text: info.version, enabled: true } : { text: 'Unavailable', enabled: false },
+          }))
+        })
+      }
       return () => {
         cancelled = true
       }
@@ -422,7 +434,10 @@ export default function FlashTools() {
     // behavior.
     const skipReset =
       action === 'crosspoint' || action === 'nightly' || action === 'custom' ||
-      action === 'device' || action.startsWith('beta-')
+      action === 'device' || action.startsWith('beta-') ||
+      // The X4 Pro can't be rebooted over serial — it always needs a manual
+      // power-button boot, so a hard reset after stock flashes buys nothing.
+      model === 'x4pro'
 
     const titles = {
       crosspoint: 'Flashing CrossPoint Firmware...',
@@ -456,7 +471,11 @@ export default function FlashTools() {
     setRunning(true)
     setRestart(
       model === 'x4pro'
-        ? { text: 'Press and hold the power button to boot CrossPoint.' }
+        ? {
+            text: action.startsWith('stock-')
+              ? 'Press and hold the power button to boot the stock firmware.'
+              : 'Press and hold the power button to boot CrossPoint.',
+          }
         : { unplug: skipReset && model !== 'x4' }
     )
     setPercent(0)
@@ -681,6 +700,12 @@ export default function FlashTools() {
                     </div>
                     <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
                   </button>
+                  {model === 'x4pro' && (
+                    <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
+                      <div className="text-sm font-semibold text-stone-900">Stock English</div>
+                      <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
+                    </button>
+                  )}
                   {model === 'sticky' && (
                     <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
                       <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
