@@ -454,7 +454,11 @@ export default function FlashTools() {
     const states = steps.map(() => 'pending')
 
     setRunning(true)
-    setRestart({ unplug: skipReset && model !== 'x4' })
+    setRestart(
+      model === 'x4pro'
+        ? { text: 'Press and hold the power button to boot CrossPoint.' }
+        : { unplug: skipReset && model !== 'x4' }
+    )
     setPercent(0)
     setProgress({ title, steps, states: [...states], status: downloadMsg ? { kind: 'info', text: downloadMsg } : null })
 
