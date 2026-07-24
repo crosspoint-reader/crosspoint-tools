@@ -50,6 +50,7 @@ const FILES = [
   { name: 'webserver-endpoints.md', label: 'Webserver API Endpoints', download_url: `${RAW_BASE}/docs/webserver-endpoints.md` },
   { name: 'troubleshooting.md', label: 'Troubleshooting Guide', download_url: `${RAW_BASE}/docs/troubleshooting.md` },
   { name: 'sd-card-fonts.md', label: 'SD Card Fonts', download_url: `${RAW_BASE}/docs/sd-card-fonts.md` },
+  { name: 'dictionary.md', label: 'Dictionary', download_url: `${RAW_BASE}/docs/dictionary.md` },
   { name: 'focus-reading.md', label: 'Focus Reading Metrics', download_url: `${RAW_BASE}/docs/focus-reading.md` },
 ]
 
