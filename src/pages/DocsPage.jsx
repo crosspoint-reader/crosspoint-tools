@@ -3,44 +3,17 @@
 // Port of public/docs.html — same data sources, rendering pipeline, deep-link
 // hash handling and scroll behavior, restyled in the Free-Ink docs shell.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 import Layout from '../components/Layout.jsx'
 import { Eyebrow } from '../components/ui.jsx'
+import { createMarkdownRenderer } from '../lib/markdown-full.js'
 import './docs/docs-prose.css'
 
 const RAW_BASE = 'https://raw.githubusercontent.com/crosspoint-reader/crosspoint-reader/master'
 
-// Rewrite image URLs and generate heading IDs so they can be linked.
-marked.use({
-  renderer: {
-    heading(token) {
-      // Support both marked.js v13+ (token object) and older versions (text, depth, raw)
-      const isObj = typeof token === 'object' && token !== null
-      const text = isObj ? token.text : arguments[0]
-      const depth = isObj ? token.depth : arguments[1]
-
-      let rawText = text || ''
-      rawText = rawText.replace(/<[^>]+>/g, '') // strip HTML tags
-      const id = rawText
-        .toLowerCase()
-        .trim()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/[\s_-]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-
-      return `<h${depth} id="${id}">${text}</h${depth}>`
-    },
-  },
-  walkTokens(token) {
-    if (token.type === 'image') {
-      if (token.href && token.href.startsWith('/')) {
-        token.href = RAW_BASE + token.href
-      } else if (token.href && !token.href.startsWith('http')) {
-        token.href = RAW_BASE + '/docs/' + token.href
-      }
-    }
-  },
+// Docs images live in the firmware repo; rewrite relative paths to GitHub raw.
+const renderMarkdown = createMarkdownRenderer({
+  imageBase: RAW_BASE,
+  imageRelativePrefix: '/docs/',
 })
 
 const FILES = [
@@ -111,20 +84,9 @@ export default function DocsPage() {
     try {
       const res = await fetch(file.download_url)
       if (!res.ok) throw new Error('HTTP ' + res.status)
-      let md = await res.text()
+      const md = await res.text()
 
-      // Also rewrite raw HTML <img> tags that marked.js walkTokens misses
-      md = md.replace(/<img([^>]+)src=["']([^"']+)["']/gi, (match, before, src) => {
-        let newSrc = src
-        if (src.startsWith('/')) {
-          newSrc = RAW_BASE + src
-        } else if (!src.startsWith('http') && !src.startsWith('data:')) {
-          newSrc = RAW_BASE + '/docs/' + src
-        }
-        return `<img${before}src="${newSrc}"`
-      })
-
-      const html = DOMPurify.sanitize(marked.parse(md), { ADD_ATTR: ['id', 'target'] })
+      const html = renderMarkdown(md)
       if (seq !== requestSeq.current) return
       setDoc({ status: 'ready', html })
     } catch {

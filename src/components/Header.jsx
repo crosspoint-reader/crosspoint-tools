@@ -9,6 +9,7 @@ const NAV = [
     name: 'Resources',
     short: 'Resources',
     items: [
+      { name: 'Blog', href: '/blog', route: true },
       { name: 'Docs', href: '/docs', route: true },
       { name: 'Roadmap', href: '/roadmap', route: true },
     ],

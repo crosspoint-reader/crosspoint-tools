@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "dev:web": "WEB_ONLY=1 vite",
-    "build": "vite build",
+    "dev": "node scripts/gen-blog-meta.mjs && vite",
+    "dev:web": "node scripts/gen-blog-meta.mjs && WEB_ONLY=1 vite",
+    "build": "node scripts/gen-blog-meta.mjs && vite build",
     "preview": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
     "tunnel": "node scripts/tunnel.js",

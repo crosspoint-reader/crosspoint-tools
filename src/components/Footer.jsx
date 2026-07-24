@@ -32,6 +32,7 @@ const COLUMNS = [
     title: 'Project',
     links: [
       { name: 'GitHub', href: GITHUB },
+      { name: 'Blog', href: '/blog', route: true },
       { name: 'Docs', href: '/docs', route: true },
       { name: 'Fund CrossPoint', href: 'https://app.royalty.dev/crosspoint-reader/crosspoint-reader' },
       { name: 'Get in touch', href: '/contact', route: true },
