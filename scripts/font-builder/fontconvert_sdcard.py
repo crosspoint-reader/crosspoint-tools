@@ -15,7 +15,7 @@ Usage:
 
     # All 4 sizes at once
     python fontconvert_sdcard.py \\
-      --intervals cjk \\
+      --intervals cjk-sc \\
       --sizes 12,14,16,18 --style regular \\
       NotoSansCJKsc-Regular.otf \\
       --output-dir NotoSansCJK/
@@ -36,71 +36,57 @@ from cpfont_version import CPFONT_VERSION
 
 # --- Unicode interval presets ---
 
+BASE_INTERVALS = [(0x0000, 0x007F), (0x2000, 0x206F)]
+
+DEFAULT_INTERVALS = [(0x0080, 0x00FF), (0x0100, 0x017F),
+                     (0x01A0, 0x01A1), (0x01AF, 0x01B0), (0x01C4, 0x021F),
+                     (0x0300, 0x036F), (0x0400, 0x04FF), (0x1EA0, 0x1EF9),
+                     (0x20A0, 0x20CF), (0x2070, 0x209F), (0x2190, 0x21FF),
+                     (0x2200, 0x22FF), (0xFB00, 0xFB06)]
+
 INTERVAL_PRESETS = {
-    "ascii":       [(0x0020, 0x007E)],
-    "latin1":      [(0x0080, 0x00FF)],
+    # Minimum readable coverage. This is included in every generated .cpfont.
+    "base":        BASE_INTERVALS,
+    # Broad CrossPoint-style reading coverage. Users can add this on top of base.
+    "default":     DEFAULT_INTERVALS,
     "latin-ext":   [(0x0020, 0x007E), (0x0080, 0x00FF), (0x0100, 0x024F),
-                    (0x02B0, 0x02FF), (0x1E00, 0x1EFF), (0x2000, 0x206F),
-                    (0xFB00, 0xFB06)],
+                    (0x1E00, 0x1EFF), (0x2000, 0x206F), (0xFB00, 0xFB06)],
     "greek":       [(0x0370, 0x03FF), (0x1F00, 0x1FFF)],
     "cyrillic":    [(0x0400, 0x04FF), (0x0500, 0x052F)],
     "hebrew":      [(0x0590, 0x05FF), (0xFB1D, 0xFB4F)],
+    "arabic":      [(0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF), (0xFB50, 0xFDF9), (0xFE70, 0xFEFF)],
     "georgian":    [(0x10A0, 0x10FF), (0x2D00, 0x2D2F)],
     "armenian":    [(0x0530, 0x058F)],
     "ethiopic":    [(0x1200, 0x137F), (0x1380, 0x139F), (0x2D80, 0x2DDF)],
     "vietnamese":  [(0x01A0, 0x01B0), (0x1EA0, 0x1EF9)],
-    "punctuation": [(0x2000, 0x206F)],
-    "cjk":         [(0x3000, 0x303F), (0x3040, 0x309F), (0x30A0, 0x30FF),
+    "cjk-sc":      [(0x3000, 0x303F), (0x4E00, 0x9FFF),
+                    (0xF900, 0xFAFF), (0xFF00, 0xFFEF)],
+    "cjk-jp":      [(0x3000, 0x303F), (0x3040, 0x309F), (0x30A0, 0x30FF),
                     (0x4E00, 0x9FFF), (0xF900, 0xFAFF), (0xFF00, 0xFFEF)],
     "hangul":      [(0xAC00, 0xD7AF), (0x1100, 0x11FF), (0x3130, 0x318F)],
     "cherokee":    [(0x13A0, 0x13FF), (0xAB70, 0xABBF)],
     "tifinagh":    [(0x2D30, 0x2D7F)],
+    "thai":        [(0x0E00, 0x0E7F)],
     # Symbol blocks commonly seen in scifi/popsci/literary fiction.
 
     "symbols":     [(0x2070, 0x209F), (0x20A0, 0x20CF), (0x2150, 0x218F),
                     (0x2190, 0x21FF), (0x2200, 0x22FF), (0x2500, 0x257F),
                     (0x25A0, 0x25FF), (0x2600, 0x26FF), (0x2700, 0x27BF)],
     # Composite preset for English-language literary fiction including scifi/popsci.
+    # Includes default coverage so selecting reading preserves the old behavior.
     # Greek for physics terms, math operators, geometric shapes, uncommon
     # dialogue punctuation, CJK quote marks, miscellaneous symbols (♪♫♬), dingbats.
-    "reading":     [(0x0020, 0x024F), (0x02B0, 0x02FF), (0x0300, 0x036F), (0x0370, 0x03FF),
-                    (0x0400, 0x04FF), (0x1E00, 0x1EFF), (0x2000, 0x206F),
-                    (0x2070, 0x209F), (0x20A0, 0x20CF), (0x2150, 0x218F),
-                    (0x2190, 0x21FF), (0x2200, 0x22FF), (0x2500, 0x257F),
+    "reading":     DEFAULT_INTERVALS + [
+                    (0x0180, 0x019F), (0x01A2, 0x01AE), (0x01B1, 0x01C3),
+                    (0x0220, 0x024F), (0x0370, 0x03FF), (0x1E00, 0x1E9F),
+                    (0x1EFA, 0x1EFF), (0x2150, 0x218F), (0x2500, 0x257F),
                     (0x25A0, 0x25FF), (0x2600, 0x26FF), (0x2700, 0x27BF),
-                    (0x2900, 0x29FF), (0x2E00, 0x2E7F), (0x3000, 0x303F),
-                    (0xFB00, 0xFB06)],
-    # Matches the built-in font intervals from fontconvert.py exactly
-    "builtin":     [(0x0000, 0x007F), (0x0080, 0x00FF), (0x0100, 0x017F),
-                    (0x01A0, 0x01A1), (0x01AF, 0x01B0), (0x01C4, 0x021F),
-                    (0x0300, 0x036F), (0x0400, 0x04FF),
-                    (0x1EA0, 0x1EF9), (0x2000, 0x206F), (0x20A0, 0x20CF),
-                    (0x2070, 0x209F), (0x2190, 0x21FF), (0x2200, 0x22FF),
-                    (0xFB00, 0xFB06)],
+                    (0x2900, 0x29FF), (0x2E00, 0x2E7F), (0x3000, 0x303F)],
 }
 
-# Keep common non-rendering controls/format marks present but invisible when a
-# requested interval includes them. Some source fonts expose cmap entries for
-# these, often with blank glyphs; generating our own zero-width glyph keeps the
-# output consistent and avoids showing U+FFFD for text cleanup artifacts.
-SYNTHETIC_BLANK_CODEPOINT_RANGES = (
-    (0x0000, 0x001F),  # C0 controls
-    (0x007F, 0x009F),  # DEL + C1 controls / mis-decoded Windows-1252 bytes
-    (0x00AD, 0x00AD),  # soft hyphen
-    (0x034F, 0x034F),  # combining grapheme joiner
-    (0x061C, 0x061C),  # Arabic letter mark
-    (0x180B, 0x180F),  # Mongolian variation selectors / separator
-    (0x200B, 0x200F),  # zero-width and bidi marks
-    (0x202A, 0x202E),  # bidi embedding/override marks
-    (0x2060, 0x2064),  # word joiner / invisible operators
-    (0x2066, 0x206F),  # bidi isolates / invisible controls
-    (0xFE00, 0xFE0F),  # variation selectors
-    (0xFEFF, 0xFEFF),  # zero-width no-break space / BOM
-)
-
-
-def is_synthetic_blank_codepoint(code_point: int) -> bool:
-    return any(start <= code_point <= end for start, end in SYNTHETIC_BLANK_CODEPOINT_RANGES)
+# Every generated .cpfont gets this minimum first; user-selected presets and
+# custom ranges are additive.
+BASE_INTERVAL_PRESETS = ("base",)
 
 # Regex for parsing unnamed hex range intervals: (0xSTART-0xEND)
 _HEX_RANGE_PATTERN = re.compile(r'^\(0x([0-9a-fA-F]+)-0x([0-9a-fA-F]+)\)$')
@@ -122,15 +108,19 @@ def parse_hex_range(s: str) -> tuple[int, int] | None:
 def resolve_intervals(preset_str):
     """Resolve comma-separated preset names into a merged, sorted, deduplicated interval list."""
     all_intervals = []
-    for name in preset_str.split(","):
-        name = name.strip().lower()
+    parsed_tokens = [(name, None) for name in BASE_INTERVAL_PRESETS]
+
+    for name in [name.strip().lower() for name in preset_str.split(",") if name.strip()]:
         unnamed_interval = parse_hex_range(name)
         if name not in INTERVAL_PRESETS and unnamed_interval is None:
             print(f"Error: unknown interval preset '{name}'", file=sys.stderr)
             print(f"Available presets: {', '.join(sorted(INTERVAL_PRESETS.keys()))}", file=sys.stderr)
             print("You can also specify unnamed hex ranges like (0x2100-0x214F)", file=sys.stderr)
             sys.exit(1)
+        parsed_tokens.append((name, unnamed_interval))
 
+    for name, unnamed_interval in parsed_tokens:
+        name = name.strip().lower()
         if unnamed_interval is not None:
             all_intervals.append(unnamed_interval)
         else:
@@ -148,6 +138,51 @@ def resolve_intervals(preset_str):
         else:
             merged.append((start, end))
     return merged
+
+
+def resolve_style_coverage(primary_face, fallback_faces, intervals):
+    """Resolve intervals against primary coverage, then optional fallback chain.
+
+    Returns (validated_intervals, codepoint_sources, source_codepoints).
+    codepoint_sources maps codepoint -> source index (0 = primary, 1+ = fallbacks).
+    Each fallback face only fills holes left by earlier faces in the chain.
+    """
+    validated_intervals = []
+    codepoint_sources = {}
+    source_codepoints = [set()]
+    source_codepoints.extend(set() for _ in fallback_faces)
+
+    for i_start, i_end in intervals:
+        run_start = None
+        run_end = None
+        for code_point in range(i_start, i_end + 1):
+            source_index = None
+            if primary_face.get_char_index(code_point) > 0:
+                source_index = 0
+            else:
+                for idx, fallback_face in enumerate(fallback_faces, start=1):
+                    if fallback_face is not None and fallback_face.get_char_index(code_point) > 0:
+                        source_index = idx
+                        break
+
+            if source_index is None:
+                if run_start is not None:
+                    validated_intervals.append((run_start, run_end))
+                    run_start = None
+                    run_end = None
+                continue
+
+            source_codepoints[source_index].add(code_point)
+            codepoint_sources[code_point] = source_index
+
+            if run_start is None:
+                run_start = code_point
+            run_end = code_point
+
+        if run_start is not None:
+            validated_intervals.append((run_start, run_end))
+
+    return validated_intervals, codepoint_sources, source_codepoints
 
 
 GlyphProps = namedtuple("GlyphProps", [
@@ -269,6 +304,10 @@ def _extract_pairpos_subtable(subtable, glyph_to_cp, raw_kern):
                     for rg in right_by_class[c2]:
                         key = (lg, rg)
                         raw_kern[key] = raw_kern.get(key, 0) + xa
+
+
+class FontBuildError(Exception):
+    """A build failure with a message suitable for showing to the end user."""
 
 
 def extract_kerning_fonttools(font_path, codepoints, ppem):
@@ -543,7 +582,7 @@ def extract_ligatures_fonttools(font_path, codepoints):
 
 
 def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=False,
-                         fallback_fontfile=None, darken_aa=False):
+                         fallback_fontfiles=None, darken_aa=False):
     """Rasterize all glyphs for one font style. Returns StyleRasterData."""
     import freetype
 
@@ -556,10 +595,12 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # it before set_char_size() would waste work at the default size and risk
     # Invalid_Size_Handle on some fonts.
     face.set_char_size(size << 6, size << 6, 150, 150)
-    fallback_face = None
-    if fallback_fontfile:
+    fallback_faces = []
+    for fallback_fontfile in (fallback_fontfiles or []):
         fallback_face = freetype.Face(fallback_fontfile)
         fallback_face.set_char_size(size << 6, size << 6, 150, 150)
+        fallback_faces.append(fallback_face)
+    source_faces = [face] + fallback_faces
 
     load_flags = freetype.FT_LOAD_RENDER | freetype.FT_LOAD_NO_BITMAP
     if force_autohint:
@@ -572,40 +613,25 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # than their built-in counterparts at the same nominal weight.
     aa_thresholds = (3, 6, 10) if darken_aa else (4, 8, 12)
 
-    def load_glyph(code_point):
-        glyph_index = face.get_char_index(code_point)
+    def load_glyph_for_face(target_face, code_point):
+        glyph_index = target_face.get_char_index(code_point)
         if glyph_index > 0:
-            face.load_glyph(glyph_index, load_flags)
-            return face
-        if fallback_face:
-            fallback_glyph_index = fallback_face.get_char_index(code_point)
-            if fallback_glyph_index > 0:
-                fallback_face.load_glyph(fallback_glyph_index, load_flags)
-                return fallback_face
+            target_face.load_glyph(glyph_index, load_flags)
+            return target_face
         return None
 
-    # Validate intervals: remove codepoints not present in the font.
-    # Only check glyph existence via get_char_index — do NOT call
-    # load_glyph here, as that triggers FT_LOAD_RENDER at the target
-    # DPI and doubles total rasterization time for no benefit.
-    print(f"  [{style_label}] Validating intervals against font...", file=sys.stderr)
-    validated_intervals = []
-    for i_start, i_end in intervals:
-        start = i_start
-        for code_point in range(i_start, i_end + 1):
-            has_primary = face.get_char_index(code_point) != 0
-            has_fallback = fallback_face and fallback_face.get_char_index(code_point) != 0
-            has_synthetic_blank = is_synthetic_blank_codepoint(code_point)
-            if not has_primary and not has_fallback and not has_synthetic_blank:
-                if start < code_point:
-                    validated_intervals.append((start, code_point - 1))
-                start = code_point + 1
-        if start <= i_end:
-            validated_intervals.append((start, i_end))
-
-    intervals = validated_intervals
+    # Validate intervals against the primary font first, then let the fallback
+    # font fill any holes. That keeps the primary family authoritative while
+    # still widening glyph coverage for SD-card fonts.
+    print(f"  [{style_label}] Validating intervals against font coverage...", file=sys.stderr)
+    intervals, codepoint_sources, source_codepoints = resolve_style_coverage(face, fallback_faces, intervals)
     total_glyphs = sum(end - start + 1 for start, end in intervals)
     print(f"  [{style_label}] Validated: {len(intervals)} intervals, {total_glyphs} glyphs", file=sys.stderr)
+    coverage_parts = [f"{len(source_codepoints[0])} primary"]
+    for idx in range(1, len(source_codepoints)):
+        fallback_name = os.path.basename(fallback_fontfiles[idx - 1]) if fallback_fontfiles else f"fallback{idx}"
+        coverage_parts.append(f"{len(source_codepoints[idx])} fallback{idx} ({fallback_name})")
+    print(f"  [{style_label}] Coverage split: {', '.join(coverage_parts)}", file=sys.stderr)
 
     # Rasterize all glyphs
     total_bitmap_size = 0
@@ -613,12 +639,8 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
 
     for i_start, i_end in intervals:
         for code_point in range(i_start, i_end + 1):
-            if is_synthetic_blank_codepoint(code_point):
-                glyph = GlyphProps(0, 0, 0, 0, 0, 0, total_bitmap_size, code_point)
-                all_glyphs.append((glyph, b''))
-                continue
-
-            f = load_glyph(code_point)
+            source_face = source_faces[codepoint_sources.get(code_point, 0)]
+            f = load_glyph_for_face(source_face, code_point)
             if f is None:
                 glyph = GlyphProps(0, 0, 0, 0, 0, 0, total_bitmap_size, code_point)
                 all_glyphs.append((glyph, b''))
@@ -699,8 +721,9 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
             total_bitmap_size += len(packed)
             all_glyphs.append((glyph, packed))
 
-    # Get font metrics from pipe character (same heuristic as fontconvert.py)
-    load_glyph(ord('|'))
+    # Get font metrics from the primary font. This keeps line metrics stable for
+    # the selected family even when a fallback contributes some glyphs.
+    load_glyph_for_face(face, ord('|'))
 
     advanceY = norm_ceil(face.size.height)
     ascender = norm_ceil(face.size.ascender)
@@ -711,9 +734,19 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
 
     # --- Extract kerning and ligatures ---
     ppem = size * 150.0 / 72.0
-    all_cps = set(g.code_point for g, _ in all_glyphs)
 
-    kern_map = extract_kerning_fonttools(fontfile, all_cps, ppem)
+    kern_map = {}
+    source_fontfiles = [fontfile]
+    source_fontfiles.extend(fallback_fontfiles or [])
+    for idx, cps in enumerate(source_codepoints):
+        if cps:
+            try:
+                kern_map.update(extract_kerning_fonttools(source_fontfiles[idx], cps, ppem))
+            except Exception as e:
+                raise FontBuildError(
+                    f"The font file '{os.path.basename(source_fontfiles[idx])}' appears to be "
+                    f"corrupt or malformed and could not be processed ({e}). "
+                    f"Try re-exporting the font or uploading a different file.") from e
     # SMP codepoints (> U+FFFF) cannot be stored in the uint16 kern codepoint
     # field; drop them before class derivation to avoid a downstream
     # struct.error when packing the binary kern tables.
@@ -732,7 +765,11 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
     # SMP codepoints in ligature inputs / outputs are filtered inside
     # extract_ligatures_fonttools (see the codepoints_set filter), so every
     # entry returned here is already 16-bit safe.
-    ligature_pairs = extract_ligatures_fonttools(fontfile, all_cps)
+    ligature_pairs = []
+    for idx, cps in enumerate(source_codepoints):
+        if cps:
+            ligature_pairs.extend(extract_ligatures_fonttools(source_fontfiles[idx], cps))
+    ligature_pairs.sort(key=lambda p: p[0])
     if len(ligature_pairs) > 255:
         print(f"  [{style_label}] WARNING: {len(ligature_pairs)} ligature pairs exceeds uint8_t max (255), truncating",
               file=sys.stderr)
@@ -817,7 +854,6 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
     """Generate a multi-style v4 .cpfont file.
 
     style_fonts: dict of {style_id: fontfile_path} e.g. {0: "Regular.ttf", 2: "Italic.ttf"}
-    fallback_style_fonts: optional dict of {style_id: fallback_fontfile_path}
     """
     MAGIC = b"CPFONT\x00\x00"
     HEADER_SIZE = 32
@@ -827,15 +863,17 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
 
     # Rasterize each style
     raster_data = {}  # style_id -> StyleRasterData
-    fallback_style_fonts = fallback_style_fonts or {}
     for style_id in sorted(style_fonts.keys()):
         fontfile = style_fonts[style_id]
-        fallback_fontfile = fallback_style_fonts.get(style_id)
+        fallback_fontfiles = []
+        if fallback_style_fonts:
+            if style_id != 0:
+                fallback_fontfiles.extend(fallback_style_fonts.get(style_id, []))
+            fallback_fontfiles.extend(fallback_style_fonts.get(0, []))
         print(f"  Rasterizing style {style_id}...", file=sys.stderr)
         raster_data[style_id] = rasterize_font_style(
             fontfile, size, intervals, style_id=style_id,
-            force_autohint=force_autohint,
-            fallback_fontfile=fallback_fontfile,
+            force_autohint=force_autohint, fallback_fontfiles=fallback_fontfiles or None,
             darken_aa=darken_aa)
 
     # Pack binary sections for each style
@@ -919,7 +957,7 @@ def main():
     parser.add_argument("fontfile", nargs="?", default=None,
                         help="Path to the font file (single-style mode).")
     parser.add_argument("--intervals", dest="intervals",
-                        help="Comma-separated interval presets (e.g., 'latin-ext,greek,cyrillic').")
+                        help="Comma-separated additional interval presets (e.g., 'default,latin-ext,cjk-jp'). Base coverage is always included.")
     parser.add_argument("--size", type=int, dest="size",
                         help="Single font size to generate.")
     parser.add_argument("--sizes", dest="sizes",
@@ -950,14 +988,19 @@ def main():
                         help="Font file for italic style.")
     parser.add_argument("--bolditalic", dest="font_bolditalic",
                         help="Font file for bold-italic style.")
-    parser.add_argument("--fallback-regular", dest="fallback_regular",
+    parser.add_argument("--fallback-regular", dest="fallback_font_regular",
                         help="Fallback font file for regular style.")
-    parser.add_argument("--fallback-bold", dest="fallback_bold",
+    parser.add_argument("--fallback2-regular", dest="fallback2_font_regular",
+                        help="Second fallback font file for regular style.")
+    parser.add_argument("--fallback-bold", dest="fallback_font_bold",
                         help="Fallback font file for bold style.")
-    parser.add_argument("--fallback-italic", dest="fallback_italic",
+    parser.add_argument("--fallback-italic", dest="fallback_font_italic",
                         help="Fallback font file for italic style.")
-    parser.add_argument("--fallback-bolditalic", dest="fallback_bolditalic",
+    parser.add_argument("--fallback-bolditalic", dest="fallback_font_bolditalic",
                         help="Fallback font file for bold-italic style.")
+    parser.add_argument("--default-fallback-font", dest="default_fallback_fonts",
+                        action="append", default=[],
+                        help="Bundled default fallback font file. Repeat to append multiple fonts after user fallbacks.")
 
     args = parser.parse_args()
 
@@ -980,23 +1023,26 @@ def main():
         style_fonts[3] = args.font_bolditalic
 
     fallback_style_fonts = {}
-    if args.fallback_regular:
-        fallback_style_fonts[0] = args.fallback_regular
-    if args.fallback_bold:
-        fallback_style_fonts[1] = args.fallback_bold
-    if args.fallback_italic:
-        fallback_style_fonts[2] = args.fallback_italic
-    if args.fallback_bolditalic:
-        fallback_style_fonts[3] = args.fallback_bolditalic
+    if args.fallback_font_regular:
+        fallback_style_fonts.setdefault(0, []).append(args.fallback_font_regular)
+    if args.fallback2_font_regular:
+        fallback_style_fonts.setdefault(0, []).append(args.fallback2_font_regular)
+    if args.fallback_font_bold:
+        fallback_style_fonts.setdefault(1, []).append(args.fallback_font_bold)
+    if args.fallback_font_italic:
+        fallback_style_fonts.setdefault(2, []).append(args.fallback_font_italic)
+    if args.fallback_font_bolditalic:
+        fallback_style_fonts.setdefault(3, []).append(args.fallback_font_bolditalic)
+    for default_fallback_font in args.default_fallback_fonts:
+        fallback_style_fonts.setdefault(0, []).append(default_fallback_font)
 
     is_multistyle = len(style_fonts) > 0
     fontfile = args.fontfile
 
-    # Require --intervals
+    # A font can be generated without choosing any extra presets; base coverage
+    # is still added inside resolve_intervals().
     if not args.intervals:
-        print("Error: --intervals is required (e.g., --intervals latin-ext,greek,cyrillic)", file=sys.stderr)
-        print(f"Available presets: {', '.join(sorted(INTERVAL_PRESETS.keys()))}", file=sys.stderr)
-        sys.exit(1)
+        args.intervals = "base"
 
     intervals = resolve_intervals(args.intervals)
 
@@ -1057,10 +1103,15 @@ def main():
         total_size += generate_cpfont_multistyle(
             style_fonts, sz, intervals, output_path,
             force_autohint=args.force_autohint,
-            fallback_style_fonts=fallback_style_fonts,
+            fallback_style_fonts=fallback_style_fonts or None,
             darken_aa=args.darken_aa)
     print(f"\nTotal: {len(sizes)} files, {total_size / 1024 / 1024:.2f} MB", file=sys.stderr)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except FontBuildError as e:
+        # The workflow greps for this prefix to report the message to the user.
+        print(f"BUILD ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
