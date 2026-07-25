@@ -582,7 +582,7 @@ def extract_ligatures_fonttools(font_path, codepoints):
 
 
 def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=False,
-                         fallback_fontfiles=None):
+                         fallback_fontfiles=None, darken_aa=False):
     """Rasterize all glyphs for one font style. Returns StyleRasterData."""
     import freetype
 
@@ -602,9 +602,16 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
         fallback_faces.append(fallback_face)
     source_faces = [face] + fallback_faces
 
-    load_flags = freetype.FT_LOAD_RENDER
+    load_flags = freetype.FT_LOAD_RENDER | freetype.FT_LOAD_NO_BITMAP
     if force_autohint:
         load_flags |= freetype.FT_LOAD_FORCE_AUTOHINT
+
+    # Matches fontconvert.py's --darken-aa: lowers the 2-bit AA thresholds so
+    # partially-covered edge pixels round up to a darker shade more readily.
+    # This is what the built-in reading fonts (Bitter/Lexend Deca/ChareInk)
+    # use, and without it, self-built fonts render visibly lighter/thinner
+    # than their built-in counterparts at the same nominal weight.
+    aa_thresholds = (3, 6, 10) if darken_aa else (4, 8, 12)
 
     def load_glyph_for_face(target_face, code_point):
         glyph_index = target_face.get_char_index(code_point)
@@ -681,11 +688,11 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                     bm = pixels4g[y * pitch + (x // 2)]
                     bm = (bm >> ((x % 2) * 4)) & 0xF
 
-                    if bm >= 12:
+                    if bm >= aa_thresholds[2]:
                         px += 3
-                    elif bm >= 8:
+                    elif bm >= aa_thresholds[1]:
                         px += 2
-                    elif bm >= 4:
+                    elif bm >= aa_thresholds[0]:
                         px += 1
 
                     if (y * bitmap.width + x) % 4 == 3:
@@ -842,7 +849,8 @@ def style_sections_total_size(sections):
 # --- File writers ---
 
 def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
-                               force_autohint=False, fallback_style_fonts=None):
+                               force_autohint=False, fallback_style_fonts=None,
+                               darken_aa=False):
     """Generate a multi-style v4 .cpfont file.
 
     style_fonts: dict of {style_id: fontfile_path} e.g. {0: "Regular.ttf", 2: "Italic.ttf"}
@@ -865,7 +873,8 @@ def generate_cpfont_multistyle(style_fonts, size, intervals, output_path,
         print(f"  Rasterizing style {style_id}...", file=sys.stderr)
         raster_data[style_id] = rasterize_font_style(
             fontfile, size, intervals, style_id=style_id,
-            force_autohint=force_autohint, fallback_fontfiles=fallback_fontfiles or None)
+            force_autohint=force_autohint, fallback_fontfiles=fallback_fontfiles or None,
+            darken_aa=darken_aa)
 
     # Pack binary sections for each style
     packed_sections = {}  # style_id -> tuple of section bytearrays
@@ -960,6 +969,9 @@ def main():
                         help="Font family name for output filenames (default: derived from font filename).")
     parser.add_argument("--force-autohint", dest="force_autohint", action="store_true",
                         help="Force FreeType auto-hinter instead of native font hinting.")
+    parser.add_argument("--darken-aa", dest="darken_aa", action="store_true",
+                        help="Use darker 2-bit anti-aliasing thresholds, matching the built-in "
+                             "reading fonts (Bitter/Lexend Deca/ChareInk).")
     parser.add_argument("-o", "--output", dest="output",
                         help="Output file path (for single-size mode).")
     parser.add_argument("--output-dir", dest="output_dir",
@@ -1091,7 +1103,8 @@ def main():
         total_size += generate_cpfont_multistyle(
             style_fonts, sz, intervals, output_path,
             force_autohint=args.force_autohint,
-            fallback_style_fonts=fallback_style_fonts or None)
+            fallback_style_fonts=fallback_style_fonts or None,
+            darken_aa=args.darken_aa)
     print(f"\nTotal: {len(sizes)} files, {total_size / 1024 / 1024:.2f} MB", file=sys.stderr)
 
 
