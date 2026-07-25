@@ -1,10 +1,16 @@
 // Build-time blog metadata generator.
 //
-// Blog posts are markdown files under `blog/`. Their title/summary come from
-// front matter, but the publish date and author are derived from git — the
-// commit that first added the file — so authors don't hand-maintain them.
-// Git history isn't available in the browser bundle, so we resolve it here at
-// build time and emit two artifacts (both gitignored, regenerated each build):
+// Blog posts are markdown files under `blog/`. Title, summary, and author all
+// come from front matter — the author is explicit (name + GitHub handle) rather
+// than derived from git, because git authorship is unreliable here: the site is
+// deployed manually from whatever machine/branch runs `npm run deploy`, and a
+// rebase, squash-merge, or "restore base" commit reassigns a file's add-commit
+// to whoever rewrote history. Only the publish date is taken from git (the
+// commit that first added the file), and front matter can override even that.
+//
+// Git history isn't available in the browser bundle, so we resolve the date
+// here at build time and emit two artifacts (both gitignored, regenerated each
+// build):
 //
 //   src/pages/blog/meta.generated.json  — { slug: { date, author } }, read by
 //                                          the client and merged with the posts
@@ -19,7 +25,6 @@ import { fileURLToPath } from 'node:url'
 import { parseFrontmatter } from '../src/lib/frontmatter.js'
 
 const SITE = 'https://crosspointreader.com'
-const REPO = 'crosspoint-reader/crosspoint-tools' // where blog/*.md live
 const DEFAULT_AUTHOR = 'CrossPoint Team'
 const FEED_TITLE = 'CrossPoint Reader Blog'
 const FEED_DESCRIPTION = 'Updates and announcements from the CrossPoint Reader project.'
@@ -29,58 +34,18 @@ const blogDir = join(rootDir, 'blog')
 const metaOut = join(rootDir, 'src/pages/blog/meta.generated.json')
 const rssOut = join(rootDir, 'public/blog/rss.xml')
 
-// Optional committed map of commit-email → { name?, github }. Resolves avatars
-// deterministically (no network), which is the reliable path — a build-time
-// GitHub API call can't be counted on (some environments can't verify TLS from
-// Node, and unpushed commits 404). Keys are lower-cased emails.
-function loadAuthors() {
-  const p = join(blogDir, 'authors.json')
-  if (!existsSync(p)) return {}
-  try {
-    const raw = JSON.parse(readFileSync(p, 'utf8'))
-    return Object.fromEntries(Object.entries(raw).map(([k, v]) => [k.toLowerCase(), v]))
-  } catch {
-    return {}
-  }
-}
-const AUTHORS = loadAuthors()
-
-// Ask git for the commit that added `relPath`: ISO date, author name, email, sha
-// (tab-separated). --diff-filter=A limits to the add; --follow tracks renames.
-// Returns null for uncommitted files (local preview) or when git is unavailable.
-function gitAddCommit(relPath) {
+// Publish date from the commit that first added `relPath` (ISO). --diff-filter=A
+// limits to the add; --follow tracks renames. Returns null for uncommitted files
+// (local preview) or when git is unavailable.
+function gitAddDate(relPath) {
   try {
     const out = execSync(
-      `git log --diff-filter=A --follow --format=%aI%x09%an%x09%ae%x09%H -- "${relPath}"`,
+      `git log --diff-filter=A --follow --format=%aI -- "${relPath}"`,
       { cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
     ).trim()
     if (!out) return null
     // Oldest (the add) is the last line if the file was ever re-added.
-    const line = out.split(/\r?\n/).filter(Boolean).pop()
-    const [date, name, email, sha] = line.split('\t')
-    return { date, name, email, sha }
-  } catch {
-    return null
-  }
-}
-
-// Resolve the real GitHub avatar for a commit by asking the API which account
-// authored that SHA — works for any commit email, as long as the commit is
-// pushed to GitHub. No token required (uses GITHUB_TOKEN if present to lift the
-// 60 req/hr anonymous limit). Returns null when offline, unpushed, or the email
-// isn't linked to a GitHub account.
-async function githubCommitAvatar(sha) {
-  if (!sha) return null
-  try {
-    const headers = { 'User-Agent': 'crosspoint-tools-blog', Accept: 'application/vnd.github+json' }
-    if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
-    const res = await fetch(`https://api.github.com/repos/${REPO}/commits/${sha}`, {
-      headers,
-      signal: AbortSignal.timeout(8000),
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    return data?.author?.avatar_url || null // data.author is null if email is unlinked
+    return out.split(/\r?\n/).filter(Boolean).pop() || null
   } catch {
     return null
   }
@@ -91,30 +56,21 @@ function gravatar(email) {
   return `https://www.gravatar.com/avatar/${hash}?d=identicon`
 }
 
-// Avatar from the commit email alone (no network): a GitHub noreply address
-// decodes to a GitHub avatar, otherwise Gravatar (identicon default).
-function emailAvatar(email) {
-  if (email) {
-    const withId = /^(\d+)\+([^@]+)@users\.noreply\.github\.com$/i.exec(email)
-    if (withId) return `https://avatars.githubusercontent.com/u/${withId[1]}`
-    const legacy = /^([^@]+)@users\.noreply\.github\.com$/i.exec(email)
-    if (legacy) return `https://github.com/${legacy[1]}.png`
-    return gravatar(email)
+// Author name + avatar for a post, entirely from front matter (deterministic,
+// no network, no git). `github:` maps to the account's avatar; `avatar:` is an
+// explicit URL override. Falls back to a Gravatar identicon so an author who
+// omits both still gets a stable image.
+function resolveAuthor(data) {
+  const name = (data.author && String(data.author).trim()) || DEFAULT_AUTHOR
+  let avatarUrl
+  if (data.avatar) {
+    avatarUrl = String(data.avatar).trim()
+  } else if (data.github) {
+    avatarUrl = `https://github.com/${String(data.github).trim()}.png`
+  } else {
+    avatarUrl = gravatar(name)
   }
-  return `https://www.gravatar.com/avatar/?d=identicon`
-}
-
-// Author name + avatar for a post. Resolution order, each tier deterministic
-// before the network one: front-matter override → committed authors map →
-// GitHub API by commit SHA (best-effort) → email/Gravatar.
-async function resolveAuthor(data, commit) {
-  const mapped = commit?.email ? AUTHORS[commit.email.toLowerCase()] : null
-  const name = data.author || mapped?.name || commit?.name || DEFAULT_AUTHOR
-
-  if (data.avatar) return { name, avatarUrl: data.avatar }
-  if (mapped?.github) return { name, avatarUrl: `https://github.com/${mapped.github}.png` }
-  const apiAvatar = await githubCommitAvatar(commit?.sha)
-  return { name, avatarUrl: apiAvatar || emailAvatar(commit?.email) }
+  return { name, avatarUrl }
 }
 
 function xmlEscape(str) {
@@ -126,7 +82,7 @@ function xmlEscape(str) {
     .replace(/'/g, '&apos;')
 }
 
-async function collectPosts() {
+function collectPosts() {
   if (!existsSync(blogDir)) return []
   const posts = []
   for (const file of readdirSync(blogDir)) {
@@ -137,10 +93,9 @@ async function collectPosts() {
     const { data } = parseFrontmatter(raw)
     if (data.draft === true) continue
 
-    const commit = gitAddCommit(relPath)
     const date =
-      data.date || commit?.date || statSync(join(blogDir, file)).mtime.toISOString()
-    const author = await resolveAuthor(data, commit)
+      data.date || gitAddDate(relPath) || statSync(join(blogDir, file)).mtime.toISOString()
+    const author = resolveAuthor(data)
 
     posts.push({
       slug,
@@ -188,7 +143,7 @@ function writeFile(path, contents) {
   writeFileSync(path, contents)
 }
 
-const posts = await collectPosts()
+const posts = collectPosts()
 
 const meta = {}
 for (const p of posts) meta[p.slug] = { date: p.date, author: p.author }
