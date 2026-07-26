@@ -706,7 +706,7 @@ export default function FlashTools() {
                       <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
                     </button>
                   )}
-                  {model === 'sticky' && (
+                  {(model === 'sticky' || model === 'x4pro') && (
                     <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
                       <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
                       <div className="mt-0.5 font-mono text-xs text-stone-400">Upload file</div>
