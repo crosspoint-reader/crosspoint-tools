@@ -6,6 +6,9 @@ import {
   setFileInput,
   sanitizeFamilyName,
   INTERVAL_PRESETS,
+  CJK_PRESET_VALUES,
+  DEFAULT_UI_SIZES,
+  customIntervalsContainCjk,
   loadJSZip,
 } from './fonts/fontBuilder.js'
 
@@ -42,6 +45,12 @@ export default function FontsPage() {
   })
   const [customIntervals, setCustomIntervals] = useState('')
   const [sizes, setSizes] = useState(['12', '14', '16', '18'])
+  const [uiSizes, setUiSizes] = useState(DEFAULT_UI_SIZES)
+
+  // CJK coverage selected (preset or custom range): the build must also ship
+  // the small UI-fallback sizes so book titles/menus can render CJK on device.
+  const cjkSelected =
+    CJK_PRESET_VALUES.some((v) => presets[v]) || customIntervalsContainCjk(customIntervals)
 
   // Auto-detect result panels (monospace multi-line text; hidden when null)
   const [autoDetectResult, setAutoDetectResult] = useState(null)
@@ -270,6 +279,18 @@ export default function FontsPage() {
         parseInt(sizes[2], 10) || 16,
         parseInt(sizes[3], 10) || 18,
       ]
+      if (cjkSelected) {
+        // CJK builds also ship the UI-fallback sizes; skip any that duplicate
+        // a reader size (the firmware reuses the same-size file).
+        const uiValues = [
+          parseInt(uiSizes[0], 10) || parseInt(DEFAULT_UI_SIZES[0], 10),
+          parseInt(uiSizes[1], 10) || parseInt(DEFAULT_UI_SIZES[1], 10),
+        ]
+        for (const v of uiValues) {
+          if (!sizeValues.includes(v)) sizeValues.push(v)
+        }
+        sizeValues.sort((a, b) => a - b)
+      }
 
       // Always start fresh; clears any prior build for this user so we
       // never collide with the worker's per-user lock from an old session.
@@ -789,6 +810,47 @@ export default function FontsPage() {
                   </div>
                 ))}
               </div>
+              {cjkSelected && (
+                <div className="mt-4">
+                  <label className="block text-sm/6 font-medium text-stone-700">
+                    UI Font Sizes (pt)
+                  </label>
+                  <p className="mt-1 max-w-[42rem] text-xs text-stone-400">
+                    CrossPoint&rsquo;s built-in UI fonts (menus, book titles) are Latin-only and
+                    come in 8, 10, and 12 pt. Because your coverage includes CJK, these two extra
+                    sizes are generated so the reader can draw CJK UI text with matching
+                    same-size fonts from this family. The 12 pt UI size is served by the Small
+                    reader size &mdash; keep Small at 12 pt for full coverage.
+                  </p>
+                  <div className="mt-2 grid grid-cols-4 gap-3">
+                    {['UI Small', 'UI Medium'].map((name, i) => (
+                      <div key={name}>
+                        <label
+                          htmlFor={`uiSize${i}`}
+                          className="block font-mono text-xs font-medium text-stone-500"
+                        >
+                          {name}
+                        </label>
+                        <input
+                          type="number"
+                          id={`uiSize${i}`}
+                          value={uiSizes[i]}
+                          min="6"
+                          max="16"
+                          onChange={(e) =>
+                            setUiSizes((prev) => {
+                              const next = prev.slice()
+                              next[i] = e.target.value
+                              return next
+                            })
+                          }
+                          className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 shadow-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Build button */}

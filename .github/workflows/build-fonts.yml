@@ -128,6 +128,11 @@ jobs:
               --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKjp-Regular.otf"
               --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKsc-Regular.otf"
             )
+          elif [[ ",${{ inputs.intervals }}," == *",cjk-tc,"* ]]; then
+            DEFAULT_FALLBACK_ARGS+=(
+              --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKtc-Regular.otf"
+              --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKsc-Regular.otf"
+            )
           elif [[ ",${{ inputs.intervals }}," == *",cjk-sc,"* ]]; then
             DEFAULT_FALLBACK_ARGS+=(
               --default-fallback-font "$DEFAULT_FALLBACK_DIR/NotoSansCJKsc-Regular.otf"
