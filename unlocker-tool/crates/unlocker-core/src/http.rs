@@ -905,12 +905,6 @@ pub async fn start(cfg: Arc<ServerConfig>, cert: &SelfSignedCert) -> anyhow::Res
     let app_http = app.clone();
     let h1 = http_handle.clone();
     let http_server = axum_server::from_tcp(http_listener)?.handle(h1);
-    let http_shutdown = shutdown_requested.clone();
-    let http = tokio::spawn(supervise_server(
-        "HTTP",
-        http_shutdown,
-        http_server.serve(app_http.into_make_service()),
-    ));
 
     let app_https = app.clone();
     let h2 = https_handle.clone();
@@ -918,6 +912,13 @@ pub async fn start(cfg: Arc<ServerConfig>, cert: &SelfSignedCert) -> anyhow::Res
     let https_server = axum_server::from_tcp(https_listener)?
         .acceptor(https_acceptor)
         .handle(h2);
+
+    let http_shutdown = shutdown_requested.clone();
+    let http = tokio::spawn(supervise_server(
+        "HTTP",
+        http_shutdown,
+        http_server.serve(app_http.into_make_service()),
+    ));
     let https_shutdown = shutdown_requested.clone();
     let https = tokio::spawn(supervise_server(
         "HTTPS",
