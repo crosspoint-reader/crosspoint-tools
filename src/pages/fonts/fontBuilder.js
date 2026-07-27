@@ -114,9 +114,54 @@ export const INTERVAL_PRESETS = [
   { value: 'thai', label: 'Thai' },
   { value: 'hangul', label: 'Hangul', note: '(Korean)' },
   { value: 'cjk-sc', label: 'Chinese', note: '(Simplified)' },
+  { value: 'cjk-tc', label: 'Chinese', note: '(Traditional)' },
   { value: 'cjk-jp', label: 'Japanese' },
   { value: 'symbols', label: 'Symbols & Arrows' },
 ]
+
+// Presets that pull in CJK scripts. CrossPoint's built-in UI fonts (menus, book
+// titles) are Latin-only and come in 8/10/12 pt; the firmware draws CJK UI text
+// by mapping a same-size .cpfont from the loaded family over each of them, so
+// CJK builds must also ship the small UI sizes (see DEFAULT_UI_SIZES).
+export const CJK_PRESET_VALUES = ['hangul', 'cjk-sc', 'cjk-tc', 'cjk-jp']
+
+// Default UI-fallback point sizes appended to CJK builds. 12 pt is normally
+// covered by the Small reader size.
+export const DEFAULT_UI_SIZES = ['8', '10']
+
+// CJK block ranges, mirroring utf8IsCjkCodepoint in the reader firmware
+// (lib/Utf8/Utf8.h) — the ranges that trigger UI font fallback on device.
+const CJK_BLOCKS = [
+  [0x1100, 0x11ff], // Hangul Jamo
+  [0x2e80, 0x2fdf], // CJK Radicals Supplement, Kangxi Radicals
+  [0x3000, 0x33ff], // CJK punctuation, Kana, Bopomofo, Hangul Compat
+  [0x3400, 0x4dbf], // CJK Extension A
+  [0x4e00, 0x9fff], // CJK Unified Ideographs
+  [0xa960, 0xa97f], // Hangul Jamo Extended-A
+  [0xac00, 0xd7ff], // Hangul Syllables, Jamo Extended-B
+  [0xf900, 0xfaff], // CJK Compatibility Ideographs
+  [0xfe30, 0xfe4f], // CJK Compatibility Forms
+  [0xff00, 0xffef], // Halfwidth and Fullwidth Forms
+  [0x20000, 0x2ebef], // CJK Extensions B-F
+  [0x2f800, 0x2fa1f], // CJK Compatibility Ideographs Supplement
+  [0x30000, 0x323af], // CJK Extensions G-H
+]
+
+// True when the custom-ranges field (e.g. "(0x4E00-0x9FFF),(0x3040-0x309F)")
+// overlaps any CJK block, so CJK typed as raw ranges also gets the UI sizes.
+export function customIntervalsContainCjk(text) {
+  const re = /0x([0-9a-f]+)\s*-\s*0x([0-9a-f]+)/gi
+  let m
+  while ((m = re.exec(text || '')) !== null) {
+    const lo = parseInt(m[1], 16)
+    const hi = parseInt(m[2], 16)
+    if (isNaN(lo) || isNaN(hi)) continue
+    for (const [blockLo, blockHi] of CJK_BLOCKS) {
+      if (lo <= blockHi && hi >= blockLo) return true
+    }
+  }
+  return false
+}
 
 // Lazy-load JSZip from the same CDN URL the old page used. Resolves to the
 // JSZip constructor, or null if the script failed to load (the caller then

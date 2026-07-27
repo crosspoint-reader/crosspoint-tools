@@ -25,6 +25,7 @@ Downloaded from upstream Noto repositories:
 - `NotoEmoji-Regular.ttf`: `https://github.com/googlefonts/noto-emoji`
 - `NotoSansCJKjp-Regular.otf`: `https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/Japanese/NotoSansCJKjp-Regular.otf`
 - `NotoSansCJKsc-Regular.otf`: `https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf`
+- `NotoSansCJKtc-Regular.otf`: `https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/TraditionalChinese/NotoSansCJKtc-Regular.otf`
 
 ## SHA-256
 
@@ -32,6 +33,7 @@ Downloaded from upstream Noto repositories:
 575bc0aa43e620a0c440a07010c30f3b3b70148bd89679162040bfda08fe3856  NotoEmoji-Regular.ttf
 68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5  NotoSansCJKjp-Regular.otf
 2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b  NotoSansCJKsc-Regular.otf
+dce08bd4fd91aa8aa76ed8fea4b694c2dfb8550f67871e326843212ddbeb88b4  NotoSansCJKtc-Regular.otf
 b85c38ecea8a7cfb39c24e395a4007474fa5a4fc864f6ee33309eb4948d232d5  NotoSans-Regular.ttf
 c3332abfe298018517d7f5b687a9c0f5c92f163ea9258f23934eaa7a9378f40e  NotoSansArmenian-Regular.ttf
 b1fc4e947c0647dc79e88a6583c3b50d81d533732cd9be821d4d4999def842cd  NotoSansCherokee-Regular.ttf
