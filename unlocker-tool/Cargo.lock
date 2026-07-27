@@ -5524,6 +5524,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-util",
+ "tower",
  "tracing",
  "uuid",
  "windows-sys 0.59.0",
