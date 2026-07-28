@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Layout from '../components/Layout.jsx'
 import DownloadModal from '../components/DownloadModal.jsx'
 import { Eyebrow } from '../components/ui.jsx'
@@ -149,6 +149,206 @@ function OtaResult({ data, onDownloadRaw }) {
       </button>
       <HexPane data={data.data} />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Serial monitor
+// ---------------------------------------------------------------------------
+
+const MONITOR_MAX_CHARS = 400_000
+const MONITOR_BAUD_RATES = [115200, 74880, 230400, 460800, 921600]
+
+function SerialMonitorCard() {
+  const [connected, setConnected] = useState(false)
+  const [log, setLog] = useState('')
+  const [autoScroll, setAutoScroll] = useState(true)
+  const [error, setError] = useState('')
+
+  const baudRef = useRef(null)
+  const portRef = useRef(null)
+  const readerRef = useRef(null)
+  const activeRef = useRef(false)
+  const loopDoneRef = useRef(null)
+  const paneRef = useRef(null)
+
+  const append = (text) =>
+    setLog((prev) => {
+      const next = prev + text
+      return next.length > MONITOR_MAX_CHARS ? next.slice(next.length - MONITOR_MAX_CHARS) : next
+    })
+
+  useEffect(() => {
+    if (autoScroll && paneRef.current) paneRef.current.scrollTop = paneRef.current.scrollHeight
+  }, [log, autoScroll])
+
+  async function readLoop(port) {
+    const decoder = new TextDecoder()
+    while (activeRef.current && port.readable) {
+      const reader = port.readable.getReader()
+      readerRef.current = reader
+      try {
+        while (activeRef.current) {
+          const { value, done } = await reader.read()
+          if (done) break
+          if (value) append(decoder.decode(value, { stream: true }))
+        }
+      } catch (err) {
+        if (activeRef.current) append(`\n[serial read error: ${err.message}]\n`)
+      } finally {
+        try {
+          reader.releaseLock()
+        } catch {}
+        if (readerRef.current === reader) readerRef.current = null
+      }
+    }
+    if (activeRef.current) {
+      // The stream ended on its own (USB unplug), not via our disconnect.
+      activeRef.current = false
+      try {
+        await port.close()
+      } catch {}
+      portRef.current = null
+      setConnected(false)
+      append('\n[device disconnected]\n')
+    }
+  }
+
+  async function connect() {
+    setError('')
+    let port
+    try {
+      port = await CrossPointFlasher.requestPort(null)
+    } catch (err) {
+      if (err?.name !== 'NotFoundError') setError(err.message || String(err))
+      return
+    }
+    try {
+      await port.open({ baudRate: Number(baudRef.current?.value) || 115200 })
+    } catch (err) {
+      setError(`Could not open port: ${err.message}`)
+      return
+    }
+    portRef.current = port
+    activeRef.current = true
+    setConnected(true)
+    setLog('')
+    loopDoneRef.current = readLoop(port)
+  }
+
+  async function disconnect() {
+    activeRef.current = false
+    try {
+      await readerRef.current?.cancel()
+    } catch {}
+    try {
+      await loopDoneRef.current
+    } catch {}
+    try {
+      await portRef.current?.close()
+    } catch {}
+    portRef.current = null
+    setConnected(false)
+  }
+
+  async function resetDevice() {
+    const port = portRef.current
+    if (!port) return
+    setError('')
+    try {
+      // Pulse EN low through RTS (DTR held clear so IO0/GPIO9 stays high) to
+      // trigger a normal-boot reset while the monitor stays attached.
+      await port.setSignals({ dataTerminalReady: false, requestToSend: true })
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      await port.setSignals({ dataTerminalReady: false, requestToSend: false })
+      append('\n[reset pulse sent]\n')
+    } catch (err) {
+      setError(`Reset failed: ${err.message}`)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      activeRef.current = false
+      try {
+        readerRef.current?.cancel()
+      } catch {}
+      try {
+        portRef.current?.close()
+      } catch {}
+    }
+  }, [])
+
+  return (
+    <ToolCard title="Serial monitor">
+      <p className="mt-1 text-sm text-stone-600">
+        Live console output from a connected device over USB serial. Useful for watching boot logs and firmware{' '}
+        <Mono>printf</Mono> output. Disconnect the monitor before using the flashing tools — they need exclusive
+        access to the port.
+      </p>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <select
+          ref={baudRef}
+          defaultValue="115200"
+          disabled={connected}
+          className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
+        >
+          {MONITOR_BAUD_RATES.map((rate) => (
+            <option key={rate} value={rate}>
+              {rate} baud
+            </option>
+          ))}
+        </select>
+        {connected ? (
+          <button type="button" onClick={disconnect} className={btnDark}>
+            Disconnect
+          </button>
+        ) : (
+          <button type="button" onClick={connect} className={btnPrimary}>
+            Connect
+          </button>
+        )}
+        <button type="button" onClick={resetDevice} disabled={!connected} className={btnOutline}>
+          Reset device
+        </button>
+        <button type="button" onClick={() => setLog('')} disabled={!log} className={btnOutline}>
+          Clear
+        </button>
+        <button
+          type="button"
+          onClick={() => downloadBlob(new TextEncoder().encode(log), 'serial-log.txt')}
+          disabled={!log}
+          className={btnOutline}
+        >
+          Download log
+        </button>
+        <label className="ml-auto flex items-center gap-2 text-sm text-stone-600">
+          <input
+            type="checkbox"
+            checked={autoScroll}
+            onChange={(e) => setAutoScroll(e.target.checked)}
+            className="size-4 rounded border-stone-300 accent-brand-500"
+          />
+          Auto-scroll
+        </label>
+      </div>
+      {error ? <p className="mt-3 font-mono text-xs text-red-600">{error}</p> : null}
+      <div className="mt-4">
+        <div className="flex items-center justify-between rounded-t-xl bg-stone-900 px-4 py-2">
+          <span className="inline-flex items-center gap-1.5 font-mono text-xs text-stone-400">
+            <span className={`size-1.5 rounded-full ${connected ? 'bg-brand-500' : 'bg-stone-600'}`} />
+            {connected ? 'Connected' : 'Not connected'}
+          </span>
+          {log ? <span className="font-mono text-xs text-stone-500 tabular-nums">{log.length.toLocaleString()} chars</span> : null}
+        </div>
+        <pre
+          ref={paneRef}
+          className="h-80 overflow-auto rounded-b-xl bg-stone-950 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-stone-100"
+        >
+          {log || (connected ? 'Waiting for output...' : 'Connect a device to start streaming serial output.')}
+        </pre>
+      </div>
+    </ToolCard>
   )
 }
 
@@ -638,6 +838,8 @@ export default function DebugPage() {
               </button>
             </div>
           </ToolCard>
+
+          <SerialMonitorCard />
 
           <ToolCard title="Output">
             {status.text ? (
