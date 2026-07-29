@@ -111,6 +111,7 @@ export const INTERVAL_PRESETS = [
   { value: 'ethiopic', label: 'Ethiopic' },
   { value: 'cherokee', label: 'Cherokee' },
   { value: 'tifinagh', label: 'Tifinagh' },
+  { value: 'bengali', label: 'Bengali' },
   { value: 'thai', label: 'Thai' },
   { value: 'hangul', label: 'Hangul', note: '(Korean)' },
   { value: 'cjk-sc', label: 'Chinese', note: '(Simplified)' },

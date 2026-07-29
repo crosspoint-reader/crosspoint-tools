@@ -72,6 +72,8 @@ INTERVAL_PRESETS = {
     "cherokee":    [(0x13A0, 0x13FF), (0xAB70, 0xABBF)],
     "tifinagh":    [(0x2D30, 0x2D7F)],
     "thai":        [(0x0E00, 0x0E7F)],
+    # Bengali block plus the shared Devanagari danda/double-danda punctuation.
+    "bengali":     [(0x0964, 0x0965), (0x0980, 0x09FF)],
     # Symbol blocks commonly seen in scifi/popsci/literary fiction.
 
     "symbols":     [(0x2070, 0x209F), (0x20A0, 0x20CF), (0x2150, 0x218F),
