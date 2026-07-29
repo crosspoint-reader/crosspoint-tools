@@ -64,6 +64,9 @@ function ProductCard({ item, ctaLabel }) {
         >
           {item.title}
         </h3>
+        {item.description && (
+          <p className="mt-1 text-xs/5 text-stone-500">{item.description}</p>
+        )}
         <span
           className={`mt-auto pt-3 text-xs font-medium ${clickable ? 'text-brand-600' : 'text-stone-400'}`}
         >

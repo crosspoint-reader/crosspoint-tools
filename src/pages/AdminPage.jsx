@@ -327,6 +327,7 @@ function accessoryImageUrl(a) {
 
 function AccessoriesCard({ secret, log }) {
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [link, setLink] = useState('')
   const [comingSoon, setComingSoon] = useState(false)
   const [category, setCategory] = useState('accessory')
@@ -360,6 +361,7 @@ function AccessoriesCard({ secret, log }) {
     try {
       const formData = new FormData()
       formData.append('title', title.trim())
+      formData.append('description', description.trim())
       formData.append('link', link.trim())
       formData.append('comingSoon', String(comingSoon))
       formData.append('category', category)
@@ -375,6 +377,7 @@ function AccessoriesCard({ secret, log }) {
       if (r.ok) {
         log('Accessory added: ' + r.data.accessory.title)
         setTitle('')
+        setDescription('')
         setLink('')
         setComingSoon(false)
         setImage(null)
@@ -444,6 +447,7 @@ function AccessoriesCard({ secret, log }) {
       } else {
         next[a.id] = {
           title: a.title,
+          description: a.description || '',
           link: a.link || '',
           comingSoon: !!a.comingSoon,
           category: a.category || 'accessory',
@@ -465,6 +469,7 @@ function AccessoriesCard({ secret, log }) {
     try {
       const formData = new FormData()
       formData.append('title', edit.title.trim())
+      formData.append('description', edit.description.trim())
       formData.append('link', edit.link.trim())
       formData.append('comingSoon', String(edit.comingSoon))
       formData.append('category', edit.category)
@@ -514,6 +519,13 @@ function AccessoriesCard({ secret, log }) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Product title (e.g. USB-C magnetic cable)"
+          className={inputCls}
+        />
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Description (optional, shown under the title)"
           className={inputCls}
         />
         <select
@@ -656,6 +668,13 @@ function AccessoriesCard({ secret, log }) {
                       type="text"
                       value={edit.title}
                       onChange={(e) => setEditField(a.id, 'title', e.target.value)}
+                      className={inputCls}
+                    />
+                    <input
+                      type="text"
+                      value={edit.description}
+                      onChange={(e) => setEditField(a.id, 'description', e.target.value)}
+                      placeholder="Description (optional, shown under the title)"
                       className={inputCls}
                     />
                     <select

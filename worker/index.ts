@@ -2738,11 +2738,13 @@ async function handleAccessoryCreate(
     return json({ error: img.error }, 400, headers);
   }
 
+  const description = formData.get('description');
   const id = `acc-${Date.now().toString(36)}`;
   const accessory: Accessory = {
     id,
     title: title.trim(),
     link: linkVal,
+    description: typeof description === 'string' ? description.trim() : '',
     comingSoon: formData.get('comingSoon') === 'true',
     category: readAccessoryCategory(formData) || 'accessory',
     createdAt: new Date().toISOString(),
@@ -2792,6 +2794,10 @@ async function handleAccessoryUpdate(
       return json({ error: 'Product link must be a valid http(s) URL' }, 400, headers);
     }
     accessory.link = linkVal;
+  }
+  const description = formData.get('description');
+  if (description !== null && typeof description === 'string') {
+    accessory.description = description.trim();
   }
   const comingSoon = formData.get('comingSoon');
   if (comingSoon !== null) {
