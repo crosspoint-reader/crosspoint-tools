@@ -434,10 +434,7 @@ export default function FlashTools() {
     // behavior.
     const skipReset =
       action === 'crosspoint' || action === 'nightly' || action === 'custom' ||
-      action === 'device' || action.startsWith('beta-') ||
-      // The X4 Pro can't be rebooted over serial — it always needs a manual
-      // power-button boot, so a hard reset after stock flashes buys nothing.
-      model === 'x4pro'
+      action === 'device' || action.startsWith('beta-')
 
     const titles = {
       crosspoint: 'Flashing CrossPoint Firmware...',
@@ -469,15 +466,7 @@ export default function FlashTools() {
     const states = steps.map(() => 'pending')
 
     setRunning(true)
-    setRestart(
-      model === 'x4pro'
-        ? {
-            text: action.startsWith('stock-')
-              ? 'Press and hold the power button to boot the stock firmware.'
-              : 'Press and hold the power button to boot CrossPoint.',
-          }
-        : { unplug: skipReset && model !== 'x4' }
-    )
+    setRestart({ unplug: skipReset && model !== 'x4' })
     setPercent(0)
     setProgress({ title, steps, states: [...states], status: downloadMsg ? { kind: 'info', text: downloadMsg } : null })
 
