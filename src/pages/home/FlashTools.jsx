@@ -689,12 +689,13 @@ export default function FlashTools() {
                     </div>
                     <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
                   </button>
+                  {/* Temporarily disabled: X4 Pro stock firmware option
                   {model === 'x4pro' && (
                     <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
                       <div className="text-sm font-semibold text-stone-900">Stock English</div>
                       <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
                     </button>
-                  )}
+                  )} */}
                   {(model === 'sticky' || model === 'x4pro') && (
                     <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
                       <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
