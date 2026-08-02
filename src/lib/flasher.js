@@ -145,6 +145,23 @@ function md5(input) {
 
 const ESP_IMAGE_MAGIC = 0xE9;
 const IMG_HEADER_SIZE = 24;
+
+// esp_chip_id_t from the ESP image extended header (bytes 12-13, LE). Legacy
+// images carry 0xFFFF ("any"), so an unrecognized id resolves to null and is
+// not treated as a mismatch.
+const ESP_IMAGE_CHIP_IDS = {
+  'ESP32': 0x0000,
+  'ESP32-S2': 0x0002,
+  'ESP32-C3': 0x0005,
+  'ESP32-S3': 0x0009,
+};
+
+export function imageChipName(data) {
+  if (data.length < 14) return null;
+  const id = data[12] | (data[13] << 8);
+  const entry = Object.entries(ESP_IMAGE_CHIP_IDS).find(([, chipId]) => chipId === id);
+  return entry ? entry[0] : null;
+}
 const IMG_SEG_HEADER_SIZE = 8;
 const IMG_SHA_TRAILER = 32;
 const IMG_CHECKSUM_SEED = 0xEF;
@@ -828,8 +845,19 @@ export class CrossPointFlasher {
     const otadata = table.find((p) => p.type === 'data-ota');
     const app0 = table.find((p) => p.type === 'app-ota_0');
     if (!nvs || !otadata || !app0) throw new Error('Reference layout is missing NVS, otadata, or app0.');
+    // Image-vs-device chip check: repair is the one flow where a bootloader
+    // built for another chip can be written to 0x0, which leaves the board
+    // unbootable (e.g. the bundled ESP32-C3 bootloader on an X4 Pro's S3).
+    const checkImageChip = (data, label) => {
+      const imgChip = imageChipName(data);
+      if (this.expectedChip && imgChip && imgChip !== this.expectedChip) {
+        const device = this.deviceName ? `the ${this.deviceName}` : 'this device';
+        throw new Error(`${label} is built for the ${imgChip}, but ${device} uses an ${this.expectedChip}. Nothing was written.`);
+      }
+    };
     if (firmwareData) {
       await validateFirmwareImage(firmwareData);
+      checkImageChip(firmwareData, 'Firmware');
       if (firmwareData.length > app0.size) {
         throw new Error(`Firmware too large: ${firmwareData.length} bytes won't fit in app0 (${app0.size} bytes).`);
       }
@@ -838,6 +866,7 @@ export class CrossPointFlasher {
       if (bootloaderData[0] !== ESP_IMAGE_MAGIC) {
         throw new Error('Invalid bootloader: ESP image magic byte (0xE9) missing. Are you sure this is a bootloader .bin?');
       }
+      checkImageChip(bootloaderData, 'Bootloader');
       if (bootloaderOffset + bootloaderData.length > 0x8000) {
         throw new Error(`Bootloader too large: ${bootloaderData.length} bytes at 0x${bootloaderOffset.toString(16)} won't fit below the partition table at 0x8000.`);
       }

@@ -6,13 +6,47 @@ import {
   CrossPointFlasher,
   X3_PARTITION_TABLE,
   X4_PARTITION_TABLE,
+  CROSSPOINT_PARTITION_TABLE,
   CROSSPOINT_KO_PARTITION_TABLE,
   downloadBlob,
   otaStateName,
   fetchBundledBootloader,
+  fetchFlashAsset,
   fetchReleaseFirmware,
+  fetchDeviceBuildFirmware,
 } from '../lib/flasher.js'
 import { fmtHex, fmtSize, hexPreview, identifyFirmwareData } from './debug/helpers.js'
+
+// Devices the debug tools can target. The chip is checked against the
+// connected device before anything is written, mirroring MODEL_CHIPS in
+// FlashTools; the X4 Pro is the odd one out (ESP32-S3, its own bundled
+// bootloader asset, admin-uploaded firmware build instead of the release
+// catalog).
+const DEBUG_DEVICES = {
+  x4: {
+    name: 'Xteink X4',
+    chip: 'ESP32-C3',
+    layouts: [
+      { value: 'X4', label: 'CrossPoint (X4) layout', table: X4_PARTITION_TABLE },
+      { value: 'X3', label: 'Stock X3 layout', table: X3_PARTITION_TABLE },
+      { value: 'KO', label: 'CrossPoint KO fork layout', table: CROSSPOINT_KO_PARTITION_TABLE },
+    ],
+  },
+  x4pro: {
+    name: 'Xteink X4 Pro',
+    chip: 'ESP32-S3',
+    layouts: [{ value: 'X4PRO', label: 'CrossPoint (X4 Pro) layout', table: CROSSPOINT_PARTITION_TABLE }],
+  },
+  x3: {
+    name: 'Xteink X3',
+    chip: 'ESP32-C3',
+    layouts: [
+      { value: 'X4', label: 'CrossPoint (X4) layout', table: X4_PARTITION_TABLE },
+      { value: 'X3', label: 'Stock X3 layout', table: X3_PARTITION_TABLE },
+      { value: 'KO', label: 'CrossPoint KO fork layout', table: CROSSPOINT_KO_PARTITION_TABLE },
+    ],
+  },
+}
 
 // ---------------------------------------------------------------------------
 // Presentational pieces
@@ -361,6 +395,9 @@ export default function DebugPage() {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState({ text: '', error: false })
   const [result, setResult] = useState(null)
+  const [deviceId, setDeviceId] = useState('x4')
+  const device = DEBUG_DEVICES[deviceId]
+  const flasherOpts = { expectedChip: device.chip, deviceName: device.name }
 
   const repairLayoutRef = useRef(null)
   const repairBootloaderRef = useRef(null)
@@ -379,7 +416,7 @@ export default function DebugPage() {
 
   async function withConnectedFlasher(operation) {
     const port = await CrossPointFlasher.requestPort()
-    const flasher = new CrossPointFlasher(port)
+    const flasher = new CrossPointFlasher(port, flasherOpts)
     try {
       await flasher.connect()
       return await operation(flasher)
@@ -405,7 +442,7 @@ export default function DebugPage() {
     }
 
     setBusy(true)
-    const flasher = new CrossPointFlasher(port)
+    const flasher = new CrossPointFlasher(port, flasherOpts)
     try {
       setStatusText('Connecting...')
       await flasher.connect()
@@ -456,7 +493,7 @@ export default function DebugPage() {
       return
     }
     setBusy(true)
-    const flasher = new CrossPointFlasher(port)
+    const flasher = new CrossPointFlasher(port, flasherOpts)
     try {
       const data = await flasher.saveFullFlash({ onProgress: setProgress })
       downloadBlob(data, 'flash.bin')
@@ -487,7 +524,7 @@ export default function DebugPage() {
       return
     }
     setBusy(true)
-    const flasher = new CrossPointFlasher(port)
+    const flasher = new CrossPointFlasher(port, flasherOpts)
     try {
       setStatusText('Reading file...')
       const data = new Uint8Array(await file.arrayBuffer())
@@ -507,8 +544,11 @@ export default function DebugPage() {
 
   async function repairBootRegion() {
     const layoutKey = repairLayoutRef.current.value
-    const tables = { X4: X4_PARTITION_TABLE, X3: X3_PARTITION_TABLE, KO: CROSSPOINT_KO_PARTITION_TABLE }
-    const table = tables[layoutKey]
+    const table = device.layouts.find((l) => l.value === layoutKey)?.table
+    if (!table) {
+      setStatusText(`Unknown layout ${layoutKey} for the ${device.name}.`, true)
+      return
+    }
     const bootloaderFile = repairBootloaderRef.current?.files[0]
 
     setResult(null)
@@ -521,16 +561,23 @@ export default function DebugPage() {
       return
     }
     setBusy(true)
-    const flasher = new CrossPointFlasher(port)
+    const flasher = new CrossPointFlasher(port, flasherOpts)
     try {
-      setStatusText(bootloaderFile ? 'Reading bootloader file...' : 'Downloading bundled bootloader...')
-      const bootloaderData = bootloaderFile
-        ? new Uint8Array(await bootloaderFile.arrayBuffer())
-        : await fetchBundledBootloader()
+      let bootloaderData
+      if (bootloaderFile) {
+        setStatusText('Reading bootloader file...')
+        bootloaderData = new Uint8Array(await bootloaderFile.arrayBuffer())
+      } else {
+        setStatusText('Downloading bundled bootloader...')
+        bootloaderData =
+          deviceId === 'x4pro'
+            ? await fetchFlashAsset('/firmware/x4pro-bootloader.bin', 'X4 Pro bootloader')
+            : await fetchBundledBootloader()
+      }
       let firmwareData = null
       if (repairFlashOsRef.current?.checked) {
-        setStatusText('Downloading CrossPoint firmware...')
-        firmwareData = await fetchReleaseFirmware()
+        setStatusText(deviceId === 'x4pro' ? 'Downloading X4 Pro build...' : 'Downloading CrossPoint firmware...')
+        firmwareData = deviceId === 'x4pro' ? await fetchDeviceBuildFirmware('x4pro') : await fetchReleaseFirmware()
       }
       const { partitions } = await flasher.repairBootRegion(table, {
         bootloaderData,
@@ -615,7 +662,7 @@ export default function DebugPage() {
       return
     }
     setBusy(true)
-    const flasher = new CrossPointFlasher(port)
+    const flasher = new CrossPointFlasher(port, flasherOpts)
     try {
       const data = await flasher.swapBootPartition({ onProgress: setProgress, skipReset: false })
       lastDownloadRef.current = data.data
@@ -720,7 +767,29 @@ export default function DebugPage() {
           Low-level tools for inspecting Xteink devices.
         </p>
 
-        <div className="mt-12 space-y-4">
+        <div className="mt-8 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 ring-1 ring-stone-950/5">
+          <label htmlFor="debug-device" className="text-sm font-semibold text-stone-900">
+            Device
+          </label>
+          <select
+            id="debug-device"
+            value={deviceId}
+            onChange={(e) => setDeviceId(e.target.value)}
+            disabled={busy}
+            className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
+          >
+            {Object.entries(DEBUG_DEVICES).map(([id, d]) => (
+              <option key={id} value={id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+          <span className="text-sm text-stone-500">
+            The connected chip is checked against this selection ({device.chip}) before anything is written.
+          </span>
+        </div>
+
+        <div className="mt-6 space-y-4">
           <ToolCard title="Download firmware">
             <p className="mt-1 text-sm text-stone-600">
               Download a firmware <Mono>.bin</Mono> for your device (stable, insider, beta, or stock) to flash
@@ -759,13 +828,16 @@ export default function DebugPage() {
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <select
+                key={deviceId}
                 ref={repairLayoutRef}
-                defaultValue="X4"
+                defaultValue={device.layouts[0].value}
                 className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700"
               >
-                <option value="X4">CrossPoint (X4) layout</option>
-                <option value="X3">Stock X3 layout</option>
-                <option value="KO">CrossPoint KO fork layout</option>
+                {device.layouts.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
               </select>
               <div className="flex gap-2">
                 <input
@@ -786,10 +858,12 @@ export default function DebugPage() {
                 defaultChecked
                 className="size-4 rounded border-stone-300 accent-brand-500"
               />
-              Also flash the latest stable CrossPoint firmware, so the device boots straight into CrossPoint
+              {deviceId === 'x4pro'
+                ? 'Also flash the current X4 Pro build, so the device boots straight into CrossPoint'
+                : 'Also flash the latest stable CrossPoint firmware, so the device boots straight into CrossPoint'}
             </label>
             <p className="mt-3 text-xs text-stone-400">
-              The bundled ESP32-C3 bootloader is used by default; supply a <Mono>bootloader.bin</Mono> above to
+              The bundled {device.chip} bootloader is used by default; supply a <Mono>bootloader.bin</Mono> above to
               override it. Uncheck the firmware option if you plan to flash stock or a beta build instead.
             </p>
           </ToolCard>
