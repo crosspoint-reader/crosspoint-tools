@@ -118,6 +118,7 @@ export const INTERVAL_PRESETS = [
   { value: 'cjk-tc', label: 'Chinese', note: '(Traditional)' },
   { value: 'cjk-jp', label: 'Japanese' },
   { value: 'symbols', label: 'Symbols & Arrows' },
+  { value: 'ipa-chars', label: 'IPA characters' },
 ]
 
 // Presets that pull in CJK scripts. CrossPoint's built-in UI fonts (menus, book
