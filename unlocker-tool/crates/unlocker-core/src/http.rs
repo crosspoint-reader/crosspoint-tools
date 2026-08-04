@@ -562,10 +562,24 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
         // Variants come from CrossInk's platformio.ini (`tiny`, `xlarge`,
         // `no_emoji`). All point at the same firmware bytes — the device's
         // variant matcher picks the one for its build.
-        let asset_version = "v99.9.9.1";
+        //
+        // The asset filename's version MUST equal `tag_name`. CrossInk <= 1.2.x
+        // derives the expected asset name from tag_name and accepts only
+        // `firmware-<variant>-v<tag>.bin`, `firmware-<variant>-<tag>.bin`, or the
+        // bare `firmware-<variant>.bin`; a mismatched version (e.g. the old
+        // `v99.9.9.1` vs tag `99.9.9`) makes checkForUpdate() return NO_UPDATE
+        // before it ever downloads. CrossInk 1.3+/1.4+ matches by prefix and
+        // ignores the version, so a tag-aligned name works for every build.
+        // Emit the bare name too — it hits the unconditional match in all
+        // versions, covering any other old strict matcher.
         ["no_emoji", "tiny", "xlarge"]
             .iter()
-            .map(|v| asset(format!("firmware-{v}-{asset_version}.bin")))
+            .flat_map(|v| {
+                [
+                    asset(format!("firmware-{v}.bin")),
+                    asset(format!("firmware-{v}-v{tag}.bin")),
+                ]
+            })
             .collect::<Vec<_>>()
     } else {
         vec![asset("firmware.bin".to_string())]
