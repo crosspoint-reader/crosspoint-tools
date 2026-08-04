@@ -770,9 +770,38 @@ export class CrossPointFlasher {
     step(0, 'done');
 
     step(1, 'running');
-    const data = await this.espLoader.readFlash(0, 0x1000000, (_, p, t) => {
-      if (onProgress) onProgress('Read flash', p, t);
-    });
+    // One readFlash command per 1 MB chunk instead of a single 16 MB read.
+    // esptool-js accumulates the response with a full re-copy per 4 KB packet,
+    // so a 16 MB read degrades quadratically until the ack loop falls behind
+    // the stub and the transfer dies on FLASH_READ_TIMEOUT. Chunking bounds
+    // the copies and gives each chunk its own retry + MD5 check.
+    const FLASH_SIZE = 0x1000000;
+    const CHUNK_SIZE = 0x100000;
+    const data = new Uint8Array(FLASH_SIZE);
+    for (let offset = 0; offset < FLASH_SIZE; offset += CHUNK_SIZE) {
+      const size = Math.min(CHUNK_SIZE, FLASH_SIZE - offset);
+      let attempt = 0;
+      for (;;) {
+        try {
+          const chunk = await this.espLoader.readFlash(offset, size, (_, p) => {
+            if (onProgress) onProgress('Read flash', offset + p, FLASH_SIZE);
+          });
+          const expected = await this.espLoader.flashMd5sum(offset, size);
+          const actual = this.espLoader.toHex(md5(chunk));
+          if (actual !== expected) {
+            throw new Error(`MD5 mismatch reading flash at 0x${offset.toString(16)}`);
+          }
+          data.set(chunk, offset);
+          break;
+        } catch (err) {
+          if (++attempt >= 3) throw err;
+          // The stub may still be streaming the aborted read; let the
+          // in-flight packets land, then discard them before retrying.
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          try { await this.espLoader.transport.flushInput(); } catch {}
+        }
+      }
+    }
     step(1, 'done');
 
     step(2, 'running');
