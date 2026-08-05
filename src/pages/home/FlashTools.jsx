@@ -11,6 +11,7 @@ import {
   fetchBuildMeta,
   fetchBetaBuilds,
   fetchBetaFirmware,
+  fetchReleaseVisibility,
   fetchDeviceBuildInfo,
   fetchDeviceBuildFirmware,
   fetchFlashAsset,
@@ -206,6 +207,10 @@ export default function FlashTools() {
   // Beta builds from /api (buttons inserted before "Custom .bin")
   const [betaBuilds, setBetaBuilds] = useState([])
 
+  // Per-device visibility for the fixed release buttons on x3/x4.
+  // { hidden: { crosspoint: ['x3'], ... } }
+  const [releaseVisibility, setReleaseVisibility] = useState({ hidden: {} })
+
   // Admin-uploaded build for DEVICE_BUILD_MODELS (sticky, m5paper, lilygo, x4pro)
   const [deviceBuild, setDeviceBuild] = useState(null)
 
@@ -253,12 +258,17 @@ export default function FlashTools() {
   const [restart, setRestart] = useState(null) // { unplug: bool }
   const progressRef = useRef(null)
 
-  // --- Load beta builds once ---
+  // --- Load beta builds + release visibility once ---
   useEffect(() => {
     let cancelled = false
     fetchBetaBuilds()
       .then((builds) => {
         if (!cancelled && Array.isArray(builds)) setBetaBuilds(builds)
+      })
+      .catch(() => {})
+    fetchReleaseVisibility()
+      .then((v) => {
+        if (!cancelled && v) setReleaseVisibility(v)
       })
       .catch(() => {})
     return () => {
@@ -602,6 +612,12 @@ export default function FlashTools() {
     setRunning(false)
   }
 
+  // Per-device visibility (only x3/x4 carry admin-controlled hiding). Betas
+  // hide via their own hiddenDevices list; the fixed release buttons hide via
+  // the release-visibility config keyed by action id.
+  const visibleBetas = betaBuilds.filter((b) => !(b.hiddenDevices || []).includes(model))
+  const isReleaseHidden = (key) => (releaseVisibility.hidden?.[key] || []).includes(model)
+
   const selectedBeta = fw?.startsWith('beta-') ? betaBuilds.find((b) => `beta-${b.id}` === fw) : null
 
   return (
@@ -705,25 +721,33 @@ export default function FlashTools() {
                 </div>
               ) : (
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <button type="button" onClick={() => selectFw('crosspoint')} className={cardClass(fw === 'crosspoint')}>
-                  <div className="text-sm font-semibold text-stone-900">
-                    {crosspoint.tag ? `CrossPoint ${crosspoint.tag}` : 'CrossPoint'}
-                  </div>
-                  <div className="mt-0.5 font-mono text-xs text-brand-600">Community</div>
-                </button>
-                <button type="button" onClick={() => selectFw('nightly')} className={cardClass(fw === 'nightly')}>
-                  <div className="text-sm font-semibold text-stone-900">CrossPoint Nightly</div>
-                  <div className="mt-0.5 font-mono text-xs text-brand-600">Insider</div>
-                </button>
-                <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
-                  <div className="text-sm font-semibold text-stone-900">Stock English</div>
-                  <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
-                </button>
-                <button type="button" onClick={() => selectFw('stock-ch')} className={cardClass(fw === 'stock-ch')}>
-                  <div className="text-sm font-semibold text-stone-900">Stock Chinese</div>
-                  <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
-                </button>
-                {betaBuilds.map((b) => (
+                {!isReleaseHidden('crosspoint') && (
+                  <button type="button" onClick={() => selectFw('crosspoint')} className={cardClass(fw === 'crosspoint')}>
+                    <div className="text-sm font-semibold text-stone-900">
+                      {crosspoint.tag ? `CrossPoint ${crosspoint.tag}` : 'CrossPoint'}
+                    </div>
+                    <div className="mt-0.5 font-mono text-xs text-brand-600">Community</div>
+                  </button>
+                )}
+                {!isReleaseHidden('nightly') && (
+                  <button type="button" onClick={() => selectFw('nightly')} className={cardClass(fw === 'nightly')}>
+                    <div className="text-sm font-semibold text-stone-900">CrossPoint Nightly</div>
+                    <div className="mt-0.5 font-mono text-xs text-brand-600">Insider</div>
+                  </button>
+                )}
+                {!isReleaseHidden('stock-en') && (
+                  <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
+                    <div className="text-sm font-semibold text-stone-900">Stock English</div>
+                    <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
+                  </button>
+                )}
+                {!isReleaseHidden('stock-ch') && (
+                  <button type="button" onClick={() => selectFw('stock-ch')} className={cardClass(fw === 'stock-ch')}>
+                    <div className="text-sm font-semibold text-stone-900">Stock Chinese</div>
+                    <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
+                  </button>
+                )}
+                {visibleBetas.map((b) => (
                   <button
                     key={b.id}
                     type="button"

@@ -1,4 +1,4 @@
-import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, Accessory } from './types';
+import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, Accessory, FirmwareDevice, ReleaseVisibility } from './types';
 
 const ROYALTY_REPO_ID = 'SoFriendly/crosspoint-tools';
 
@@ -227,6 +227,11 @@ async function handleApi(
       case '/api/beta':
         if (request.method === 'GET') return handleBetaList(env, corsHeaders);
         if (request.method === 'POST') return handleBetaCreate(request, env, corsHeaders);
+        return json({ error: 'Method not allowed' }, 405, corsHeaders);
+
+      case '/api/release-visibility':
+        if (request.method === 'GET') return handleReleaseVisibilityGet(env, corsHeaders);
+        if (request.method === 'PUT') return handleReleaseVisibilityUpdate(request, env, corsHeaders);
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
       case '/api/banner':
@@ -2922,6 +2927,91 @@ async function handleBetaList(
   return json({ builds: list }, 200, headers);
 }
 
+// --- Per-device firmware visibility (x3 / x4) ---
+//
+// The web flasher shows every release/nightly/stock button and every beta on
+// both Xteink models by default. The admin panel can hide individual options
+// per device: betas carry a `hiddenDevices` list on their own record, and the
+// fixed "official release" buttons are tracked in a single KV blob keyed by
+// release key -> hidden devices.
+
+const RELEASE_VISIBILITY_KEY = 'release-visibility';
+const FIRMWARE_DEVICES: FirmwareDevice[] = ['x3', 'x4'];
+// Keys for the fixed release buttons the flasher renders for x3/x4. Kept in
+// sync with the `action` ids used in FlashTools.jsx.
+const OFFICIAL_RELEASE_KEYS = ['crosspoint', 'nightly', 'stock-en', 'stock-ch'];
+
+// Coerce an arbitrary value into a clean list of known firmware devices.
+// Accepts an array (from JSON bodies) or a comma-separated string (from
+// multipart form fields). Unknown/duplicate entries are dropped.
+function parseHiddenDevices(value: unknown): FirmwareDevice[] {
+  let raw: unknown[] = [];
+  if (Array.isArray(value)) {
+    raw = value;
+  } else if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      raw = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      raw = trimmed.split(',');
+    }
+  }
+  const out: FirmwareDevice[] = [];
+  for (const entry of raw) {
+    const id = typeof entry === 'string' ? entry.trim() : '';
+    if (FIRMWARE_DEVICES.includes(id as FirmwareDevice) && !out.includes(id as FirmwareDevice)) {
+      out.push(id as FirmwareDevice);
+    }
+  }
+  return out;
+}
+
+async function getReleaseVisibility(env: Env): Promise<ReleaseVisibility> {
+  const raw = await env.BUILD_META.get(RELEASE_VISIBILITY_KEY);
+  const parsed = raw ? (JSON.parse(raw) as Partial<ReleaseVisibility>) : null;
+  const hidden: Record<string, FirmwareDevice[]> = {};
+  if (parsed && parsed.hidden && typeof parsed.hidden === 'object') {
+    for (const key of OFFICIAL_RELEASE_KEYS) {
+      const devices = parseHiddenDevices((parsed.hidden as Record<string, unknown>)[key]);
+      if (devices.length) hidden[key] = devices;
+    }
+  }
+  return { hidden };
+}
+
+async function handleReleaseVisibilityGet(
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const visibility = await getReleaseVisibility(env);
+  return json(visibility, 200, headers);
+}
+
+async function handleReleaseVisibilityUpdate(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+
+  const body = await request.json().catch(() => null) as { hidden?: Record<string, unknown> } | null;
+  const incoming = body && body.hidden && typeof body.hidden === 'object' ? body.hidden : {};
+
+  const hidden: Record<string, FirmwareDevice[]> = {};
+  for (const key of OFFICIAL_RELEASE_KEYS) {
+    const devices = parseHiddenDevices(incoming[key]);
+    if (devices.length) hidden[key] = devices;
+  }
+
+  const visibility: ReleaseVisibility = { hidden };
+  await env.BUILD_META.put(RELEASE_VISIBILITY_KEY, JSON.stringify(visibility));
+  return json(visibility, 200, headers);
+}
+
 // Resolve a tag on crosspoint-reader to a firmware.bin (or first *.bin) asset
 // and stream it back. Used by beta builds whose source is a GitHub release.
 async function fetchReleaseFirmware(
@@ -3021,6 +3111,8 @@ async function handleBetaCreate(
     customMetadata: { sha256 },
   });
 
+  const hiddenDevices = parseHiddenDevices(formData.get('hiddenDevices'));
+
   const build: BetaBuild = {
     id,
     name: name.trim(),
@@ -3030,6 +3122,7 @@ async function handleBetaCreate(
     firmwareSize: data.byteLength,
     firmwareSha256: sha256,
     source,
+    ...(hiddenDevices.length ? { hiddenDevices } : {}),
   };
 
   const list = await getBetaList(env);
@@ -3062,6 +3155,7 @@ async function handleBetaUpdate(
     notes?: string;
     releaseTag?: string;
     releaseRepo?: string;
+    hiddenDevices?: unknown;
   };
 
   if (body.name !== undefined) {
@@ -3072,6 +3166,11 @@ async function handleBetaUpdate(
   }
   if (body.notes !== undefined) {
     build.notes = typeof body.notes === 'string' ? body.notes.trim() : '';
+  }
+  if (body.hiddenDevices !== undefined) {
+    const hiddenDevices = parseHiddenDevices(body.hiddenDevices);
+    if (hiddenDevices.length) build.hiddenDevices = hiddenDevices;
+    else delete build.hiddenDevices;
   }
 
   // Re-link to (or refresh from) a GitHub release. Replaces the R2 binary in place.

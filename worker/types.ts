@@ -121,6 +121,10 @@ export type BetaSource =
   | { type: 'upload' }
   | { type: 'github-release'; owner: string; repo: string; tag: string; asset: string };
 
+// Xteink models that share the release/nightly/stock/beta catalog and can have
+// their firmware options hidden per-device from the admin panel.
+export type FirmwareDevice = 'x3' | 'x4';
+
 export interface BetaBuild {
   id: string;
   name: string;
@@ -131,6 +135,17 @@ export interface BetaBuild {
   firmwareSha256?: string;
   // Absent on legacy entries; treat undefined as { type: 'upload' }.
   source?: BetaSource;
+  // Devices on which this beta is hidden in the web flasher. Absent/empty means
+  // shown on every device (backwards-compatible with legacy entries).
+  hiddenDevices?: FirmwareDevice[];
+}
+
+// Per-device visibility for the fixed "official release" firmware buttons
+// (CrossPoint stable, Nightly, Stock English, Stock Chinese). Keyed by release
+// key; the value lists the devices on which that button is hidden. A missing
+// key or absent device means the button is shown.
+export interface ReleaseVisibility {
+  hidden: Record<string, FirmwareDevice[]>;
 }
 
 export interface Accessory {
