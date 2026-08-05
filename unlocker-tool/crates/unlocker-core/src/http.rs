@@ -1,15 +1,16 @@
 //! Manifest server.
 //!
 //! Two listeners on the bridge IP:
-//!   * port 80   — plain HTTP. Serves the stock updater path.
-//!   * port 443  — HTTPS with a self-signed cert for the spoofed API hostname.
-//!                 Handles the CrossPoint GitHub API spoof and firmware asset.
+//! * port 80 — plain HTTP. Serves the stock updater path.
+//! * port 443 — HTTPS with the bundled Unlocker certificate chain. Handles the
+//!   GitHub API spoof and firmware asset.
 //!
 //! The CrossPoint OTA path should look like a plain fixed-length HTTPS asset
 //! download, not a chunked application stream.
 
 use crate::cert::SelfSignedCert;
 use crate::types::{Locale, Model};
+use anyhow::Context as _;
 use axum::{
     body::Body,
     extract::{Path as AxPath, Query, State},
@@ -19,16 +20,26 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use axum_server::tls_rustls::RustlsConfig;
+use axum_server::{
+    accept::Accept,
+    tls_rustls::{RustlsAcceptor, RustlsConfig},
+};
 use bytes::Bytes;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::net::{IpAddr, SocketAddr};
+use std::future::Future;
+use std::io;
+use std::net::{IpAddr, SocketAddr, TcpListener};
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::task::{Context, Poll};
+use tokio::net::TcpStream;
+use tokio_rustls::server::TlsStream;
 
 /// Body stream that yields the firmware in fixed-size chunks while logging
 /// progress and final state. The Drop impl is the key piece: it tells us
@@ -75,16 +86,9 @@ fn log_image_metadata(bytes: &[u8]) {
     let magic = bytes[0];
     let segment_count = bytes[1];
     let chip_id = u16::from_le_bytes([bytes[12], bytes[13]]);
-    let chip_name = match chip_id {
-        0x0000 => "ESP32",
-        0x0002 => "ESP32-S2",
-        0x0005 => "ESP32-S3",
-        0x0006 => "ESP32-C3",
-        0x0009 => "ESP32-S2-Beta",
-        0x000C => "ESP32-C2",
-        0x000D => "ESP32-C6",
-        0x0010 => "ESP32-H2",
-        other => return tracing::warn!(magic, segment_count, chip_id = other, "unknown chip_id"),
+    let Some(chip_name) = esp_chip_name(chip_id) else {
+        tracing::warn!(magic, segment_count, chip_id, "unknown chip_id");
+        return;
     };
 
     let desc = &bytes[32..32 + 256];
@@ -121,6 +125,100 @@ fn log_image_metadata(bytes: &[u8]) {
 fn cstr_field(b: &[u8]) -> String {
     let end = b.iter().position(|&c| c == 0).unwrap_or(b.len());
     String::from_utf8_lossy(&b[..end]).into_owned()
+}
+
+fn esp_chip_name(chip_id: u16) -> Option<&'static str> {
+    match chip_id {
+        0x0000 => Some("ESP32"),
+        0x0002 => Some("ESP32-S2"),
+        0x0005 => Some("ESP32-C3"),
+        0x0009 => Some("ESP32-S3"),
+        0x000C => Some("ESP32-C2"),
+        0x000D => Some("ESP32-C6"),
+        0x0010 => Some("ESP32-H2"),
+        _ => None,
+    }
+}
+
+/// Adds connection and handshake diagnostics around axum-server's Rustls
+/// acceptor. axum-server intentionally discards acceptor errors before the
+/// HTTP middleware runs, so failures must be logged here.
+#[derive(Clone)]
+struct LoggingTlsAcceptor {
+    inner: RustlsAcceptor,
+}
+
+impl LoggingTlsAcceptor {
+    fn new(config: RustlsConfig) -> Self {
+        Self {
+            inner: RustlsAcceptor::new(config),
+        }
+    }
+}
+
+impl<S> Accept<TcpStream, S> for LoggingTlsAcceptor
+where
+    S: Send + 'static,
+{
+    type Stream = TlsStream<TcpStream>;
+    type Service = S;
+    type Future =
+        Pin<Box<dyn Future<Output = io::Result<(Self::Stream, Self::Service)>> + Send + 'static>>;
+
+    fn accept(&self, stream: TcpStream, service: S) -> Self::Future {
+        let client = stream.peer_addr().ok();
+        let local = stream.local_addr().ok();
+        tracing::info!(?client, ?local, "incoming HTTPS TCP connection");
+        tracing::info!(?client, "TLS handshake start");
+
+        let handshake = self.inner.accept(stream, service);
+        Box::pin(async move {
+            match handshake.await {
+                Ok((tls_stream, service)) => {
+                    let connection = tls_stream.get_ref().1;
+                    let tls_version = connection
+                        .protocol_version()
+                        .map(|version| format!("{version:?}"))
+                        .unwrap_or_else(|| "unknown".to_string());
+                    let cipher = connection
+                        .negotiated_cipher_suite()
+                        .map(|suite| format!("{:?}", suite.suite()))
+                        .unwrap_or_else(|| "unknown".to_string());
+                    let alpn = connection
+                        .alpn_protocol()
+                        .map(|value| String::from_utf8_lossy(value).into_owned())
+                        .unwrap_or_else(|| "not negotiated".to_string());
+                    let sni = connection
+                        .server_name()
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| "not supplied".to_string());
+
+                    tracing::info!(
+                        ?client,
+                        %sni,
+                        %tls_version,
+                        %cipher,
+                        %alpn,
+                        "TLS handshake success"
+                    );
+                    Ok((tls_stream, service))
+                }
+                Err(error) => {
+                    // RustlsAcceptor does not expose the partially parsed
+                    // ClientHello when its handshake future fails, so SNI is
+                    // only available on the successful path above.
+                    tracing::error!(
+                        ?client,
+                        error = %error,
+                        error_debug = ?error,
+                        sni_available = false,
+                        "TLS handshake failed"
+                    );
+                    Err(error)
+                }
+            }
+        })
+    }
 }
 
 impl Stream for LoggedFirmwareStream {
@@ -236,10 +334,7 @@ pub fn router(cfg: Arc<ServerConfig>) -> Router {
         // franssjz.github.io/cpr-vcodex/firmware/manifest.json. Schema is
         // custom (FirmwareManifestJsonParser only reads top-level `version`,
         // `downloadUrl`, `size`), not the GitHub releases shape.
-        .route(
-            "/cpr-vcodex/firmware/manifest.json",
-            get(vcodex_manifest),
-        )
+        .route("/cpr-vcodex/firmware/manifest.json", get(vcodex_manifest))
         .fallback(catch_all)
         .layer(middleware::from_fn(log_request))
         .with_state(cfg)
@@ -460,7 +555,7 @@ async fn github_releases_latest(
     State(cfg): State<Arc<ServerConfig>>,
     AxPath((owner, repo)): AxPath<(String, String)>,
     headers: HeaderMap,
-) -> Json<serde_json::Value> {
+) -> Response {
     tracing::info!(
         host = ?headers.get(header::HOST),
         user_agent = ?headers.get(header::USER_AGENT),
@@ -469,7 +564,28 @@ async fn github_releases_latest(
     );
 
     cfg.on_manifest_request.notify_one();
-    Json(build_release(&cfg, &repo))
+    let release = build_release(&cfg, &repo);
+    if repo.eq_ignore_ascii_case("biscuit") {
+        biscuit_manifest_response(release)
+    } else {
+        Json(release).into_response()
+    }
+}
+
+fn biscuit_manifest_response(release: serde_json::Value) -> Response {
+    let body = serde_json::to_vec(&release).expect("serializing a JSON value cannot fail");
+    tracing::info!(
+        content_length = body.len(),
+        json = %String::from_utf8_lossy(&body),
+        "serving fixed-length Biscuit manifest response"
+    );
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::CONTENT_LENGTH, body.len())
+        .body(Body::from(body))
+        .expect("static Biscuit response headers are valid")
 }
 
 /// Spoofs `GET /repos/{owner}/{repo}/releases`.
@@ -530,9 +646,10 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
     // `esp_crt_bundle_attach` (chain-only validation, no hostname enforcement).
     let is_inx = repo.eq_ignore_ascii_case("inx");
     let is_crosspet = repo.eq_ignore_ascii_case("crosspet");
+    let is_biscuit = repo.eq_ignore_ascii_case("biscuit");
 
     let crosspet_http = is_crosspet && cfg.crosspet_http;
-    let scheme = if (is_inx || is_crosspet) && !crosspet_http {
+    let scheme = if is_biscuit || (is_inx || is_crosspet) && !crosspet_http {
         "https"
     } else {
         "http"
@@ -562,10 +679,24 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
         // Variants come from CrossInk's platformio.ini (`tiny`, `xlarge`,
         // `no_emoji`). All point at the same firmware bytes — the device's
         // variant matcher picks the one for its build.
-        let asset_version = "v99.9.9.1";
+        //
+        // The asset filename's version MUST equal `tag_name`. CrossInk <= 1.2.x
+        // derives the expected asset name from tag_name and accepts only
+        // `firmware-<variant>-v<tag>.bin`, `firmware-<variant>-<tag>.bin`, or the
+        // bare `firmware-<variant>.bin`; a mismatched version (e.g. the old
+        // `v99.9.9.1` vs tag `99.9.9`) makes checkForUpdate() return NO_UPDATE
+        // before it ever downloads. CrossInk 1.3+/1.4+ matches by prefix and
+        // ignores the version, so a tag-aligned name works for every build.
+        // Emit the bare name too — it hits the unconditional match in all
+        // versions, covering any other old strict matcher.
         ["no_emoji", "tiny", "xlarge"]
             .iter()
-            .map(|v| asset(format!("firmware-{v}-{asset_version}.bin")))
+            .flat_map(|v| {
+                [
+                    asset(format!("firmware-{v}.bin")),
+                    asset(format!("firmware-{v}-v{tag}.bin")),
+                ]
+            })
             .collect::<Vec<_>>()
     } else {
         vec![asset("firmware.bin".to_string())]
@@ -574,7 +705,7 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
     // Use a very high version so the device always considers it newer.
     // CrossPoint's version check uses sscanf("%d.%d.%d") so this parses
     // as 99.9.9 which is greater than any real version.
-    tracing::info!(%download_url, %tag, is_crossink, is_inx, is_crosspet, crosspet_http, "serving manifest");
+    tracing::info!(%download_url, %tag, is_biscuit, is_crossink, is_inx, is_crosspet, crosspet_http, "serving manifest");
 
     serde_json::json!({
         "tag_name": tag,
@@ -654,14 +785,70 @@ pub struct ServerHandles {
     pub https: tokio::task::JoinHandle<std::io::Result<()>>,
     pub http_handle: axum_server::Handle<SocketAddr>,
     pub https_handle: axum_server::Handle<SocketAddr>,
+    shutdown_requested: Arc<AtomicBool>,
 }
 
 impl ServerHandles {
     pub async fn shutdown(self) {
+        self.shutdown_requested.store(true, Ordering::SeqCst);
         self.http_handle.shutdown();
         self.https_handle.shutdown();
-        let _ = self.http.await;
-        let _ = self.https.await;
+        report_server_join("HTTP", self.http.await);
+        report_server_join("HTTPS", self.https.await);
+    }
+}
+
+fn report_server_join(
+    server: &'static str,
+    result: Result<io::Result<()>, tokio::task::JoinError>,
+) {
+    match result {
+        Ok(Ok(())) => tracing::info!(server, "server task joined"),
+        Ok(Err(error)) => tracing::error!(server, error = %error, "server task returned an error"),
+        Err(error) => tracing::error!(server, error = %error, "server supervisor task failed"),
+    }
+}
+
+fn bind_server_listener(addr: SocketAddr, server: &'static str) -> anyhow::Result<TcpListener> {
+    let listener = TcpListener::bind(addr)
+        .map_err(|error| {
+            tracing::error!(server, %addr, error = %error, "failed to bind server socket");
+            error
+        })
+        .with_context(|| format!("failed to bind {server} server socket on {addr}"))?;
+    listener
+        .set_nonblocking(true)
+        .with_context(|| format!("failed to set {server} listener on {addr} nonblocking"))?;
+    tracing::info!(server, %addr, "server socket bound");
+    Ok(listener)
+}
+
+async fn supervise_server<F>(
+    server: &'static str,
+    shutdown_requested: Arc<AtomicBool>,
+    future: F,
+) -> io::Result<()>
+where
+    F: Future<Output = io::Result<()>> + Send + 'static,
+{
+    match tokio::spawn(future).await {
+        Ok(result) => {
+            let expected = shutdown_requested.load(Ordering::SeqCst);
+            match (&result, expected) {
+                (Ok(()), true) => tracing::info!(server, "server stopped after shutdown request"),
+                (Ok(()), false) => tracing::warn!(server, "server task terminated unexpectedly"),
+                (Err(error), _) => {
+                    tracing::error!(server, error = %error, expected, "server task terminated with error")
+                }
+            }
+            result
+        }
+        Err(error) => {
+            tracing::error!(server, error = %error, "server task panicked or was cancelled");
+            Err(io::Error::other(format!(
+                "{server} server task panicked or was cancelled: {error}"
+            )))
+        }
     }
 }
 
@@ -670,19 +857,6 @@ pub async fn start(cfg: Arc<ServerConfig>, cert: &SelfSignedCert) -> anyhow::Res
 
     let http_addr = SocketAddr::new(cfg.bind_ip, 80);
     let https_addr = SocketAddr::new(cfg.bind_ip, 443);
-
-    let http_handle = axum_server::Handle::new();
-    let https_handle = axum_server::Handle::new();
-
-    // Plain HTTP listener.
-    let app_http = app.clone();
-    let h1 = http_handle.clone();
-    let http = tokio::spawn(async move {
-        axum_server::bind(http_addr)
-            .handle(h1)
-            .serve(app_http.into_make_service())
-            .await
-    });
 
     // HTTPS listener. Force HTTP/1.1 only — ESP32's esp_http_client
     // doesn't support HTTP/2, and ALPN negotiation can cause issues.
@@ -730,21 +904,242 @@ pub async fn start(cfg: Arc<ServerConfig>, cert: &SelfSignedCert) -> anyhow::Res
         .with_single_cert(certs, key)?;
     server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
     let tls = RustlsConfig::from_config(std::sync::Arc::new(server_config));
+
+    // Bind both privileged sockets synchronously. Returning from this function
+    // now proves that both listeners exist; the UI must not report "armed" on
+    // the strength of spawned tasks that have not attempted their binds yet.
+    let http_listener = bind_server_listener(http_addr, "HTTP")?;
+    let https_listener = bind_server_listener(https_addr, "HTTPS")?;
+
+    let http_handle = axum_server::Handle::new();
+    let https_handle = axum_server::Handle::new();
+    let shutdown_requested = Arc::new(AtomicBool::new(false));
+
+    // Plain HTTP listener.
+    let app_http = app.clone();
+    let h1 = http_handle.clone();
+    let http_server = axum_server::from_tcp(http_listener)?.handle(h1);
+
     let app_https = app.clone();
     let h2 = https_handle.clone();
-    let https = tokio::spawn(async move {
-        axum_server::bind_rustls(https_addr, tls)
-            .handle(h2)
-            .serve(app_https.into_make_service())
-            .await
-    });
+    let https_acceptor = LoggingTlsAcceptor::new(tls);
+    let https_server = axum_server::from_tcp(https_listener)?
+        .acceptor(https_acceptor)
+        .handle(h2);
 
-    tracing::info!(%http_addr, %https_addr, "manifest servers up");
+    let http_shutdown = shutdown_requested.clone();
+    let http = tokio::spawn(supervise_server(
+        "HTTP",
+        http_shutdown,
+        http_server.serve(app_http.into_make_service()),
+    ));
+    let https_shutdown = shutdown_requested.clone();
+    let https = tokio::spawn(supervise_server(
+        "HTTPS",
+        https_shutdown,
+        https_server.serve(app_https.into_make_service()),
+    ));
+
+    tracing::info!(%http_addr, %https_addr, "manifest servers ready; both sockets bound");
 
     Ok(ServerHandles {
         http,
         https,
         http_handle,
         https_handle,
+        shutdown_requested,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+    use tower::ServiceExt;
+
+    const TEST_FIRMWARE_SIZE: u64 = 446_736;
+    const BISCUIT_FIRMWARE_URL: &str =
+        "https://unlocker.crosspointreader.com/firmware/firmware.bin";
+
+    fn test_config(crosspet_http: bool) -> Arc<ServerConfig> {
+        Arc::new(ServerConfig {
+            bridge_ip: "192.168.137.1".to_string(),
+            bind_ip: "192.168.137.1".parse().unwrap(),
+            model: Model::X4,
+            locale: Locale::English,
+            firmware_path: PathBuf::from("firmware.bin"),
+            firmware_size: TEST_FIRMWARE_SIZE,
+            firmware_sha256: "00".repeat(32),
+            crosspoint_version: "test".to_string(),
+            change_log: "test".to_string(),
+            crosspet_http,
+            on_manifest_request: Arc::new(tokio::sync::Notify::new()),
+            on_firmware_streamed: Arc::new(tokio::sync::Notify::new()),
+        })
+    }
+
+    fn asset_urls(release: &serde_json::Value) -> Vec<&str> {
+        release["assets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|asset| asset["browser_download_url"].as_str().unwrap())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn biscuit_manifest_is_exact_and_fixed_length() {
+        let response = router(test_config(false))
+            .oneshot(
+                AxRequest::builder()
+                    .uri("/repos/yattsu/biscuit/releases/latest")
+                    .header(header::HOST, "api.github.com")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/json"
+        );
+        assert!(response.headers().get(header::TRANSFER_ENCODING).is_none());
+
+        let declared_length: usize = response
+            .headers()
+            .get(header::CONTENT_LENGTH)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        assert_eq!(declared_length, body.len());
+
+        let expected = serde_json::json!({
+            "tag_name": "99.9.9",
+            "name": "CrossPoint test",
+            "assets": [{
+                "name": "firmware.bin",
+                "browser_download_url": BISCUIT_FIRMWARE_URL,
+                "size": TEST_FIRMWARE_SIZE,
+                "content_type": "application/octet-stream",
+            }],
+        });
+        assert_eq!(body.as_ref(), serde_json::to_vec(&expected).unwrap());
+
+        let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parsed["tag_name"], "99.9.9");
+        let assets = parsed["assets"].as_array().unwrap();
+        assert_eq!(assets.len(), 1);
+        assert_eq!(assets[0]["name"], "firmware.bin");
+        assert_eq!(assets[0]["browser_download_url"], BISCUIT_FIRMWARE_URL);
+        assert_eq!(assets[0]["size"], TEST_FIRMWARE_SIZE);
+    }
+
+    #[tokio::test]
+    async fn stock_and_vcodex_routes_remain_unchanged() {
+        let app = router(test_config(false));
+        let stock_response = app
+            .clone()
+            .oneshot(
+                AxRequest::builder()
+                    .uri("/api/v1/check-update")
+                    .header(header::HOST, "api-prod.xteink.cc")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let stock_body = to_bytes(stock_response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let stock: serde_json::Value = serde_json::from_slice(&stock_body).unwrap();
+        assert_eq!(stock["code"], 0);
+        assert_eq!(stock["data"]["version"], "V99.9.9");
+        assert_eq!(stock["data"]["size"], TEST_FIRMWARE_SIZE);
+        let stock_url = stock["data"]["download_url"].as_str().unwrap();
+        assert!(stock_url.starts_with("http://192.168.137.1/firmware/V99.9.9-X4-EN-PROD-"));
+        assert!(stock_url.ends_with(".bin"));
+
+        let vcodex_response = app
+            .oneshot(
+                AxRequest::builder()
+                    .uri("/cpr-vcodex/firmware/manifest.json")
+                    .header(header::HOST, "franssjz.github.io")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let vcodex_body = to_bytes(vcodex_response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let vcodex: serde_json::Value = serde_json::from_slice(&vcodex_body).unwrap();
+        assert_eq!(vcodex["version"], "99.9.9");
+        assert_eq!(
+            vcodex["downloadUrl"],
+            "http://unlocker.crosspointreader.com/firmware/firmware.bin"
+        );
+        assert_eq!(vcodex["size"], TEST_FIRMWARE_SIZE);
+    }
+
+    #[test]
+    fn biscuit_detection_does_not_change_other_repo_manifests() {
+        let cfg = test_config(false);
+
+        let biscuit = build_release(&cfg, "biscuit");
+        assert_eq!(asset_urls(&biscuit), vec![BISCUIT_FIRMWARE_URL]);
+
+        let crosspoint = build_release(&cfg, "crosspoint-reader");
+        assert_eq!(crosspoint["tag_name"], "99.9.9");
+        assert_eq!(
+            asset_urls(&crosspoint),
+            vec!["http://unlocker.crosspointreader.com/firmware/firmware.bin"]
+        );
+        assert_eq!(crosspoint["assets"][0]["name"], "firmware.bin");
+
+        let inx = build_release(&cfg, "inx");
+        assert_eq!(
+            asset_urls(&inx),
+            vec!["https://unlocker.crosspointreader.com/firmware/firmware.bin"]
+        );
+
+        let crosspet = build_release(&cfg, "crosspet");
+        assert_eq!(
+            asset_urls(&crosspet),
+            vec!["https://unlocker.crosspointreader.com/firmware/firmware.bin"]
+        );
+        let crosspet_http = build_release(&test_config(true), "crosspet");
+        assert_eq!(
+            asset_urls(&crosspet_http),
+            vec!["http://unlocker.crosspointreader.com/firmware/firmware.bin"]
+        );
+
+        let crossink = build_release(&cfg, "crossink");
+        let crossink_assets = crossink["assets"].as_array().unwrap();
+        assert_eq!(crossink_assets.len(), 3);
+        assert_eq!(
+            crossink_assets[0]["name"],
+            "firmware-no_emoji-v99.9.9.1.bin"
+        );
+        assert!(asset_urls(&crossink)
+            .iter()
+            .all(|url| url.starts_with("http://")));
+
+        let similarly_named_repo = build_release(&cfg, "biscuit-next");
+        assert_eq!(
+            asset_urls(&similarly_named_repo),
+            vec!["http://unlocker.crosspointreader.com/firmware/firmware.bin"]
+        );
+    }
+
+    #[test]
+    fn esp32c3_image_chip_id_is_five() {
+        assert_eq!(esp_chip_name(0x0005), Some("ESP32-C3"));
+        assert_eq!(esp_chip_name(0x0009), Some("ESP32-S3"));
+        assert_eq!(esp_chip_name(0x0006), None);
+    }
 }

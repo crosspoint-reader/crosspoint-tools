@@ -31,6 +31,9 @@ axum-server = { version = "0.8", features = ["tls-rustls"] }
 rustls-pemfile = { workspace = true }
 x509-parser = "0.18"
 
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
