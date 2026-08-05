@@ -70,6 +70,64 @@ function ArrowDownIcon() {
   )
 }
 
+// --- Per-device visibility (x3 / x4) -----------------------------------
+// The web flasher shows every firmware option on both Xteink models by
+// default; these controls let an admin hide individual betas or official
+// release buttons on a specific device.
+
+const FIRMWARE_DEVICES = [
+  { id: 'x3', label: 'X3' },
+  { id: 'x4', label: 'X4' },
+]
+
+// The fixed release buttons the flasher renders for x3/x4. Keys match the
+// `action` ids in FlashTools.jsx and OFFICIAL_RELEASE_KEYS in the worker.
+const OFFICIAL_RELEASES = [
+  { key: 'crosspoint', label: 'CrossPoint', sub: 'Community · stable release' },
+  { key: 'nightly', label: 'CrossPoint Nightly', sub: 'Insider' },
+  { key: 'stock-en', label: 'Stock English', sub: 'Official' },
+  { key: 'stock-ch', label: 'Stock Chinese', sub: 'Official' },
+]
+
+// Checkbox pair ("Show on X3 / X4") driven by a hiddenDevices list. Both
+// boxes checked = shown on both devices (empty hiddenDevices).
+function DeviceVisibilityToggles({ hiddenDevices, onChange }) {
+  const hidden = hiddenDevices || []
+  return (
+    <div className="flex items-center gap-4">
+      <span className="text-xs font-medium text-stone-500">Show on:</span>
+      {FIRMWARE_DEVICES.map((d) => {
+        const shown = !hidden.includes(d.id)
+        return (
+          <label key={d.id} className="flex items-center gap-1.5 text-sm text-stone-700">
+            <input
+              type="checkbox"
+              checked={shown}
+              onChange={(e) =>
+                onChange(
+                  e.target.checked ? hidden.filter((x) => x !== d.id) : [...hidden, d.id]
+                )
+              }
+              className="size-4 rounded border-stone-300 text-brand-500 focus:ring-brand-500/20"
+            />
+            {d.label}
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
+// Compact label describing where an item is visible, or null when it's shown
+// everywhere (the default, so no badge is needed).
+function visibilityLabel(hiddenDevices) {
+  const hidden = hiddenDevices || []
+  const shown = FIRMWARE_DEVICES.filter((d) => !hidden.includes(d.id))
+  if (shown.length === FIRMWARE_DEVICES.length) return null
+  if (shown.length === 0) return 'hidden on all'
+  return shown.map((d) => d.label).join(', ') + ' only'
+}
+
 // --- Current build status ----------------------------------------------
 
 function BuildStatusCard({ log, refreshRef }) {
@@ -748,6 +806,7 @@ function BetaCard({ secret, log }) {
   const [file, setFile] = useState(null)
   const [releaseTag, setReleaseTag] = useState('')
   const [releaseRepo, setReleaseRepo] = useState('')
+  const [hiddenDevices, setHiddenDevices] = useState([])
   const [busy, setBusy] = useState(false)
   const [builds, setBuilds] = useState([])
   // Per-build edit panels: { [id]: { name, notes, tag, repo } }
@@ -792,6 +851,7 @@ function BetaCard({ secret, log }) {
       const formData = new FormData()
       formData.append('name', trimmedName)
       formData.append('notes', notes.trim())
+      formData.append('hiddenDevices', JSON.stringify(hiddenDevices))
       if (isRelease) {
         formData.append('releaseTag', tag)
         if (repo) formData.append('releaseRepo', repo)
@@ -819,6 +879,7 @@ function BetaCard({ secret, log }) {
         setFile(null)
         if (fileInputRef.current) fileInputRef.current.value = ''
         setReleaseTag('')
+        setHiddenDevices([])
         loadBetaList()
       } else {
         log('Beta create failed: ' + data.error)
@@ -855,7 +916,13 @@ function BetaCard({ secret, log }) {
       } else {
         // Don't pre-fill the tag; leaving it blank means "keep current binary".
         // Pre-filling would force a re-fetch on every save.
-        next[b.id] = { name: b.name, notes: b.notes || '', tag: '', repo: '' }
+        next[b.id] = {
+          name: b.name,
+          notes: b.notes || '',
+          tag: '',
+          repo: '',
+          hiddenDevices: b.hiddenDevices || [],
+        }
       }
       return next
     })
@@ -874,7 +941,7 @@ function BetaCard({ secret, log }) {
     const repo = edit.repo.trim()
     if (!editName) return
 
-    const body = { name: editName, notes: editNotes }
+    const body = { name: editName, notes: editNotes, hiddenDevices: edit.hiddenDevices || [] }
     if (tag) {
       body.releaseTag = tag
       if (repo) body.releaseRepo = repo
@@ -1010,6 +1077,10 @@ function BetaCard({ secret, log }) {
             </p>
           </div>
         )}
+
+        <div className="pt-1">
+          <DeviceVisibilityToggles hiddenDevices={hiddenDevices} onChange={setHiddenDevices} />
+        </div>
       </div>
 
       {builds.length > 0 && (
@@ -1021,6 +1092,7 @@ function BetaCard({ secret, log }) {
             const currentTag = src ? src.tag : ''
             const currentRepo = src ? src.owner + '/' + src.repo : ''
             const edit = edits[b.id]
+            const visLabel = visibilityLabel(b.hiddenDevices)
             return (
               <div key={b.id} className="py-2.5">
                 <div className="flex items-center justify-between">
@@ -1041,6 +1113,12 @@ function BetaCard({ secret, log }) {
                           <span className="text-stone-500" title={b.notes}>
                             has notes
                           </span>
+                        </>
+                      )}
+                      {visLabel && (
+                        <>
+                          {' '}
+                          &middot; <span className="text-amber-600">{visLabel}</span>
                         </>
                       )}
                     </div>
@@ -1100,6 +1178,10 @@ function BetaCard({ secret, log }) {
                         Setting a tag refetches firmware.bin and replaces the stored binary.
                       </p>
                     </div>
+                    <DeviceVisibilityToggles
+                      hiddenDevices={edit.hiddenDevices}
+                      onChange={(next) => setEditField(b.id, 'hiddenDevices', next)}
+                    />
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -1124,6 +1206,104 @@ function BetaCard({ secret, log }) {
         </div>
       )}
       {builds.length === 0 && <p className="mt-3 text-xs text-stone-400">No beta builds</p>}
+    </Card>
+  )
+}
+
+// --- Official release visibility (x3 / x4) -----------------------------------
+// Per-device show/hide for the fixed release buttons the flasher renders for
+// the Xteink X3 and X4. Betas are controlled individually in the Beta Testing
+// card above.
+
+function ReleaseVisibilityCard({ secret, log }) {
+  const [hidden, setHidden] = useState({})
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null) // { ok, text }
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/release-visibility')
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled) setHidden(data.hidden || {})
+      } catch {
+        log('Failed to load release visibility')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [log])
+
+  function setReleaseHidden(key, next) {
+    setHidden((prev) => {
+      const copy = { ...prev }
+      if (next.length) copy[key] = next
+      else delete copy[key]
+      return copy
+    })
+  }
+
+  async function save() {
+    setBusy(true)
+    setResult(null)
+    try {
+      const res = await fetch('/api/release-visibility', {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer ' + secret,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ hidden }),
+      })
+      if (res.ok) {
+        setResult({ ok: true, text: 'Saved' })
+        log('Release visibility saved')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setResult({ ok: false, text: data.error || 'Save failed' })
+      }
+    } catch {
+      setResult({ ok: false, text: 'Connection error' })
+    }
+    setBusy(false)
+  }
+
+  return (
+    <Card>
+      <CardTitle>Release Visibility</CardTitle>
+      <p className="mt-1 text-xs text-stone-400">
+        Show or hide each official firmware option on the{' '}
+        <Link to="/" className="font-medium text-brand-500 underline underline-offset-2">
+          homepage flasher
+        </Link>{' '}
+        per device (X3 / X4). Unchecking a box hides that option on that device. Individual betas
+        are controlled in the Beta Testing card above.
+      </p>
+
+      <div className="mt-3 divide-y divide-stone-100">
+        {OFFICIAL_RELEASES.map((r) => (
+          <div key={r.key} className="flex items-center justify-between gap-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-stone-700">{r.label}</div>
+              <div className="text-xs text-stone-400">{r.sub}</div>
+            </div>
+            <DeviceVisibilityToggles
+              hiddenDevices={hidden[r.key]}
+              onChange={(next) => setReleaseHidden(r.key, next)}
+            />
+          </div>
+        ))}
+      </div>
+
+      <Button as="button" variant="primary" className="mt-3 w-full" onClick={save} disabled={busy}>
+        {busy ? 'Saving...' : 'Save visibility'}
+      </Button>
+      {result && (
+        <p className={`mt-2 text-xs ${result.ok ? 'text-brand-600' : 'text-red-600'}`}>{result.text}</p>
+      )}
     </Card>
   )
 }
@@ -1492,6 +1672,7 @@ export default function AdminPage() {
             <BannerCard secret={secret} log={log} />
             <AccessoriesCard secret={secret} log={log} />
             <BetaCard secret={secret} log={log} />
+            <ReleaseVisibilityCard secret={secret} log={log} />
             <DeviceBuildCard
               secret={secret}
               log={log}

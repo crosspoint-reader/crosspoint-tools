@@ -1076,6 +1076,20 @@ export async function fetchBetaBuilds() {
   return data.builds || [];
 }
 
+// Per-device visibility for the fixed release buttons (crosspoint, nightly,
+// stock-en, stock-ch) on x3/x4. Returns { hidden: { [key]: ['x3'|'x4'] } }.
+// Falls back to "nothing hidden" so a fetch failure never blanks the flasher.
+export async function fetchReleaseVisibility() {
+  try {
+    const res = await fetch('/api/release-visibility')
+    if (!res.ok) return { hidden: {} }
+    const data = await res.json()
+    return { hidden: data.hidden || {} }
+  } catch {
+    return { hidden: {} }
+  }
+}
+
 export async function fetchBetaFirmware(id) {
   const res = await fetch(`/api/beta/${id}/firmware`);
   if (!res.ok) throw new Error(`Failed to download beta firmware: ${res.status}`);
