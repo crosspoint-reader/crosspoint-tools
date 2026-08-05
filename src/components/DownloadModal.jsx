@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
+import { fetchReleaseVisibility, fetchBetaBuilds } from '../lib/flasher.js'
+
+// Maps catalog channels to the release-visibility keys the admin panel uses.
+// Only the "real" stable release maps to `crosspoint`; recovery entries
+// (channel 'stable', id 'recovery-*') are left alone.
+const CHANNEL_VISIBILITY_KEY = { insider: 'nightly', 'stock-en': 'stock-en', 'stock-ch': 'stock-ch' }
 
 // Download .bin modal: device picker + firmware picker (from /api/catalog) → download.
 
@@ -40,6 +46,12 @@ function formatSize(bytes) {
 export default function DownloadModal({ open, onClose }) {
   const [model, setModel] = useState(null)
   const [catalog, setCatalog] = useState(null)
+  // Per-device visibility, matching the homepage flasher. `visibility.hidden`
+  // covers the fixed release/stock channels; `betaHidden` maps a beta id to the
+  // devices it's hidden on. Both default to "nothing hidden" so a fetch failure
+  // never blanks the list.
+  const [visibility, setVisibility] = useState({ hidden: {} })
+  const [betaHidden, setBetaHidden] = useState({})
   const [loadError, setLoadError] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const [status, setStatus] = useState({ text: '', error: false })
@@ -68,19 +80,55 @@ export default function DownloadModal({ open, onClose }) {
     }
   }, [open, catalog])
 
-  // Order: stable, insider, betas, stock (newest first).
+  // Load per-device visibility (release toggles + beta hiddenDevices) once the
+  // modal opens, so the list matches what the homepage flasher shows.
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    fetchReleaseVisibility()
+      .then((v) => {
+        if (!cancelled && v) setVisibility(v)
+      })
+      .catch(() => {})
+    fetchBetaBuilds()
+      .then((builds) => {
+        if (cancelled || !Array.isArray(builds)) return
+        const map = {}
+        builds.forEach((b) => {
+          if (b.hiddenDevices && b.hiddenDevices.length) map[b.id] = b.hiddenDevices
+        })
+        setBetaHidden(map)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [open])
+
+  // Order: stable, insider, betas, stock (newest first). Options hidden for the
+  // selected device (via the admin panel) are filtered out first.
   const releases = useMemo(() => {
     if (!model || !catalog) return []
-    const base = (catalog.releases || []).filter(
-      (r) => !r.supported_devices || r.supported_devices.includes(model)
-    )
-    return [...base, ...stockReleases(model)].sort((a, b) => {
+    const hidden = visibility.hidden || {}
+    const isHidden = (key) => (hidden[key] || []).includes(model)
+    const base = (catalog.releases || []).filter((r) => {
+      if (r.supported_devices && !r.supported_devices.includes(model)) return false
+      if (r.channel === 'beta') return !(betaHidden[r.id] || []).includes(model)
+      // Only the real stable release honors the crosspoint toggle; recovery
+      // entries (id 'recovery-*') stay visible regardless.
+      if (r.channel === 'stable' && r.id.startsWith('stable-')) return !isHidden('crosspoint')
+      const key = CHANNEL_VISIBILITY_KEY[r.channel]
+      if (key) return !isHidden(key)
+      return true
+    })
+    const stock = stockReleases(model).filter((r) => !isHidden(r.channel))
+    return [...base, ...stock].sort((a, b) => {
       const ca = CHANNEL_ORDER[a.channel] ?? 99
       const cb = CHANNEL_ORDER[b.channel] ?? 99
       if (ca !== cb) return ca - cb
       return (b.released_at || '').localeCompare(a.released_at || '')
     })
-  }, [model, catalog])
+  }, [model, catalog, visibility, betaHidden])
 
   // Default to the latest stable release (falling back to the top of the list,
   // e.g. for X3 which has no stable build) so SD flashing is one click away.
