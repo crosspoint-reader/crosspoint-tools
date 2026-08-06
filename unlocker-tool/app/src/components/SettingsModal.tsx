@@ -25,6 +25,47 @@ function ActionButton({
   );
 }
 
+function CollapsibleSection({
+  title,
+  subtitle,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-b border-stone-200 last:border-b-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 py-3 text-left"
+      >
+        <span>
+          <span className="block font-serif text-sm font-semibold text-stone-900">
+            {title}
+          </span>
+          {subtitle && !open && (
+            <span className="mt-0.5 block text-xs text-stone-500">{subtitle}</span>
+          )}
+        </span>
+        <span
+          className={`shrink-0 text-stone-400 transition-transform ${open ? "rotate-90" : ""}`}
+          aria-hidden="true"
+        >
+          ›
+        </span>
+      </button>
+      {open && <div className="space-y-2 pb-4">{children}</div>}
+    </div>
+  );
+}
+
 export function SettingsModal({ onClose }: { onClose: () => void }) {
   const [repairing, setRepairing] = useState(false);
   const [repairMessage, setRepairMessage] = useState<string | null>(null);
@@ -34,6 +75,10 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const [captureRegion, setCaptureRegion] = useState<"english" | "chinese">(
     "english",
   );
+  // Accordion: at most one section open at a time keeps the modal short.
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  const toggle = (id: string) =>
+    setOpenSection((cur) => (cur === id ? null : id));
   const showCustomFirmwareOption = useSettingsStore(
     (state) => state.showCustomFirmwareOption,
   );
@@ -106,10 +151,10 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg space-y-5 rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-stone-200 bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex shrink-0 items-center justify-between border-b border-stone-200 p-6 pb-4">
           <h2 className="font-serif text-xl font-medium text-stone-900">
             Settings &amp; recovery
           </h2>
@@ -123,10 +168,13 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <section className="space-y-2">
-          <h3 className="font-serif text-sm font-semibold text-stone-900">
-            Repair this {isWindows() ? "PC" : isMac() ? "Mac" : isLinux() ? "Linux" : "unknown system"}'s network settings
-          </h3>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6">
+        <CollapsibleSection
+          title={`Repair this ${isWindows() ? "PC" : isMac() ? "Mac" : isLinux() ? "Linux" : "system"}'s network settings`}
+          subtitle="Undo leftover network changes after a crash"
+          open={openSection === "repair"}
+          onToggle={() => toggle("repair")}
+        >
           <p className="text-sm text-stone-600">
             {isWindows()
               ? "If Unlocker was closed mid-session and Mobile Hotspot or Wi-Fi routing stopped working, run a cleanup pass to tear down Unlocker-managed network changes. Safe to run any time."
@@ -145,12 +193,14 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           {repairMessage && (
             <p className="text-sm text-stone-600">{repairMessage}</p>
           )}
-        </section>
+        </CollapsibleSection>
 
-        <section className="space-y-2 border-t border-stone-200 pt-5">
-          <h3 className="font-serif text-sm font-semibold text-stone-900">
-            Advanced firmware options
-          </h3>
+        <CollapsibleSection
+          title="Advanced firmware options"
+          subtitle="Betas, custom .bin, crosspet HTTP"
+          open={openSection === "firmware"}
+          onToggle={() => toggle("firmware")}
+        >
           <label className="flex items-start gap-3 text-sm text-stone-700">
             <input
               type="checkbox"
@@ -203,12 +253,14 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               </span>
             </span>
           </label>
-        </section>
+        </CollapsibleSection>
 
-        <section className="space-y-2 border-t border-stone-200 pt-5">
-          <h3 className="font-serif text-sm font-semibold text-stone-900">
-            Capture device traffic (diagnostics)
-          </h3>
+        <CollapsibleSection
+          title="Capture device traffic (diagnostics)"
+          subtitle="Log a device's update requests without flashing"
+          open={openSection === "capture"}
+          onToggle={() => toggle("capture")}
+        >
           <p className="text-sm text-stone-600">
             Brings up the hotspot and logs every request your device makes when
             it checks for updates — without offering or flashing any firmware.
@@ -236,12 +288,14 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               {capturing ? "Starting capture…" : "Start traffic capture"}
             </ActionButton>
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="space-y-2 border-t border-stone-200 pt-5">
-          <h3 className="font-serif text-sm font-semibold text-stone-900">
-            Stop the privileged helper
-          </h3>
+        <CollapsibleSection
+          title="Stop the privileged helper"
+          subtitle="You'll be prompted for a password next launch"
+          open={openSection === "helper"}
+          onToggle={() => toggle("helper")}
+        >
           <p className="text-sm text-stone-600">
             The helper stays running with admin rights so subsequent runs do
             not need a password. Stop it if you would rather have it gone —
@@ -255,9 +309,10 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           {helperMessage && (
             <p className="text-sm text-stone-600">{helperMessage}</p>
           )}
-        </section>
+        </CollapsibleSection>
+        </div>
 
-        <div className="flex justify-end border-t border-stone-200 pt-4">
+        <div className="flex shrink-0 justify-end border-t border-stone-200 p-6 pt-4">
           <PrimaryButton onClick={onClose}>Done</PrimaryButton>
         </div>
       </div>
