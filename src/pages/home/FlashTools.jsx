@@ -16,7 +16,25 @@ import {
   fetchDeviceBuildFirmware,
   fetchFlashAsset,
 } from '../../lib/flasher.js'
-import { renderMarkdown } from './markdown.js'
+import { createMarkdownRenderer } from '../../lib/markdown-full.js'
+
+// Release/beta/device notes are authored in full markdown (headings, lists,
+// code blocks), so render them with the same sanitized marked pipeline the
+// docs/blog use — the old inline subset only did bold/italic/links and left
+// headings and lists as raw "#"/"-" text. Styling is scoped to the compact
+// card via NOTES_PROSE rather than the page-sized .docs-prose treatment.
+const renderMarkdown = createMarkdownRenderer()
+const NOTES_PROSE =
+  'mt-3 text-sm/6 text-stone-700 ' +
+  '[&_h1]:mt-2 [&_h1]:mb-1 [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-stone-900 ' +
+  '[&_h2]:mt-2 [&_h2]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-stone-900 ' +
+  '[&_h3]:mt-2 [&_h3]:mb-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-stone-800 ' +
+  '[&_p]:my-1.5 [&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5 ' +
+  '[&_a]:font-medium [&_a]:text-brand-600 [&_a]:underline [&_a]:underline-offset-2 hover:[&_a]:text-brand-700 ' +
+  '[&_code]:rounded [&_code]:bg-black/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.9em] ' +
+  '[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-stone-900 [&_pre]:p-3 [&_pre]:text-xs [&_pre]:text-stone-100 [&_pre_code]:bg-transparent [&_pre_code]:p-0 ' +
+  '[&_blockquote]:border-l-2 [&_blockquote]:border-stone-300 [&_blockquote]:pl-3 [&_blockquote]:text-stone-500 ' +
+  '[&_hr]:my-3 [&_hr]:border-stone-200'
 import { trackFirmwareFlash } from '../../lib/analytics.js'
 
 // ---------- small presentational bits ----------
@@ -476,7 +494,14 @@ export default function FlashTools() {
     const states = steps.map(() => 'pending')
 
     setRunning(true)
-    setRestart({ unplug: skipReset && model !== 'x4' })
+    // The X4 Pro can't be rebooted over serial — it always needs a manual
+    // power-button boot after flashing, so show that instead of the
+    // unplug/reset instructions the other devices use.
+    setRestart(
+      model === 'x4pro'
+        ? { text: 'Press and hold the power button to boot.' }
+        : { unplug: skipReset && model !== 'x4' }
+    )
     setPercent(0)
     setProgress({ title, steps, states: [...states], status: downloadMsg ? { kind: 'info', text: downloadMsg } : null })
 
@@ -705,13 +730,12 @@ export default function FlashTools() {
                     </div>
                     <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
                   </button>
-                  {/* Temporarily disabled: X4 Pro stock firmware option
                   {model === 'x4pro' && (
                     <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
                       <div className="text-sm font-semibold text-stone-900">Stock English</div>
                       <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
                     </button>
-                  )} */}
+                  )}
                   {(model === 'sticky' || model === 'x4pro') && (
                     <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
                       <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
@@ -932,8 +956,7 @@ export default function FlashTools() {
                       </div>
                       {selectedBeta.notes && (
                         <div
-                          className="mt-3 text-sm/6 text-stone-700"
-                          // Rendered through the same escape-first markdown subset the old page used.
+                          className={NOTES_PROSE}
                           dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedBeta.notes) }}
                         />
                       )}
@@ -963,7 +986,7 @@ export default function FlashTools() {
                       </div>
                       {deviceBuild.notes && (
                         <div
-                          className="mt-3 text-sm/6 text-stone-700"
+                          className={NOTES_PROSE}
                           dangerouslySetInnerHTML={{ __html: renderMarkdown(deviceBuild.notes) }}
                         />
                       )}
