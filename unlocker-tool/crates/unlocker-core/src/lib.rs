@@ -3,6 +3,7 @@ pub mod cert;
 pub mod dns;
 pub mod helper;
 pub mod http;
+pub mod ntp;
 pub mod orchestrator;
 pub mod runtime;
 pub mod session;

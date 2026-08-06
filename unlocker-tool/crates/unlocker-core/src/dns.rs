@@ -35,6 +35,20 @@ impl DnsConfig {
                 // so the bundled LE cert (CN=unlocker.crosspointreader.com)
                 // still passes TLS as long as the chain validates.
                 "franssjz.github.io".to_string(),
+                // NTP time-sync hosts. Stock firmwares (e.g. the X4 Pro) sync
+                // their clock before checking for updates; on this isolated
+                // hotspot there's no real internet, so we point these at the
+                // bridge IP and answer them with our own SNTP responder (see
+                // `ntp.rs`). Without this the device spins forever on NTP and
+                // never reaches check-update. `pool.ntp.org` subdomains
+                // (0/1/2/3.pool.ntp.org, country pools) are matched by suffix
+                // in `is_spoofed`.
+                "pool.ntp.org".to_string(),
+                "time.google.com".to_string(),
+                "time.apple.com".to_string(),
+                "time.windows.com".to_string(),
+                "time.cloudflare.com".to_string(),
+                "time.nist.gov".to_string(),
             ],
             answer_with: bridge_ip,
         }
@@ -102,6 +116,17 @@ pub async fn start(config: DnsConfig) -> Result<DnsHandle> {
     Ok(DnsHandle { shutdown: tx, join })
 }
 
+/// Whether a queried name should resolve to the bridge IP. Matches the
+/// configured hosts exactly, plus any `*.pool.ntp.org` subdomain (the NTP pool
+/// hands out numbered and country-specific names like `0.pool.ntp.org` or
+/// `us.pool.ntp.org` that we still want to capture for time sync).
+fn is_spoofed(qname_norm: &str, spoofed_hosts: &[String]) -> bool {
+    spoofed_hosts
+        .iter()
+        .any(|h| h.eq_ignore_ascii_case(qname_norm))
+        || qname_norm.ends_with(".pool.ntp.org")
+}
+
 async fn handle_query(
     bytes: &[u8],
     src: SocketAddr,
@@ -124,10 +149,7 @@ async fn handle_query(
         .to_string()
         .trim_end_matches('.')
         .to_lowercase();
-    let should_spoof = cfg
-        .spoofed_hosts
-        .iter()
-        .any(|h| h.to_lowercase() == qname_norm);
+    let should_spoof = is_spoofed(&qname_norm, &cfg.spoofed_hosts);
 
     tracing::info!(
         host = %qname_norm,

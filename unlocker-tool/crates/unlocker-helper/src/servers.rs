@@ -12,7 +12,13 @@ use tokio::sync::{Mutex, Notify};
 use unlocker_core::cert::SelfSignedCert;
 use unlocker_core::dns::{self, DnsConfig, DnsHandle};
 use unlocker_core::http::{self, ServerConfig, ServerHandles};
+use unlocker_core::ntp::{self, NtpHandle};
 use unlocker_core::types::ArmServerSpec;
+
+/// Standard NTP port. Bound directly on the bridge IP (the helper is root);
+/// macOS runs no NTP *server* of its own, so no pfctl redirect is needed the
+/// way DNS/53 requires one.
+const NTP_PORT: u16 = 123;
 
 /// Let's Encrypt cert for unlocker.crosspointreader.com — trusted by ESP32's
 /// CA bundle, so both stock Xteink and CrossPoint firmware accept it.
@@ -21,6 +27,7 @@ const BUNDLED_KEY_PEM: &str = include_str!("../certs/privkey.pem");
 
 pub struct ServerSet {
     dns: Option<DnsHandle>,
+    ntp: Option<NtpHandle>,
     http: Option<ServerHandles>,
     pub on_manifest: Arc<Notify>,
     pub on_firmware: Arc<Notify>,
@@ -44,6 +51,9 @@ impl ServerHolder {
             if let Some(h) = old.http.take() {
                 h.shutdown().await;
             }
+            if let Some(n) = old.ntp.take() {
+                n.shutdown().await;
+            }
             if let Some(d) = old.dns.take() {
                 d.shutdown().await;
             }
@@ -61,6 +71,11 @@ impl ServerHolder {
 
         let dns_cfg = DnsConfig::for_locale(spec.locale, bridge_ip, spec.dns_internal_port);
         let dns_handle = dns::start(dns_cfg.clone()).await?;
+
+        // SNTP responder so devices that time-sync before checking for updates
+        // (e.g. the X4 Pro) get a working clock on this internet-less hotspot.
+        // The DNS spoof above points the NTP hostnames at the bridge IP.
+        let ntp_handle = ntp::start(bridge_ip.into(), NTP_PORT).await?;
 
         // On Windows, ICS owns port 53 on the bridge IP. Bridge our DNS
         // spoofing through the system hosts file so the ICS DNS proxy
@@ -90,6 +105,7 @@ impl ServerHolder {
 
         *guard = Some(ServerSet {
             dns: Some(dns_handle),
+            ntp: Some(ntp_handle),
             http: Some(http_handles),
             on_manifest,
             on_firmware,
@@ -103,6 +119,9 @@ impl ServerHolder {
         if let Some(mut set) = guard.take() {
             if let Some(h) = set.http.take() {
                 h.shutdown().await;
+            }
+            if let Some(n) = set.ntp.take() {
+                n.shutdown().await;
             }
             if let Some(d) = set.dns.take() {
                 d.shutdown().await;
