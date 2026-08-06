@@ -179,4 +179,13 @@ pub struct ArmServerSpec {
     /// to false (HTTPS) until HTTP OTA support is confirmed on the hardware.
     #[serde(default)]
     pub crosspet_http: bool,
+    /// Capture-only mode: arm DNS + HTTP + HTTPS and log every request the
+    /// device makes, but never offer an update. All update-check endpoints
+    /// answer "no update available", so the device checks in (revealing its
+    /// real `device_id`, headers, and which endpoints it hits) and then goes
+    /// away without downloading or flashing anything. Used by the Settings
+    /// "capture device traffic" button to reverse-engineer devices (e.g. the
+    /// X4 Pro's account-bound update flow) without running an install.
+    #[serde(default)]
+    pub capture_only: bool,
 }

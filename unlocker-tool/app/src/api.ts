@@ -52,6 +52,11 @@ export const api = {
   uninstallHelper: () => invoke<void>("uninstall_helper"),
   repairSystem: () => invoke<void>("repair_system"),
   confirmRunning: () => invoke<void>("confirm_running"),
+  // Capture-only mode: arm the hotspot + DNS/HTTP/HTTPS servers and log every
+  // request the device makes, without offering or flashing any firmware.
+  // `locale` picks which Xteink API host is DNS-spoofed (english → .cc).
+  startCapture: (locale: Locale = "english", model: Model = "x4") =>
+    invoke<void>("start_capture", { locale, model }),
   cancel: () => invoke<void>("cancel"),
   getLogs: () => invoke<LogEntry[]>("get_logs"),
   getHelperLogTail: (lines = 200) =>

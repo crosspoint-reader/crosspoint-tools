@@ -30,6 +30,10 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const [repairMessage, setRepairMessage] = useState<string | null>(null);
   const [removingHelper, setRemovingHelper] = useState(false);
   const [helperMessage, setHelperMessage] = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
+  const [captureRegion, setCaptureRegion] = useState<"english" | "chinese">(
+    "english",
+  );
   const showCustomFirmwareOption = useSettingsStore(
     (state) => state.showCustomFirmwareOption,
   );
@@ -65,6 +69,19 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
       setRepairMessage(`Repair failed: ${String(e)}`);
     } finally {
       setRepairing(false);
+    }
+  }
+
+  async function onStartCapture() {
+    setCapturing(true);
+    try {
+      await api.startCapture(captureRegion);
+      // Hand off to the main window, which drives the hotspot / Internet
+      // Sharing steps and shows the live log while capture is armed.
+      onClose();
+    } catch (e) {
+      setCapturing(false);
+      setHelperMessage(`Could not start capture: ${String(e)}`);
     }
   }
 
@@ -186,6 +203,39 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               </span>
             </span>
           </label>
+        </section>
+
+        <section className="space-y-2 border-t border-stone-200 pt-5">
+          <h3 className="font-serif text-sm font-semibold text-stone-900">
+            Capture device traffic (diagnostics)
+          </h3>
+          <p className="text-sm text-stone-600">
+            Brings up the hotspot and logs every request your device makes when
+            it checks for updates — without offering or flashing any firmware.
+            Useful for diagnosing devices whose update flow isn't yet supported.
+            You'll still be guided to enable{" "}
+            {isWindows() ? "Mobile Hotspot" : "Internet Sharing"}; then tap
+            Check for Updates on the device and watch the log. Nothing is
+            flashed. Use Cancel to tear the network back down when done.
+          </p>
+          <label className="flex items-center gap-2 text-sm text-stone-700">
+            <span className="font-medium text-stone-900">Region:</span>
+            <select
+              value={captureRegion}
+              onChange={(e) =>
+                setCaptureRegion(e.target.value as "english" | "chinese")
+              }
+              className="rounded-md border border-stone-300 bg-white px-2 py-1 text-sm text-stone-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
+            >
+              <option value="english">Overseas (api-prod.xteink.cc)</option>
+              <option value="chinese">China (api-prod.xteink.cn)</option>
+            </select>
+          </label>
+          <div className="pt-1">
+            <ActionButton onClick={onStartCapture} disabled={capturing}>
+              {capturing ? "Starting capture…" : "Start traffic capture"}
+            </ActionButton>
+          </div>
         </section>
 
         <section className="space-y-2 border-t border-stone-200 pt-5">

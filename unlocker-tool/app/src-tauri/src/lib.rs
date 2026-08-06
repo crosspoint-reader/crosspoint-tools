@@ -960,6 +960,7 @@ async fn run_prepared_install(
         crosspoint_version: firmware.version,
         change_log: firmware.change_log,
         crosspet_http,
+        capture_only: false,
     };
     runtime.arm(&helper, arm_cfg).await?;
     log.push("info", "DNS + HTTP + HTTPS servers armed", None)
@@ -1019,6 +1020,122 @@ async fn run_prepared_install(
     Ok(())
 }
 
+/// Capture-only run: bring up the hotspot exactly like an install, arm the
+/// DNS/HTTP/HTTPS servers in `capture_only` mode, then park — never selecting
+/// firmware, never serving an update, never flashing. Every request the device
+/// makes is logged by the manifest server (full method/URI/headers/body), so
+/// this is the "just log what the device sends" path used to reverse-engineer
+/// devices like the X4 Pro whose update flow we don't yet fully understand.
+///
+/// Reuses the normal hotspot states so the existing UI still guides the user
+/// through enabling Internet Sharing; it just stops at "armed, waiting" instead
+/// of advancing to Serving/Done. The user watches the helper debug log and
+/// tears down with Cancel when finished.
+async fn run_capture(
+    orch: Arc<Orchestrator>,
+    log: Arc<SessionLog>,
+    runtime: Arc<Runtime>,
+    helper: Arc<Helper>,
+    model: Model,
+    locale: Locale,
+) -> anyhow::Result<()> {
+    orch.set_device(model, locale).await;
+
+    // ── Hotspot (identical to the install path) ──
+    orch.transition(OrchState::SettingUpHotspot, None).await;
+    let ssid = "crosspoint".to_string();
+    let psk = "11111111".to_string();
+    let hotspot_label = if cfg!(target_os = "windows") {
+        "Mobile Hotspot"
+    } else {
+        "Internet Sharing"
+    };
+    log.push(
+        "info",
+        format!("capture mode: configuring {hotspot_label}"),
+        None,
+    )
+    .await;
+    runtime.prepare_hotspot(&helper, &ssid, &psk).await?;
+
+    orch.transition(OrchState::WaitingForInternetSharing, None)
+        .await;
+    let info = runtime.await_hotspot(&helper, &ssid, &psk).await?;
+    log.push(
+        "info",
+        format!("hotspot up — bridge at {}", info.bridge_ip),
+        None,
+    )
+    .await;
+    orch.set_hotspot(info.ssid, info.psk, info.bridge_ip.to_string())
+        .await;
+
+    // ── Arm in capture-only mode. No firmware is selected or served, so the
+    //    firmware fields are placeholders the manifest server never reads
+    //    (every update-check endpoint short-circuits to "no update"). ──
+    let arm_cfg = ArmConfig {
+        bridge_ip: info.bridge_ip,
+        model,
+        locale,
+        firmware_path: std::path::PathBuf::new(),
+        firmware_size: 0,
+        firmware_sha256: String::new(),
+        crosspoint_version: "capture".into(),
+        change_log: String::new(),
+        crosspet_http: false,
+        capture_only: true,
+    };
+    runtime.arm(&helper, arm_cfg).await?;
+    log.push(
+        "info",
+        "capture mode armed — DNS + HTTP + HTTPS logging every device request",
+        None,
+    )
+    .await;
+
+    orch.transition(OrchState::AwaitingClient, None).await;
+    log.push("info", "waiting for device to join hotspot", None)
+        .await;
+
+    // Cosmetic lease detection, same as the install path.
+    match await_device_lease(&helper, info.bridge_ip, Duration::from_secs(1800)).await {
+        Ok((mac, ip)) => {
+            log.push("info", format!("device joined: {mac} -> {ip}"), None)
+                .await;
+            orch.set_device_ip(ip).await;
+        }
+        Err(e) => {
+            log.push(
+                "warn",
+                format!("could not detect DHCP lease ({e}); capturing anyway"),
+                None,
+            )
+            .await;
+        }
+    }
+
+    // Park here: servers stay armed and keep logging. Nothing advances the
+    // state — the user triggers "check for updates" on the device as many
+    // times as they like, reads the helper log, and hits Cancel to tear down.
+    orch.transition(
+        OrchState::AwaitingDeviceRequest,
+        Some(
+            "Capture active — tap Check for Updates on the device, then read the log. \
+             Nothing will be flashed."
+                .into(),
+        ),
+    )
+    .await;
+    log.push(
+        "info",
+        "capture armed; trigger update checks on the device and watch the log",
+        None,
+    )
+    .await;
+
+    Ok(())
+}
+
 fn render_changelog(release: &CrossPointRelease) -> String {
     format!(
         "Installing CrossPoint Reader {ver}\n\n\
@@ -1026,6 +1143,34 @@ fn render_changelog(release: &CrossPointRelease) -> String {
          Learn more: https://crosspointreader.com",
         ver = release.version,
     )
+}
+
+/// Settings-triggered "capture device traffic" button. Brings up the hotspot
+/// and arms the servers in capture-only mode (logs every device request, never
+/// offers an update). `locale` picks which Xteink API host to DNS-spoof
+/// (English → `.cc`, Chinese → `.cn`); `model` only labels the session and is
+/// otherwise unused because nothing is served. Defaults to X4 / English.
+#[tauri::command]
+async fn start_capture(
+    state: State<'_, AppState>,
+    model: Option<Model>,
+    locale: Option<Locale>,
+) -> Result<(), String> {
+    let model = model.unwrap_or(Model::X4);
+    let locale = locale.unwrap_or(Locale::English);
+
+    let orch = state.orch.clone();
+    let log = state.log.clone();
+    let runtime = state.runtime.clone();
+    let helper = state.helper.clone();
+
+    tokio::spawn(async move {
+        if let Err(e) = run_capture(orch.clone(), log, runtime, helper, model, locale).await {
+            orch.fail(format!("{e:#}")).await;
+        }
+    });
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -1240,6 +1385,7 @@ pub fn run() {
             select_local_firmware,
             export_firmware,
             confirm_running,
+            start_capture,
             cleanup_after_install,
             cancel,
             repair_system,

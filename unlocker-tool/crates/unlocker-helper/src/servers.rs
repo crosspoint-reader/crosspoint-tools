@@ -82,6 +82,7 @@ impl ServerHolder {
             crosspoint_version: spec.crosspoint_version,
             change_log: spec.change_log,
             crosspet_http: spec.crosspet_http,
+            capture_only: spec.capture_only,
             on_manifest_request: on_manifest.clone(),
             on_firmware_streamed: on_firmware.clone(),
         });

@@ -280,6 +280,10 @@ pub struct ServerConfig {
     /// When true, crosspet devices get a plain-HTTP firmware URL instead of
     /// HTTPS (see `ArmServerSpec::crosspet_http`). User-controlled toggle.
     pub crosspet_http: bool,
+    /// Capture-only mode: still log every request (that's the point), but make
+    /// all update-check endpoints answer "no update available" so the device
+    /// never downloads or flashes. See `ArmServerSpec::capture_only`.
+    pub capture_only: bool,
     /// Notified on every manifest request. Orchestrator awaits the first
     /// notification to advance from AwaitingDeviceRequest.
     pub on_manifest_request: Arc<tokio::sync::Notify>,
@@ -340,34 +344,88 @@ pub fn router(cfg: Arc<ServerConfig>) -> Router {
         .with_state(cfg)
 }
 
+/// Upper bound on how much request body we buffer for logging. Requests *to*
+/// this server are tiny (a stock `check-update` GET carries none; `activate`
+/// and friends post a small JSON envelope), so this never truncates real
+/// traffic — it's only a guard against a pathological client streaming a huge
+/// body at us. Firmware bytes flow the other way (a GET *response*), so they
+/// aren't affected.
+const MAX_LOGGED_BODY: usize = 1024 * 1024;
+
+/// Full request capture for every request on a spoofed host.
+///
+/// The device's OTA/account traffic is exactly what we're reverse-engineering
+/// (e.g. the X4 Pro's real `device_id` format, its `Authorization` bearer, and
+/// which `device/tasks` / `subscription/task` / sync endpoints it calls), so
+/// this logs the complete picture: method, full URI *including query string*,
+/// every header, and the buffered body. The body must be read to bytes and the
+/// request rebuilt from parts so the downstream handler still receives it.
+///
+/// This deliberately logs `Authorization` and any tokens verbatim — this is a
+/// local debugging tool pointed at the user's own device, and those values are
+/// the point of the capture. Don't ship these logs anywhere.
 async fn log_request(req: AxRequest<Body>, next: Next) -> Response {
-    let method = req.method().clone();
-    let uri = req.uri().clone();
-    let host = req
-        .headers()
+    let (parts, body) = req.into_parts();
+
+    let method = parts.method.clone();
+    let uri = parts.uri.clone();
+    let host = parts
+        .headers
         .get(header::HOST)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
-    let ua = req
-        .headers()
-        .get(header::USER_AGENT)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-    tracing::info!(%method, %uri, %host, %ua, "http request");
-    next.run(req).await
+
+    // Render every header, values lossily (bearer tokens and device ids are
+    // ASCII anyway). One entry per header keeps long tokens readable in logs.
+    let headers: Vec<String> = parts
+        .headers
+        .iter()
+        .map(|(name, value)| format!("{name}: {}", String::from_utf8_lossy(value.as_bytes())))
+        .collect();
+
+    // Buffer the body so we can log it and still forward it downstream.
+    let bytes = match axum::body::to_bytes(body, MAX_LOGGED_BODY).await {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            tracing::warn!(%method, %uri, %error, "failed to buffer request body for logging");
+            Bytes::new()
+        }
+    };
+
+    let body_repr = if bytes.is_empty() {
+        "<empty>".to_string()
+    } else if let Ok(text) = std::str::from_utf8(&bytes) {
+        text.to_string()
+    } else {
+        format!("<{} non-utf8 bytes> {}", bytes.len(), hex::encode(&bytes))
+    };
+
+    tracing::info!(
+        %method,
+        %uri,
+        %host,
+        query = uri.query().unwrap_or(""),
+        headers = ?headers,
+        body_len = bytes.len(),
+        body = %body_repr,
+        "http request (full capture)"
+    );
+
+    next.run(AxRequest::from_parts(parts, Body::from(bytes))).await
 }
 
 async fn check_update(
     State(cfg): State<Arc<ServerConfig>>,
     headers: HeaderMap,
     Query(q): Query<UpdateQuery>,
-) -> Json<Manifest> {
+) -> Response {
     tracing::info!(
         host = ?headers.get(header::HOST),
         device_type = %q.device_type,
         current_version = %q.current_version,
+        device_id = %q.device_id,
+        capture_only = cfg.capture_only,
         "stock device requested update"
     );
 
@@ -375,6 +433,18 @@ async fn check_update(
     // against the device hitting check-update before the orchestrator has
     // begun awaiting the manifest event (e.g. when device discovery is slow).
     cfg.on_manifest_request.notify_one();
+
+    // Capture-only: mirror the upstream "no update" envelope so the device
+    // logs its request (already captured above + in the middleware) and then
+    // leaves without downloading anything. Nothing is flashed.
+    if cfg.capture_only {
+        return Json(serde_json::json!({
+            "code": 0,
+            "data": null,
+            "message": "No update available",
+        }))
+        .into_response();
+    }
 
     let filename = format!(
         "V99.9.9-{model}-{locale}-PROD-{date}.bin",
@@ -395,6 +465,7 @@ async fn check_update(
         },
         message: "Update available".into(),
     })
+    .into_response()
 }
 
 async fn serve_firmware(
@@ -560,10 +631,15 @@ async fn github_releases_latest(
         host = ?headers.get(header::HOST),
         user_agent = ?headers.get(header::USER_AGENT),
         %owner, %repo,
+        capture_only = cfg.capture_only,
         "device requested update via GitHub API (latest)"
     );
 
     cfg.on_manifest_request.notify_one();
+    // Capture-only: no release, so CrossPoint/CrossInk/INX see "up to date".
+    if cfg.capture_only {
+        return StatusCode::NOT_FOUND.into_response();
+    }
     let release = build_release(&cfg, &repo);
     if repo.eq_ignore_ascii_case("biscuit") {
         biscuit_manifest_response(release)
@@ -598,20 +674,25 @@ async fn github_releases_list(
     State(cfg): State<Arc<ServerConfig>>,
     AxPath((owner, repo)): AxPath<(String, String)>,
     headers: HeaderMap,
-) -> Json<serde_json::Value> {
+) -> Response {
     tracing::info!(
         host = ?headers.get(header::HOST),
         user_agent = ?headers.get(header::USER_AGENT),
         %owner, %repo,
+        capture_only = cfg.capture_only,
         "device requested update via GitHub API (list)"
     );
 
     cfg.on_manifest_request.notify_one();
+    // Capture-only: empty release list so nothing is offered.
+    if cfg.capture_only {
+        return Json(serde_json::Value::Array(vec![])).into_response();
+    }
     let release = build_release(&cfg, &repo);
     if repo.eq_ignore_ascii_case("inx") {
-        Json(release)
+        Json(release).into_response()
     } else {
-        Json(serde_json::Value::Array(vec![release]))
+        Json(serde_json::Value::Array(vec![release])).into_response()
     }
 }
 
@@ -722,14 +803,21 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
 async fn vcodex_manifest(
     State(cfg): State<Arc<ServerConfig>>,
     headers: HeaderMap,
-) -> Json<serde_json::Value> {
+) -> Response {
     tracing::info!(
         host = ?headers.get(header::HOST),
         user_agent = ?headers.get(header::USER_AGENT),
+        capture_only = cfg.capture_only,
         "device requested update via CPR-vCodex manifest"
     );
 
     cfg.on_manifest_request.notify_one();
+
+    // Capture-only: 404 so the fork's parser finds no manifest and offers
+    // nothing.
+    if cfg.capture_only {
+        return StatusCode::NOT_FOUND.into_response();
+    }
 
     let download_url = "http://unlocker.crosspointreader.com/firmware/firmware.bin";
     tracing::info!(%download_url, "serving vcodex manifest");
@@ -739,6 +827,7 @@ async fn vcodex_manifest(
         "downloadUrl": download_url,
         "size": cfg.firmware_size,
     }))
+    .into_response()
 }
 
 /// Stub for `POST /api/v1/device/activate` — V5.5.3+ stock firmware POSTs here
@@ -973,6 +1062,7 @@ mod tests {
             crosspoint_version: "test".to_string(),
             change_log: "test".to_string(),
             crosspet_http,
+            capture_only: false,
             on_manifest_request: Arc::new(tokio::sync::Notify::new()),
             on_firmware_streamed: Arc::new(tokio::sync::Notify::new()),
         })
