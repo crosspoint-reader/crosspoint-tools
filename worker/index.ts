@@ -843,14 +843,20 @@ const STOCK_CHECK_URLS: Record<string, Record<string, string>> = {
   },
 };
 
-// Stock firmware bundled as a static asset for models with no upstream
-// update API (the X4 Pro has none). Served through the /api/firmware/stock
-// route rather than fetched directly by the page: content-filter extensions
-// can throttle or block direct *.bin URLs, and this keeps every firmware
-// download on the same /api path.
+// Stock firmware bundled as a static asset. Served through the
+// /api/firmware/stock route rather than fetched directly by the page:
+// content-filter extensions can throttle or block direct *.bin URLs, and this
+// keeps every firmware download on the same /api path.
+//
+// The X4 Pro's upstream check-update only serves an ENCRYPTED image
+// (ota_format encrypted_v1, .xota) — not directly flashable — so we pin the
+// plain image here. This 7.0.8 build was cut from a device's app slot (the
+// decrypted firmware) and verified against the server's published
+// plain_sha256 (369cfee9…), so it's byte-identical to what an official OTA
+// installs. Replace this file + version when a newer plain build is produced.
 const STATIC_STOCK: Record<string, Record<string, { assetPath: string; version: string }>> = {
   x4pro: {
-    en: { assetPath: '/firmware/x4pro-stock-en.bin', version: 'V.0.0.7' },
+    en: { assetPath: '/firmware/x4pro-stock-en.bin', version: 'V7.0.8' },
   },
 };
 
