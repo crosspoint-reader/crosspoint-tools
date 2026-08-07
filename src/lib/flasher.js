@@ -376,21 +376,21 @@ export function otaStateName(state) {
 // pointer, instead of blanking both sectors and forcing the bootloader's
 // "no eligible otadata" default (app0).
 //
-// State is VALID, not NEW. On devices built with
-// CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE (the X4 Pro — its own otadata sits at
-// state VALID, and its OTA is locked-down/encrypted), a NEW entry is booted
-// once as "pending verify" and the bootloader rolls back to the previous slot
-// unless the freshly-booted app calls esp_ota_mark_app_valid_cancel_rollback().
-// An externally flashed image has no running-app handshake to do that, so NEW
-// reverts on the next boot and the user has to flash a second time. We're
-// writing a complete, already-verified image, so we mark it VALID ourselves —
-// exactly the state the device records after its own OTA. VALID always boots
-// and never boots worse than NEW; on non-rollback bootloaders (x4/x3) the
-// bootloader ignores ota_state anyway, so this is a no-op there.
+// State is NEW, not VALID — this preserves the bootloader's app-rollback safety
+// net. On rollback-enabled bootloaders (the X4 Pro), a NEW slot is booted once
+// as "pending verify"; if that image can't boot (e.g. a firmware flashed onto a
+// mismatched bootloader/partition table), the bootloader ROLLS BACK to the
+// previous, working slot instead of boot-looping the broken one. Writing VALID
+// removes that fallback and can strand a device on a bad flash (see the X4 Pro
+// stock->CrossPoint mismatch incident). The trade-off is the known "may need to
+// flash twice" case when the new app doesn't self-confirm via
+// esp_ota_mark_app_valid_cancel_rollback() — that's the lesser evil vs. losing
+// rollback. On non-rollback bootloaders (x4/x3) ota_state is ignored, so this
+// is a no-op there.
 function buildNewOtadataSector(existingSectorData, newSeq) {
   const newData = new Uint8Array(existingSectorData);
   newData.set(u32ToLeBytes(newSeq), 0);
-  newData.set(u32ToLeBytes(OTA_STATE.VALID), 0x18);
+  newData.set(u32ToLeBytes(OTA_STATE.NEW), 0x18);
   newData.set(generateCrc32Le(newSeq), 0x1C);
   return newData;
 }
