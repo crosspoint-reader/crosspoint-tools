@@ -509,12 +509,12 @@ export default function FlashTools() {
     const states = steps.map(() => 'pending')
 
     setRunning(true)
-    // The X4 Pro can't be rebooted over serial — it always needs a manual
-    // power-button boot after flashing, so show that instead of the
-    // unplug/reset instructions the other devices use.
+    // The X4 Pro can't be rebooted over serial — after flashing it needs a
+    // full power cycle: unplug/replug USB, then press and hold the power button
+    // to boot. Shown instead of the plain unplug/reset the other devices use.
     setRestart(
       model === 'x4pro'
-        ? { text: 'Press and hold the power button to boot into CrossPoint.' }
+        ? { text: 'Unplug and reconnect the USB cable, then press and hold the power button to boot.' }
         : { unplug: skipReset && model !== 'x4' }
     )
     setPercent(0)
@@ -566,7 +566,7 @@ export default function FlashTools() {
           kind: 'ok',
           text:
             model === 'x4pro'
-              ? 'Flash complete! Press and hold the power button to boot into CrossPoint.'
+              ? 'Flash complete! Unplug and reconnect the USB cable, then press and hold the power button to boot.'
               : skipReset
                 ? 'Flash complete! Unplug and replug the USB cable to restart your device.'
                 : 'Flash complete! Your device will restart with the new firmware.',
