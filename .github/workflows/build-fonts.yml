@@ -22,7 +22,7 @@ on:
         default: 'https://crosspointreader.com'
 
 concurrency:
-  group: font-build-${{ inputs.buildId }}
+  group: font-build-${{ github.event.inputs.buildId }}
   cancel-in-progress: false
 
 jobs:

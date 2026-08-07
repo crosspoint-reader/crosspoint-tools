@@ -31,7 +31,7 @@ on:
         default: 'https://crosspointreader.com'
 
 concurrency:
-  group: theme-icon-build-${{ inputs.buildId }}
+  group: theme-icon-build-${{ github.event.inputs.buildId }}
   cancel-in-progress: false
 
 jobs:
