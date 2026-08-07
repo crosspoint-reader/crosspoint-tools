@@ -18,11 +18,12 @@ const renderMarkdown = createMarkdownRenderer({
 
 const FILES = [
   { name: 'user_guide.md', label: 'User Guide', download_url: `${RAW_BASE}/USER_GUIDE.md` },
-  { name: 'scope.md', label: 'Project Scope', download_url: `${RAW_BASE}/SCOPE.md` },
   { name: 'webserver.md', label: 'Webserver Interface', download_url: `${RAW_BASE}/docs/webserver.md` },
   { name: 'webserver-endpoints.md', label: 'Webserver API Endpoints', download_url: `${RAW_BASE}/docs/webserver-endpoints.md` },
   { name: 'troubleshooting.md', label: 'Troubleshooting Guide', download_url: `${RAW_BASE}/docs/troubleshooting.md` },
+  { name: 'fix-bricked-xteink.md', label: 'Recovering a Bricked Xteink', download_url: `${RAW_BASE}/docs/fix-bricked-xteink.md` },
   { name: 'sd-card-fonts.md', label: 'SD Card Fonts', download_url: `${RAW_BASE}/docs/sd-card-fonts.md` },
+  { name: 'dictionary.md', label: 'Dictionary', download_url: `${RAW_BASE}/docs/dictionary.md` },
   { name: 'focus-reading.md', label: 'Focus Reading Metrics', download_url: `${RAW_BASE}/docs/focus-reading.md` },
 ]
 
