@@ -8,7 +8,7 @@ const COLUMNS = [
     links: [
       { name: 'Flash from browser', href: '/#flash-tools' },
       { name: 'Stable releases', href: `${GITHUB}/releases` },
-      { name: 'Nightly builds', href: '/insider', route: true },
+      { name: 'Update Notifications', href: 'https://updates.crosspointreader.com' },
       { name: 'Roadmap', href: '/roadmap', route: true },
     ],
   },
