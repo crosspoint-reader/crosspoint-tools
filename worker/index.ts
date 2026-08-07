@@ -1,6 +1,11 @@
 import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, Accessory, FirmwareDevice, ReleaseVisibility } from './types';
 import { betaDevices, normalizeBetaBuildList } from './betas';
-import { reconcileBetaStatus } from './instatus';
+import {
+  reconcileBetaStatus,
+  reconcileDeviceBuildStatus,
+  reconcileInsiderStatus,
+  reconcileReleaseStatusSnapshot,
+} from './instatus';
 
 const ROYALTY_REPO_ID = 'SoFriendly/crosspoint-tools';
 
@@ -90,6 +95,17 @@ export default {
     // Let static assets handle everything else (SPA fallback serves index.html)
     return env.ASSETS.fetch(request);
   },
+
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      reconcileAllReleaseStatus(env, { notifyStable: true }).catch(error => {
+        console.error(JSON.stringify({
+          message: 'Scheduled Instatus reconciliation failed',
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      })
+    );
+  },
 };
 
 const LEGACY_HTML_ROUTES: Record<string, string> = {
@@ -140,7 +156,10 @@ async function handleApi(
         return handleBuildStatus(request, env, corsHeaders);
 
       case '/api/build/upload':
-        return handleBuildUpload(request, env, corsHeaders);
+        return handleBuildUpload(request, env, ctx, corsHeaders);
+
+      case '/api/status/reconcile':
+        return await handleStatusReconcile(request, url, env, corsHeaders);
 
       case '/api/catalog':
         return handleCatalog(env, corsHeaders);
@@ -251,11 +270,11 @@ async function handleApi(
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
       case '/api/sticky/upload':
-        return handleDeviceBuildUpload(DEVICE_BUILDS.sticky, request, env, corsHeaders);
+        return handleDeviceBuildUpload(DEVICE_BUILDS.sticky, request, env, ctx, corsHeaders);
 
       case '/api/sticky':
-        if (request.method === 'PATCH') return handleDeviceBuildUpdate(DEVICE_BUILDS.sticky, request, env, corsHeaders);
-        if (request.method === 'DELETE') return handleDeviceBuildDelete(DEVICE_BUILDS.sticky, request, env, corsHeaders);
+        if (request.method === 'PATCH') return handleDeviceBuildUpdate(DEVICE_BUILDS.sticky, request, env, ctx, corsHeaders);
+        if (request.method === 'DELETE') return handleDeviceBuildDelete(DEVICE_BUILDS.sticky, request, env, ctx, corsHeaders);
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
       case '/api/sticky/info':
@@ -274,12 +293,12 @@ async function handleApi(
           const cfg = DEVICE_BUILDS[parts[0]];
           if (!cfg) return json({ error: 'Unknown device' }, 404, corsHeaders);
           const sub = parts[1] || '';
-          if (sub === 'upload') return handleDeviceBuildUpload(cfg, request, env, corsHeaders);
+          if (sub === 'upload') return handleDeviceBuildUpload(cfg, request, env, ctx, corsHeaders);
           if (sub === 'info') return handleDeviceBuildInfo(cfg, env, corsHeaders);
           if (sub === 'firmware') return handleDeviceBuildFirmware(cfg, env, corsHeaders);
           if (sub === '') {
-            if (request.method === 'PATCH') return handleDeviceBuildUpdate(cfg, request, env, corsHeaders);
-            if (request.method === 'DELETE') return handleDeviceBuildDelete(cfg, request, env, corsHeaders);
+            if (request.method === 'PATCH') return handleDeviceBuildUpdate(cfg, request, env, ctx, corsHeaders);
+            if (request.method === 'DELETE') return handleDeviceBuildDelete(cfg, request, env, ctx, corsHeaders);
             return json({ error: 'Method not allowed' }, 405, corsHeaders);
           }
           return json({ error: 'Not found' }, 404, corsHeaders);
@@ -682,6 +701,7 @@ async function handleBuildStatus(
 async function handleBuildUpload(
   request: Request,
   env: Env,
+  ctx: ExecutionContext,
   headers: Record<string, string>
 ): Promise<Response> {
   if (request.method !== 'PUT') {
@@ -709,6 +729,16 @@ async function handleBuildUpload(
   });
 
   await env.BUILD_META.put(`sha256:insider:${commit}`, sha256);
+
+  scheduleInstatusTask(
+    ctx,
+    reconcileInsiderStatus(env, {
+      name: version || `master-${commit.substring(0, 7)}`,
+      version: version || `master-${commit.substring(0, 7)}`,
+      fingerprint: commit !== 'unknown' ? commit : sha256,
+    }, true),
+    'Insider build'
+  );
 
   return json({ ok: true, size: firmwareData.byteLength, sha256 }, 200, headers);
 }
@@ -843,27 +873,75 @@ const STOCK_CHECK_URLS: Record<string, Record<string, string>> = {
     ch: 'https://api-prod.xteink.cn/api/v1/check-update?current_version=V5.1.0&device_type=ESP32C3_X3&device_id=12345&lng=en',
     en: 'https://api-prod.xteink.cc/api/v1/check-update?current_version=V5.1.0&device_type=ESP32C3_X3&device_id=12345&lng=en',
   },
+  // X4 Pro: needs the panel-suffixed device_type (`_SSD1677`) in the query or
+  // the endpoint reports "No update available". current_version=V0.0.1 forces
+  // the latest build to be offered. The response is `ota_format: encrypted_v1`
+  // (a `.xota`), which handleStockFirmware decrypts in-worker (see decryptXota).
+  x4pro: {
+    en: 'https://api-prod.xteink.cc/api/v1/check-update?current_version=V0.0.1&device_type=ESP32S3_X4_TL_SSD1677&device_id=12345&lng=en&ota_type=1',
+  },
 };
 
-// Stock firmware bundled as a static asset. Served through the
-// /api/firmware/stock route rather than fetched directly by the page:
-// content-filter extensions can throttle or block direct *.bin URLs, and this
-// keeps every firmware download on the same /api path.
-//
-// The X4 Pro's upstream check-update only serves an ENCRYPTED image
-// (ota_format encrypted_v1, .xota) — not directly flashable — so we pin the
-// plain image here. This 7.0.8 build was cut from a device's app slot (the
-// decrypted firmware) and verified against the server's published
-// plain_sha256 (369cfee9…), so it's byte-identical to what an official OTA
-// installs. Replace this file + version when a newer plain build is produced.
+// Firmware-embedded AES-128 key for the X4 Pro `.xota` (recovered by RE; see
+// unlocker-tool/X4PRO-API-REFERENCE.md). Same key decrypts every X4 Pro build
+// until Xteink rotates the DROM key table.
+const X4PRO_OTA_KEY_HEX = '4f2791b80dd75a6aef0d728a39a8c05e';
+// Bytes of AES-128-CTR-encrypted metadata between the IV and the body.
+const X4PRO_META_LEN = 182;
+
+// Decrypt an X4 Pro `encrypted_v1` `.xota` to the plain ESP-IDF app image.
+// Layout: `XOTA`(4) + IV[4:20] + one continuous AES-128-CTR stream over
+// [20:] = metadata(182B) then body. Returns the body (the flashable image).
+async function decryptXota(xota: ArrayBuffer): Promise<Uint8Array> {
+  const buf = new Uint8Array(xota);
+  if (buf.byteLength < 202 || String.fromCharCode(buf[0], buf[1], buf[2], buf[3]) !== 'XOTA') {
+    throw new Error('not a valid .xota (missing XOTA magic)');
+  }
+  const iv = buf.slice(4, 20);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    hexToBytes(X4PRO_OTA_KEY_HEX),
+    { name: 'AES-CTR' },
+    false,
+    ['decrypt']
+  );
+  const whole = new Uint8Array(
+    await crypto.subtle.decrypt({ name: 'AES-CTR', counter: iv, length: 64 }, key, buf.slice(20))
+  );
+  return whole.slice(X4PRO_META_LEN);
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
+}
+
+async function sha256Hex(data: BufferSource): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Pinned stock firmware, now used only as a FALLBACK. handleStockFirmware
+// fetches the X4 Pro build live from Xteink and decrypts the `.xota` in-worker
+// (see decryptXota), so this asset is served only when upstream is unreachable
+// or a key rotation breaks decryption. Keep it as a known-good last resort;
+// bump the version when you refresh the bundled bin.
 const STATIC_STOCK: Record<string, Record<string, { assetPath: string; version: string }>> = {
   x4pro: {
     en: { assetPath: '/firmware/x4pro-stock-en.bin', version: 'V7.0.8' },
   },
 };
 
+type StockData = {
+  version: string;
+  download_url: string;
+  ota_format?: string;   // 'encrypted_v1' for the X4 Pro
+  plain_sha256?: string; // sha256 of the DECRYPTED image (verify after decrypt)
+};
+
 type StockFetchResult =
-  | { ok: true; data: { version: string; download_url: string } }
+  | { ok: true; data: StockData }
   | { ok: false; reason: 'unknown_model' | 'upstream_unreachable' };
 
 async function fetchStockFirmwareInfo(model: string, lang: string): Promise<StockFetchResult> {
@@ -873,7 +951,7 @@ async function fetchStockFirmwareInfo(model: string, lang: string): Promise<Stoc
   try {
     const res = await fetch(checkUrl, { signal: AbortSignal.timeout(15000) });
     if (res.ok) {
-      const body = await res.json() as { data?: { version: string; download_url: string } };
+      const body = await res.json() as { data?: StockData };
       if (body.data?.download_url) return { ok: true, data: body.data };
     }
   } catch { /* fall through */ }
@@ -888,13 +966,14 @@ async function handleStockFirmwareInfo(
   const model = url.searchParams.get('model') || 'x4';
   const lang = url.searchParams.get('lang') || 'en';
 
-  const pinned = STATIC_STOCK[model]?.[lang];
-  if (pinned) {
-    return json({ version: pinned.version, downloadUrl: null, model, lang }, 200, headers);
-  }
-
   const result = await fetchStockFirmwareInfo(model, lang);
   if (!result.ok) {
+    // Upstream unreachable — fall back to the pinned build's version so the UI
+    // still shows something rather than an error.
+    const pinned = STATIC_STOCK[model]?.[lang];
+    if (pinned) {
+      return json({ version: pinned.version, downloadUrl: null, model, lang }, 200, headers);
+    }
     if (result.reason === 'unknown_model') {
       return json({ error: 'Invalid model or language' }, 400, headers);
     }
@@ -946,12 +1025,13 @@ async function handleStockFirmware(
   const model = url.searchParams.get('model') || 'x4';
   const lang = url.searchParams.get('lang') || 'en';
 
-  const pinned = STATIC_STOCK[model]?.[lang];
-  if (pinned) {
+  // Pinned fallback (kept so the site never breaks if upstream is down or a key
+  // rotation breaks decryption). Not the primary path anymore.
+  const servePinned = async (): Promise<Response | null> => {
+    const pinned = STATIC_STOCK[model]?.[lang];
+    if (!pinned) return null;
     const assetRes = await env.ASSETS.fetch(new URL(pinned.assetPath, url.origin));
-    if (!assetRes.ok) {
-      return json({ error: 'Bundled stock firmware missing' }, 502, headers);
-    }
+    if (!assetRes.ok) return null;
     return new Response(assetRes.body, {
       headers: {
         ...headers,
@@ -960,53 +1040,81 @@ async function handleStockFirmware(
         'X-Firmware-Version': pinned.version,
       },
     });
-  }
+  };
 
-  // Determine the current upstream version first so we never serve a stale
-  // cache. The info endpoint always reports the live upstream version, so if
-  // we blindly returned whatever the nightly job last cached, the page would
-  // advertise a newer version than the bytes we actually flash.
+  // Live upstream version first so the advertised version and served bytes
+  // never diverge.
   const result = await fetchStockFirmwareInfo(model, lang);
   if (!result.ok) {
+    const fallback = await servePinned();
+    if (fallback) return fallback;
     if (result.reason === 'unknown_model') {
       return json({ error: 'Invalid model or language' }, 400, headers);
     }
     return json({ error: 'Upstream firmware API unreachable' }, 502, headers);
   }
 
-  // Use the R2 cache (populated by nightly GitHub Actions job) only when it
-  // matches the current upstream version.
+  const version = result.data.version;
+  const serveBytes = (bytes: BodyInit) =>
+    new Response(bytes, {
+      headers: {
+        ...headers,
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${model}-${lang}-firmware.bin"`,
+        'X-Firmware-Version': version,
+      },
+    });
+
+  // R2 cache: for x4/x3 populated by the nightly job; for the X4 Pro populated
+  // below with the DECRYPTED bytes. Serve only when it matches the live version.
   const cachedRaw = await env.BUILD_META.get(`stock-${model}-${lang}`);
   if (cachedRaw) {
     const cached = JSON.parse(cachedRaw) as { r2Key: string; version: string };
-    if (cached.version === result.data.version) {
+    if (cached.version === version) {
       const object = await env.FIRMWARE_BUCKET.get(cached.r2Key);
-      if (object) {
-        return new Response(object.body, {
-          headers: {
-            ...headers,
-            'Content-Type': 'application/octet-stream',
-            'Content-Disposition': `attachment; filename="${model}-${lang}-firmware.bin"`,
-            'X-Firmware-Version': cached.version,
-          },
-        });
-      }
+      if (object) return serveBytes(object.body);
     }
   }
 
   const fwRes = await fetch(result.data.download_url);
   if (!fwRes.ok) {
+    const fallback = await servePinned();
+    if (fallback) return fallback;
     return json({ error: 'Failed to download stock firmware' }, 502, headers);
   }
 
-  return new Response(fwRes.body, {
-    headers: {
-      ...headers,
-      'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${model}-${lang}-firmware.bin"`,
-      'X-Firmware-Version': result.data.version,
-    },
-  });
+  // X4 Pro ships an encrypted `.xota`; decrypt in-worker, verify against the
+  // published plain_sha256, then cache + serve the plain image. Other models
+  // stream the plain download straight through (unchanged behavior).
+  if (result.data.ota_format === 'encrypted_v1') {
+    let plain: Uint8Array;
+    try {
+      plain = await decryptXota(await fwRes.arrayBuffer());
+    } catch {
+      const fallback = await servePinned();
+      if (fallback) return fallback;
+      return json({ error: 'Failed to decrypt stock firmware' }, 502, headers);
+    }
+    if (result.data.plain_sha256) {
+      const got = await sha256Hex(plain);
+      if (got !== result.data.plain_sha256.toLowerCase()) {
+        // Hash mismatch — likely a key rotation with a new build. Don't serve
+        // mismatched bytes; fall back to the pinned image.
+        const fallback = await servePinned();
+        if (fallback) return fallback;
+        return json({ error: 'Decrypted firmware failed hash verification' }, 502, headers);
+      }
+    }
+    // Cache the decrypted image so we only fetch + decrypt once per version.
+    const r2Key = `stock/${model}-${lang}-${version}.bin`;
+    await env.FIRMWARE_BUCKET.put(r2Key, plain, {
+      customMetadata: { model, lang, version, cachedAt: new Date().toISOString() },
+    });
+    await env.BUILD_META.put(`stock-${model}-${lang}`, JSON.stringify({ r2Key, version }));
+    return serveBytes(plain);
+  }
+
+  return serveBytes(fwRes.body!);
 }
 
 // --- Insider Access Gate ---
@@ -2954,6 +3062,17 @@ function scheduleBetaStatusReconcile(
   );
 }
 
+function scheduleInstatusTask(ctx: ExecutionContext, task: Promise<void>, subject: string): void {
+  ctx.waitUntil(
+    task.catch(error => {
+      console.error(JSON.stringify({
+        message: `Failed to reconcile ${subject} with Instatus`,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    })
+  );
+}
+
 async function handleBetaList(
   env: Env,
   headers: Record<string, string>
@@ -3409,6 +3528,7 @@ interface DeviceBuildConfig {
   defaultName: string;
   filename: string;
   label: string;
+  statusDevice: 'x4pro' | 'sticky' | 'm5paper' | 'lilygo';
 }
 
 const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
@@ -3418,6 +3538,7 @@ const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
     defaultName: 'Sticky Beta',
     filename: 'sticky-firmware.bin',
     label: 'Sticky',
+    statusDevice: 'sticky',
   },
   m5paper: {
     r2Key: 'builds/m5paper/firmware.bin',
@@ -3425,6 +3546,7 @@ const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
     defaultName: 'M5Paper Beta',
     filename: 'm5paper-firmware.bin',
     label: 'M5Paper',
+    statusDevice: 'm5paper',
   },
   lilygo: {
     r2Key: 'builds/lilygo/firmware.bin',
@@ -3432,6 +3554,7 @@ const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
     defaultName: 'LilyGo T5 Beta',
     filename: 'lilygo-firmware.bin',
     label: 'LilyGo T5',
+    statusDevice: 'lilygo',
   },
   x4pro: {
     r2Key: 'builds/x4pro/firmware.bin',
@@ -3439,13 +3562,32 @@ const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
     defaultName: 'X4 Pro Beta',
     filename: 'x4pro-firmware.bin',
     label: 'X4 Pro',
+    statusDevice: 'x4pro',
   },
 };
+
+type StoredDeviceBuild = {
+  name: string;
+  notes?: string;
+  firmwareSize?: number;
+  firmwareSha256?: string;
+  uploadedAt?: string;
+};
+
+function deviceBuildStatus(build: StoredDeviceBuild) {
+  return {
+    name: build.name,
+    version: build.name,
+    fingerprint: build.firmwareSha256 || build.uploadedAt || build.name,
+    notes: build.notes,
+  };
+}
 
 async function handleDeviceBuildUpload(
   cfg: DeviceBuildConfig,
   request: Request,
   env: Env,
+  ctx: ExecutionContext,
   headers: Record<string, string>
 ): Promise<Response> {
   if (request.method !== 'POST') {
@@ -3480,6 +3622,12 @@ async function handleDeviceBuildUpload(
   };
   await env.BUILD_META.put(cfg.metaKey, JSON.stringify(build));
 
+  scheduleInstatusTask(
+    ctx,
+    reconcileDeviceBuildStatus(env, cfg.statusDevice, deviceBuildStatus(build), true),
+    `${cfg.label} build`
+  );
+
   return json({ build }, 201, headers);
 }
 
@@ -3487,6 +3635,7 @@ async function handleDeviceBuildUpdate(
   cfg: DeviceBuildConfig,
   request: Request,
   env: Env,
+  ctx: ExecutionContext,
   headers: Record<string, string>
 ): Promise<Response> {
   if (!isAuthorizedWebhookRequest(request, env)) {
@@ -3497,7 +3646,7 @@ async function handleDeviceBuildUpdate(
   if (!raw) {
     return json({ error: `No ${cfg.label} build uploaded` }, 404, headers);
   }
-  const build = JSON.parse(raw) as { name: string; notes?: string };
+  const build = JSON.parse(raw) as StoredDeviceBuild;
 
   const body = await request.json() as { name?: string; notes?: string };
   if (body.name !== undefined) {
@@ -3511,6 +3660,11 @@ async function handleDeviceBuildUpdate(
   }
 
   await env.BUILD_META.put(cfg.metaKey, JSON.stringify(build));
+  scheduleInstatusTask(
+    ctx,
+    reconcileDeviceBuildStatus(env, cfg.statusDevice, deviceBuildStatus(build)),
+    `${cfg.label} build metadata`
+  );
   return json({ build }, 200, headers);
 }
 
@@ -3518,6 +3672,7 @@ async function handleDeviceBuildDelete(
   cfg: DeviceBuildConfig,
   request: Request,
   env: Env,
+  ctx: ExecutionContext,
   headers: Record<string, string>
 ): Promise<Response> {
   if (!isAuthorizedWebhookRequest(request, env)) {
@@ -3531,6 +3686,11 @@ async function handleDeviceBuildDelete(
 
   await env.FIRMWARE_BUCKET.delete(cfg.r2Key);
   await env.BUILD_META.delete(cfg.metaKey);
+  scheduleInstatusTask(
+    ctx,
+    reconcileDeviceBuildStatus(env, cfg.statusDevice, null),
+    `${cfg.label} build removal`
+  );
   return json({ ok: true }, 200, headers);
 }
 
@@ -3580,11 +3740,6 @@ interface CatalogRelease {
 }
 
 const ORIGIN = 'https://crosspointreader.com';
-
-async function sha256Hex(data: ArrayBuffer): Promise<string> {
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
 async function getOrComputeR2Sha(
   env: Env,
@@ -3764,6 +3919,73 @@ async function handleCatalog(
     ...headers,
     'Cache-Control': 'public, max-age=300',
   });
+}
+
+type StatusReconcileOptions = {
+  notifyStable?: boolean;
+  notifyInsider?: boolean;
+};
+
+async function readStoredDeviceBuild(env: Env, cfg: DeviceBuildConfig): Promise<StoredDeviceBuild | null> {
+  const raw = await env.BUILD_META.get(cfg.metaKey);
+  return raw ? JSON.parse(raw) as StoredDeviceBuild : null;
+}
+
+async function reconcileAllReleaseStatus(
+  env: Env,
+  options: StatusReconcileOptions = {}
+): Promise<{ stable: string | null; insider: string | null; betas: number; deviceBuilds: number }> {
+  const deviceConfigs = Object.values(DEVICE_BUILDS);
+  const [stable, insider, betas, ...deviceBuilds] = await Promise.all([
+    fetchStableForCatalog(env),
+    fetchInsiderForCatalog(env),
+    getBetaList(env),
+    ...deviceConfigs.map(cfg => readStoredDeviceBuild(env, cfg)),
+  ]);
+
+  const statusDeviceBuilds: Partial<Record<DeviceBuildConfig['statusDevice'], ReturnType<typeof deviceBuildStatus> | null>> = {};
+  deviceConfigs.forEach((cfg, index) => {
+    const build = deviceBuilds[index];
+    statusDeviceBuilds[cfg.statusDevice] = build ? deviceBuildStatus(build) : null;
+  });
+
+  await reconcileReleaseStatusSnapshot(env, {
+    stable: stable ? {
+      name: stable.name,
+      version: stable.version,
+      fingerprint: stable.firmware_sha256 || stable.id,
+    } : null,
+    insider: insider ? {
+      name: insider.name,
+      version: insider.version,
+      fingerprint: insider.firmware_sha256 || insider.id,
+    } : null,
+    betas,
+    deviceBuilds: statusDeviceBuilds,
+  }, options);
+  return {
+    stable: stable?.version || null,
+    insider: insider?.version || null,
+    betas: betas.length,
+    deviceBuilds: deviceBuilds.filter(Boolean).length,
+  };
+}
+
+async function handleStatusReconcile(
+  request: Request,
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, headers);
+  if (!isAuthorizedWebhookRequest(request, env)) return json({ error: 'Unauthorized' }, 401, headers);
+
+  const notifyAll = url.searchParams.get('notify') === 'all';
+  const result = await reconcileAllReleaseStatus(env, {
+    notifyStable: notifyAll,
+    notifyInsider: notifyAll,
+  });
+  return json({ ok: true, ...result }, 200, headers);
 }
 
 // --- Helpers ---
