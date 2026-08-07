@@ -514,7 +514,7 @@ export default function FlashTools() {
     // unplug/reset instructions the other devices use.
     setRestart(
       model === 'x4pro'
-        ? { text: 'Press and hold the power button to boot.' }
+        ? { text: 'Press and hold the power button to boot into CrossPoint.' }
         : { unplug: skipReset && model !== 'x4' }
     )
     setPercent(0)
@@ -564,9 +564,12 @@ export default function FlashTools() {
         ...p,
         status: {
           kind: 'ok',
-          text: skipReset
-            ? 'Flash complete! Unplug and replug the USB cable to restart your device.'
-            : 'Flash complete! Your device will restart with the new firmware.',
+          text:
+            model === 'x4pro'
+              ? 'Flash complete! Press and hold the power button to boot into CrossPoint.'
+              : skipReset
+                ? 'Flash complete! Unplug and replug the USB cable to restart your device.'
+                : 'Flash complete! Your device will restart with the new firmware.',
         },
       }))
     } catch (err) {
