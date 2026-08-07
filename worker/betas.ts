@@ -97,18 +97,17 @@ export function betaComponentDescription(builds: BetaBuild[], device: FirmwareDe
 
 export function betaNotificationMessage(
   build: Pick<BetaBuild, 'title' | 'version' | 'notes' | 'hiddenDevices'>,
-  kind: 'created' | 'binary-replaced'
+  kind: 'created' | 'version-bumped' | 'binary-replaced'
 ): string {
   const displayName = betaDisplayName(build);
   const deviceNames = betaDevices(build)
     .map(device => `Xteink ${device.toUpperCase()}`)
     .join(' and ');
-  const action = kind === 'created' ? 'is now available' : 'has a new firmware binary';
+  const action = kind === 'binary-replaced' ? 'has a new firmware binary' : 'is now available';
   const notes = build.notes.trim();
 
   return [
     `${displayName} ${action} for ${deviceNames}.`,
-    ...(notes ? [`What's new:\n${notes}`] : []),
-    'Flash it at https://crosspointreader.com/#flash-tools',
+    ...(notes ? [notes] : []),
   ].join('\n\n');
 }

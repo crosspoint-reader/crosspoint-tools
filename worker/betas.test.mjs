@@ -91,8 +91,7 @@ test('includes changelog notes in subscriber notifications', () => {
   assert.equal(
     betaNotificationMessage(build, 'binary-replaced'),
     'CrossPoint 1.5 RC5 has a new firmware binary for Xteink X4.\n\n' +
-      "What's new:\n## Highlights\n\n- Faster page turns\n- Fixed Wi-Fi reconnects\n\n" +
-      'Flash it at https://crosspointreader.com/#flash-tools'
+      '## Highlights\n\n- Faster page turns\n- Fixed Wi-Fi reconnects'
   )
 })
 
@@ -103,7 +102,10 @@ test('keeps notifications concise when a beta has no notes', () => {
 
   assert.equal(
     betaNotificationMessage(build, 'created'),
-    'Page Turner v10 is now available for Xteink X3 and Xteink X4.\n\n' +
-      'Flash it at https://crosspointreader.com/#flash-tools'
+    'Page Turner v10 is now available for Xteink X3 and Xteink X4.'
+  )
+  assert.equal(
+    betaNotificationMessage(build, 'version-bumped'),
+    'Page Turner v10 is now available for Xteink X3 and Xteink X4.'
   )
 })

@@ -1,10 +1,13 @@
 import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, Accessory, FirmwareDevice, ReleaseVisibility } from './types';
 import { betaDevices, normalizeBetaBuildList } from './betas';
 import {
+  flushPendingBetaNotifications,
+  queueBetaNotification,
   reconcileBetaStatus,
   reconcileDeviceBuildStatus,
   reconcileInsiderStatus,
   reconcileReleaseStatusSnapshot,
+  type BetaNotification,
 } from './instatus';
 
 const ROYALTY_REPO_ID = 'SoFriendly/crosspoint-tools';
@@ -98,12 +101,24 @@ export default {
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(
-      reconcileAllReleaseStatus(env, { notifyStable: true }).catch(error => {
-        console.error(JSON.stringify({
-          message: 'Scheduled Instatus reconciliation failed',
-          error: error instanceof Error ? error.message : String(error),
-        }));
-      })
+      (async () => {
+        try {
+          await reconcileAllReleaseStatus(env, { notifyStable: true });
+        } catch (error) {
+          console.error(JSON.stringify({
+            message: 'Scheduled Instatus reconciliation failed',
+            error: error instanceof Error ? error.message : String(error),
+          }));
+        }
+        try {
+          await flushPendingBetaNotifications(env);
+        } catch (error) {
+          console.error(JSON.stringify({
+            message: 'Scheduled Instatus beta notification retry failed',
+            error: error instanceof Error ? error.message : String(error),
+          }));
+        }
+      })()
     );
   },
 };
@@ -3050,7 +3065,7 @@ function scheduleBetaStatusReconcile(
   ctx: ExecutionContext,
   env: Env,
   builds: BetaBuild[],
-  notification?: { kind: 'created' | 'binary-replaced'; build: BetaBuild }
+  notification?: BetaNotification
 ): void {
   ctx.waitUntil(
     reconcileBetaStatus(env, builds, notification).catch(error => {
@@ -3300,7 +3315,9 @@ async function handleBetaCreate(
   const list = await getBetaList(env);
   list.unshift(build);
   await saveBetaList(env, list);
-  scheduleBetaStatusReconcile(ctx, env, list, { kind: 'created', build });
+  const notification: BetaNotification = { kind: 'created', build };
+  await queueBetaNotification(env, notification);
+  scheduleBetaStatusReconcile(ctx, env, list, notification);
 
   return json({ build }, 201, headers);
 }
@@ -3374,6 +3391,8 @@ async function handleBetaUpdate(
   if (!body) {
     return json({ error: 'Invalid beta update payload' }, 400, headers);
   }
+
+  const previousVersion = build.version;
 
   if (body.title !== undefined) {
     if (typeof body.title !== 'string' || !body.title.trim()) {
@@ -3455,12 +3474,14 @@ async function handleBetaUpdate(
   build.updatedAt = now;
   if (binaryReplaced) build.binaryUpdatedAt = now;
   await saveBetaList(env, list);
-  scheduleBetaStatusReconcile(
-    ctx,
-    env,
-    list,
-    binaryReplaced ? { kind: 'binary-replaced', build } : undefined
-  );
+  const versionChanged = build.version !== previousVersion;
+  const notification: BetaNotification | undefined = versionChanged
+    ? { kind: 'version-bumped', build }
+    : binaryReplaced
+      ? { kind: 'binary-replaced', build }
+      : undefined;
+  if (notification) await queueBetaNotification(env, notification);
+  scheduleBetaStatusReconcile(ctx, env, list, notification);
   return json({ build }, 200, headers);
 }
 

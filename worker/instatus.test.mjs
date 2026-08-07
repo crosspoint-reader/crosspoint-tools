@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { reconcileReleaseStatusSnapshot, reconcileStableStatus } from './instatus.ts'
+import {
+  flushPendingBetaNotifications,
+  queueBetaNotification,
+  reconcileBetaStatus,
+  reconcileReleaseStatusSnapshot,
+  reconcileStableStatus,
+} from './instatus.ts'
 
 function jsonResponse(value, status = 200) {
   return new Response(value === null ? null : JSON.stringify(value), {
@@ -205,4 +211,80 @@ test('full reconciliation lists components once instead of fetching each compone
   assert.equal(listRequests, 2)
   assert.equal(updates, 10)
   assert.equal(deletes, 2)
+})
+
+test('keeps a failed beta notice queued and retries it without duplicates', async (t) => {
+  const kv = new Map()
+  const components = new Map([
+    ['x3-beta', { id: 'x3-beta', name: 'Beta', group: 'x3-group', description: 'Old' }],
+    ['x4-beta', { id: 'x4-beta', name: 'Beta', group: 'x4-group', description: 'Old' }],
+  ])
+  let incidentAttempts = 0
+  const incidents = []
+
+  const originalFetch = globalThis.fetch
+  t.after(() => { globalThis.fetch = originalFetch })
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(String(input))
+    const method = init.method || 'GET'
+    const id = url.pathname.split('/').at(-1)
+    if (method === 'GET' && components.has(id)) return jsonResponse(components.get(id))
+    if (method === 'PUT' && components.has(id)) {
+      const body = JSON.parse(String(init.body))
+      Object.assign(components.get(id), body, { group: body.groupId })
+      return jsonResponse(components.get(id))
+    }
+    if (method === 'POST' && url.pathname === '/v1/page/incidents') {
+      incidentAttempts += 1
+      if (incidentAttempts === 1) return jsonResponse({ error: 'rate limited' }, 429)
+      incidents.push(JSON.parse(String(init.body)))
+      return jsonResponse({ id: 'incident-1' }, 201)
+    }
+    return jsonResponse({ error: `${method} ${url.pathname}` }, 404)
+  }
+
+  const env = {
+    INSTATUS_API_KEY: 'test-secret',
+    INSTATUS_PAGE_ID: 'page',
+    INSTATUS_X3_GROUP_ID: 'x3-group',
+    INSTATUS_X4_GROUP_ID: 'x4-group',
+    INSTATUS_X3_BETA_COMPONENT_ID: 'x3-beta',
+    INSTATUS_X4_BETA_COMPONENT_ID: 'x4-beta',
+    BUILD_META: {
+      get: async key => kv.get(key) ?? null,
+      put: async (key, value) => { kv.set(key, value) },
+      delete: async key => { kv.delete(key) },
+      list: async ({ prefix }) => ({
+        keys: [...kv.keys()].filter(key => key.startsWith(prefix)).map(name => ({ name })),
+        list_complete: true,
+        cacheStatus: null,
+      }),
+    },
+  }
+  const build = {
+    id: 'page-turner',
+    title: 'Bluetooth Page Turner Beta',
+    version: '10',
+    name: 'Bluetooth Page Turner Beta',
+    notes: 'Improved reconnect behavior.',
+    createdAt: '2026-08-07T09:00:00.000Z',
+    updatedAt: '2026-08-07T09:40:45.607Z',
+    binaryUpdatedAt: '2026-08-07T09:40:45.607Z',
+    firmwareSize: 1234,
+    firmwareSha256: 'beta-10-sha',
+    source: { type: 'upload' },
+  }
+  const notification = { kind: 'binary-replaced', build }
+
+  await queueBetaNotification(env, notification)
+  await assert.rejects(reconcileBetaStatus(env, [build], notification), /429/)
+  assert.ok(kv.has('instatus:pending:beta:page-turner'))
+
+  await flushPendingBetaNotifications(env)
+  assert.equal(incidents.length, 1)
+  assert.equal(incidents[0].name, 'Beta updated: Bluetooth Page Turner Beta 10')
+  assert.equal(kv.has('instatus:pending:beta:page-turner'), false)
+
+  await flushPendingBetaNotifications(env)
+  assert.equal(incidents.length, 1)
 })

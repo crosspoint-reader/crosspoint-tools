@@ -6,8 +6,8 @@ import {
 } from './betas.ts';
 import type { BetaBuild, Env, FirmwareDevice } from './types';
 
-type BetaNotification = {
-  kind: 'created' | 'binary-replaced';
+export type BetaNotification = {
+  kind: 'created' | 'version-bumped' | 'binary-replaced';
   build: BetaBuild;
 };
 
@@ -59,6 +59,7 @@ type ComponentTarget = {
 };
 
 const NOTIFIED_KEY_PREFIX = 'instatus:notified:';
+const PENDING_BETA_NOTIFICATION_PREFIX = 'instatus:pending:beta:';
 
 function getInstatusConfig(env: Env): InstatusConfig | null {
   if (!env.INSTATUS_API_KEY || !env.INSTATUS_PAGE_ID) return null;
@@ -370,6 +371,98 @@ async function publishNotificationOnce(
   await env.BUILD_META.put(key, fingerprint);
 }
 
+function betaNotificationFingerprint(notification: BetaNotification): string {
+  const build = notification.build;
+  return [
+    notification.kind,
+    build.version,
+    build.firmwareSha256 || build.binaryUpdatedAt,
+  ].join(':');
+}
+
+function pendingBetaNotificationKey(buildId: string): string {
+  return `${PENDING_BETA_NOTIFICATION_PREFIX}${buildId}`;
+}
+
+export async function queueBetaNotification(
+  env: Env,
+  notification: BetaNotification
+): Promise<void> {
+  if (!getInstatusConfig(env)) return;
+  await env.BUILD_META.put(
+    pendingBetaNotificationKey(notification.build.id),
+    JSON.stringify(notification)
+  );
+}
+
+async function deliverBetaNotification(
+  env: Env,
+  config: InstatusConfig,
+  notification: BetaNotification
+): Promise<void> {
+  const devices = betaDevices(notification.build);
+  if (devices.length === 0) {
+    await env.BUILD_META.delete(pendingBetaNotificationKey(notification.build.id));
+    return;
+  }
+
+  const componentIds = devices.map(device => betaTarget(env, device).componentId);
+  if (componentIds.some(id => !id)) {
+    throw new Error('Missing Instatus beta component ID');
+  }
+
+  const displayName = betaDisplayName(notification.build);
+  const notificationName = notification.kind === 'created'
+    ? `New beta: ${displayName}`
+    : notification.kind === 'version-bumped'
+      ? `New beta release: ${displayName}`
+      : `Beta updated: ${displayName}`;
+
+  await publishNotificationOnce(
+    env,
+    config,
+    `beta:${notification.build.id}`,
+    betaNotificationFingerprint(notification),
+    componentIds as string[],
+    notificationName,
+    betaNotificationMessage(notification.build, notification.kind)
+  );
+  await env.BUILD_META.delete(pendingBetaNotificationKey(notification.build.id));
+}
+
+export async function flushPendingBetaNotifications(env: Env): Promise<void> {
+  const config = getInstatusConfig(env);
+  if (!config) return;
+
+  let cursor: string | undefined;
+  do {
+    const page = await env.BUILD_META.list({
+      prefix: PENDING_BETA_NOTIFICATION_PREFIX,
+      ...(cursor ? { cursor } : {}),
+    });
+    for (const key of page.keys) {
+      const raw = await env.BUILD_META.get(key.name);
+      if (!raw) continue;
+      let notification: BetaNotification;
+      try {
+        notification = JSON.parse(raw) as BetaNotification;
+      } catch {
+        await env.BUILD_META.delete(key.name);
+        continue;
+      }
+      if (
+        !notification?.build?.id ||
+        !['created', 'version-bumped', 'binary-replaced'].includes(notification.kind)
+      ) {
+        await env.BUILD_META.delete(key.name);
+        continue;
+      }
+      await deliverBetaNotification(env, config, notification);
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+}
+
 function limitedNotes(notes?: string): string {
   const clean = (notes || '').trim();
   if (clean.length <= 1500) return clean;
@@ -456,21 +549,16 @@ export async function reconcileBetaStatus(
   const config = getInstatusConfig(env);
   if (!config) return;
 
-  const componentIds = await Promise.all((['x3', 'x4'] as const).map(device =>
+  const componentUpdates = await Promise.allSettled((['x3', 'x4'] as const).map(device =>
     updateComponent(config, betaTarget(env, device), betaComponentDescription(builds, device))
   ));
 
-  if (!notification) return;
-  const devices = betaDevices(notification.build);
-  if (devices.length === 0) return;
-  const ids = devices.map(device => componentIds[device === 'x3' ? 0 : 1]);
-  const displayName = betaDisplayName(notification.build);
-  await publishNotification(
-    config,
-    ids,
-    notification.kind === 'created' ? `New beta: ${displayName}` : `Beta updated: ${displayName}`,
-    betaNotificationMessage(notification.build, notification.kind)
+  if (notification) await deliverBetaNotification(env, config, notification);
+
+  const failedUpdate = componentUpdates.find(
+    (result): result is PromiseRejectedResult => result.status === 'rejected'
   );
+  if (failedUpdate) throw failedUpdate.reason;
 }
 
 export async function reconcileStableStatus(
