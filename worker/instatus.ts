@@ -270,6 +270,15 @@ async function updateComponent(
   knownComponents?: InstatusComponent[]
 ): Promise<string> {
   const current = await resolveComponent(config, target, description, knownComponents);
+  if (
+    current.name === target.name &&
+    current.description === description &&
+    current.status === 'OPERATIONAL' &&
+    componentGroupId(current) === target.groupId &&
+    current.archived !== true
+  ) {
+    return current.id!;
+  }
   await instatusRequest(
     config,
     `/v2/${config.pageId}/components/${current.id}`,

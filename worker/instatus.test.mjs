@@ -123,7 +123,11 @@ test('full reconciliation lists components once instead of fetching each compone
     }
     if (method === 'PUT' && url.pathname.startsWith('/v2/page/components/')) {
       updates += 1
-      return jsonResponse({ id: url.pathname.split('/').at(-1) })
+      const id = url.pathname.split('/').at(-1)
+      const body = JSON.parse(String(init.body))
+      const component = components.find(item => item.id === id)
+      Object.assign(component, body, { group: body.groupId })
+      return jsonResponse(component)
     }
     return jsonResponse({ error: `${method} ${url.pathname}` }, 404)
   }
@@ -167,5 +171,19 @@ test('full reconciliation lists components once instead of fetching each compone
   })
 
   assert.equal(listRequests, 1)
+  assert.equal(updates, 10)
+
+  await reconcileReleaseStatusSnapshot(env, {
+    stable,
+    insider,
+    betas: [],
+    deviceBuilds: {
+      x4pro: { name: 'X4 Pro Beta 12', version: '12', fingerprint: 'x4pro-sha' },
+      sticky: { name: 'Sticky RC 5', version: 'RC 5', fingerprint: 'sticky-sha' },
+      m5paper: { name: 'M5Paper RC1', version: 'RC1', fingerprint: 'm5paper-sha' },
+      lilygo: { name: 'LilyGo Beta 2', version: '2', fingerprint: 'lilygo-sha' },
+    },
+  })
+  assert.equal(listRequests, 2)
   assert.equal(updates, 10)
 })

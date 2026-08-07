@@ -3981,11 +3981,17 @@ async function handleStatusReconcile(
   if (!isAuthorizedWebhookRequest(request, env)) return json({ error: 'Unauthorized' }, 401, headers);
 
   const notifyAll = url.searchParams.get('notify') === 'all';
-  const result = await reconcileAllReleaseStatus(env, {
-    notifyStable: notifyAll,
-    notifyInsider: notifyAll,
-  });
-  return json({ ok: true, ...result }, 200, headers);
+  try {
+    const result = await reconcileAllReleaseStatus(env, {
+      notifyStable: notifyAll,
+      notifyInsider: notifyAll,
+    });
+    return json({ ok: true, ...result }, 200, headers);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({ message: 'Manual Instatus reconciliation failed', error: detail }));
+    return json({ error: 'Instatus reconciliation failed', detail }, 502, headers);
+  }
 }
 
 // --- Helpers ---
