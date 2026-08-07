@@ -800,7 +800,8 @@ function AccessoriesCard({ secret, log }) {
 // --- Beta testing ----------------------------------------------------------
 
 function BetaCard({ secret, log }) {
-  const [name, setName] = useState('')
+  const [title, setTitle] = useState('')
+  const [version, setVersion] = useState('')
   const [notes, setNotes] = useState('')
   const [mode, setMode] = useState('upload') // 'upload' | 'release'
   const [file, setFile] = useState(null)
@@ -808,8 +809,9 @@ function BetaCard({ secret, log }) {
   const [releaseRepo, setReleaseRepo] = useState('')
   const [hiddenDevices, setHiddenDevices] = useState([])
   const [busy, setBusy] = useState(false)
+  const [savingId, setSavingId] = useState(null)
   const [builds, setBuilds] = useState([])
-  // Per-build edit panels: { [id]: { name, notes, tag, repo } }
+  // Per-build edit panels include metadata plus an optional binary replacement.
   const [edits, setEdits] = useState({})
   const fileInputRef = useRef(null)
 
@@ -827,13 +829,14 @@ function BetaCard({ secret, log }) {
     loadBetaList()
   }, [loadBetaList])
 
-  const hasName = !!name.trim()
-  const uploadDisabled = busy || !file || !hasName
-  const releaseDisabled = busy || !releaseTag.trim() || !hasName
+  const hasReleaseIdentity = !!title.trim() && !!version.trim()
+  const uploadDisabled = busy || !file || !hasReleaseIdentity
+  const releaseDisabled = busy || !releaseTag.trim() || !hasReleaseIdentity
 
   async function uploadBeta() {
-    const trimmedName = name.trim()
-    if (!trimmedName) return
+    const trimmedTitle = title.trim()
+    const trimmedVersion = version.trim()
+    if (!trimmedTitle || !trimmedVersion) return
 
     const isRelease = mode === 'release'
     const tag = releaseTag.trim()
@@ -849,7 +852,8 @@ function BetaCard({ secret, log }) {
 
     try {
       const formData = new FormData()
-      formData.append('name', trimmedName)
+      formData.append('title', trimmedTitle)
+      formData.append('version', trimmedVersion)
       formData.append('notes', notes.trim())
       formData.append('hiddenDevices', JSON.stringify(hiddenDevices))
       if (isRelease) {
@@ -869,12 +873,15 @@ function BetaCard({ secret, log }) {
       if (res.ok) {
         log(
           'Beta build created: ' +
-            data.build.name +
+            data.build.title +
+            ' ' +
+            data.build.version +
             (data.build.source && data.build.source.type === 'github-release'
               ? ' (release ' + data.build.source.tag + ')'
               : '')
         )
-        setName('')
+        setTitle('')
+        setVersion('')
         setNotes('')
         setFile(null)
         if (fileInputRef.current) fileInputRef.current.value = ''
@@ -891,8 +898,8 @@ function BetaCard({ secret, log }) {
     setBusy(false)
   }
 
-  async function deleteBeta(id, buildName) {
-    if (!window.confirm('Delete beta build "' + buildName + '"?')) return
+  async function deleteBeta(id, buildLabel) {
+    if (!window.confirm('Delete beta build "' + buildLabel + '"?')) return
 
     try {
       const res = await fetch('/api/beta/' + id, {
@@ -900,7 +907,7 @@ function BetaCard({ secret, log }) {
         headers: { Authorization: 'Bearer ' + secret },
       })
       if (res.ok) {
-        log('Deleted beta build: ' + buildName)
+        log('Deleted beta build: ' + buildLabel)
         loadBetaList()
       }
     } catch (err) {
@@ -917,8 +924,11 @@ function BetaCard({ secret, log }) {
         // Don't pre-fill the tag; leaving it blank means "keep current binary".
         // Pre-filling would force a re-fetch on every save.
         next[b.id] = {
-          name: b.name,
+          title: b.title || b.name,
+          version: b.version || '',
           notes: b.notes || '',
+          replacementMode: 'upload',
+          firmware: null,
           tag: '',
           repo: '',
           hiddenDevices: b.hiddenDevices || [],
@@ -935,30 +945,44 @@ function BetaCard({ secret, log }) {
   async function saveBetaEdit(id) {
     const edit = edits[id]
     if (!edit) return
-    const editName = edit.name.trim()
+    const editTitle = edit.title.trim()
+    const editVersion = edit.version.trim()
     const editNotes = edit.notes.trim()
     const tag = edit.tag.trim()
     const repo = edit.repo.trim()
-    if (!editName) return
+    if (!editTitle || !editVersion) return
 
-    const body = { name: editName, notes: editNotes, hiddenDevices: edit.hiddenDevices || [] }
-    if (tag) {
-      body.releaseTag = tag
-      if (repo) body.releaseRepo = repo
+    const formData = new FormData()
+    formData.append('title', editTitle)
+    formData.append('version', editVersion)
+    formData.append('notes', editNotes)
+    formData.append('hiddenDevices', JSON.stringify(edit.hiddenDevices || []))
+    if (edit.replacementMode === 'upload' && edit.firmware) {
+      formData.append('firmware', edit.firmware)
+    } else if (edit.replacementMode === 'release' && tag) {
+      formData.append('releaseTag', tag)
+      if (repo) formData.append('releaseRepo', repo)
     }
 
+    setSavingId(id)
     try {
       const res = await fetch('/api/beta/' + id, {
         method: 'PATCH',
-        headers: {
-          Authorization: 'Bearer ' + secret,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
+        headers: { Authorization: 'Bearer ' + secret },
+        body: formData,
       })
 
       if (res.ok) {
-        log('Updated beta build: ' + editName + (tag ? ' (linked to ' + tag + ')' : ''))
+        const replaced =
+          (edit.replacementMode === 'upload' && edit.firmware) ||
+          (edit.replacementMode === 'release' && tag)
+        log(
+          'Updated beta build: ' +
+            editTitle +
+            ' ' +
+            editVersion +
+            (replaced ? ' (firmware replaced)' : '')
+        )
         setEdits((prev) => {
           const next = { ...prev }
           delete next[id]
@@ -971,6 +995,8 @@ function BetaCard({ secret, log }) {
       }
     } catch (err) {
       log('Update error: ' + err.message)
+    } finally {
+      setSavingId(null)
     }
   }
 
@@ -982,17 +1008,29 @@ function BetaCard({ secret, log }) {
     <Card>
       <CardTitle>Beta Testing</CardTitle>
       <p className="mt-1 text-xs text-stone-400">
-        Upload a .bin or point at a GitHub release to expose it as a firmware option on the main page.
+        Give each beta a stable title and a separate version. You can replace its firmware later
+        without recreating the release or its subscriber entry.
       </p>
 
       <div className="mt-3 space-y-2">
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Build name (e.g. KOSync Fix)"
-          className={inputCls}
-        />
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            aria-label="Beta title"
+            placeholder="Title (e.g. Bluetooth Page Turner)"
+            className={inputCls}
+          />
+          <input
+            type="text"
+            value={version}
+            onChange={(e) => setVersion(e.target.value)}
+            aria-label="Beta version"
+            placeholder="Version (e.g. v10)"
+            className={inputCls}
+          />
+        </div>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -1087,17 +1125,26 @@ function BetaCard({ secret, log }) {
         <div className="mt-4 divide-y divide-stone-100">
           {builds.map((b) => {
             const size = formatMB(b.firmwareSize)
-            const date = new Date(b.createdAt).toLocaleDateString()
+            const date = new Date(b.binaryUpdatedAt || b.updatedAt || b.createdAt).toLocaleDateString()
             const src = b.source && b.source.type === 'github-release' ? b.source : null
             const currentTag = src ? src.tag : ''
             const currentRepo = src ? src.owner + '/' + src.repo : ''
             const edit = edits[b.id]
             const visLabel = visibilityLabel(b.hiddenDevices)
+            const buildTitle = b.title || b.name
+            const buildLabel = [buildTitle, b.version].filter(Boolean).join(' ')
             return (
               <div key={b.id} className="py-2.5">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-stone-700">{b.name}</div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <div className="text-sm font-medium text-stone-700">{buildTitle}</div>
+                      {b.version && (
+                        <span className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-[11px] text-stone-500">
+                          {b.version}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-stone-400">
                       {size} MB &middot; {date}
                       {src && (
@@ -1134,7 +1181,7 @@ function BetaCard({ secret, log }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => deleteBeta(b.id, b.name)}
+                      onClick={() => deleteBeta(b.id, buildLabel)}
                       className="rounded-md p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
                       title="Delete"
                     >
@@ -1143,40 +1190,87 @@ function BetaCard({ secret, log }) {
                   </div>
                 </div>
                 {edit && (
-                  <div className="mt-2 space-y-2">
-                    <input
-                      type="text"
-                      value={edit.name}
-                      onChange={(e) => setEditField(b.id, 'name', e.target.value)}
-                      className={inputCls}
-                    />
+                  <div className="mt-3 space-y-2 rounded-lg border border-stone-200 bg-stone-50/60 p-3">
+                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+                      <input
+                        type="text"
+                        value={edit.title}
+                        onChange={(e) => setEditField(b.id, 'title', e.target.value)}
+                        aria-label="Beta title"
+                        placeholder="Title"
+                        className={inputCls}
+                      />
+                      <input
+                        type="text"
+                        value={edit.version}
+                        onChange={(e) => setEditField(b.id, 'version', e.target.value)}
+                        aria-label="Beta version"
+                        placeholder="Version"
+                        className={inputCls}
+                      />
+                    </div>
                     <textarea
                       value={edit.notes}
                       onChange={(e) => setEditField(b.id, 'notes', e.target.value)}
                       rows={2}
                       className={`${inputCls} resize-none`}
                     />
-                    <div className="space-y-1.5 rounded-md border border-stone-200 p-2">
-                      <div className="text-xs font-medium text-stone-500">
-                        Re-link to GitHub release (optional)
+                    <div className="space-y-2 rounded-md border border-stone-200 bg-white p-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xs font-medium text-stone-600">Replace firmware (optional)</div>
+                        <span className="font-mono text-[10px] uppercase tracking-wide text-stone-400">
+                          Keep blank to retain current
+                        </span>
                       </div>
-                      <input
-                        type="text"
-                        value={edit.tag}
-                        onChange={(e) => setEditField(b.id, 'tag', e.target.value)}
-                        placeholder={currentTag ? 'Currently: ' + currentTag : 'Release tag'}
-                        className={inputClsXs}
-                      />
-                      <input
-                        type="text"
-                        value={edit.repo}
-                        onChange={(e) => setEditField(b.id, 'repo', e.target.value)}
-                        placeholder={currentRepo || 'crosspoint-reader/crosspoint-reader'}
-                        className={`${inputClsXs} text-stone-700`}
-                      />
-                      <p className="text-xs text-stone-400">
-                        Setting a tag refetches firmware.bin and replaces the stored binary.
-                      </p>
+                      <div className="flex gap-1 rounded-lg bg-stone-100 p-1 font-mono text-xs font-medium">
+                        <button
+                          type="button"
+                          onClick={() => setEditField(b.id, 'replacementMode', 'upload')}
+                          className={`${modeBtnBase} ${edit.replacementMode === 'upload' ? modeActive : modeInactive}`}
+                        >
+                          Upload .bin
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditField(b.id, 'replacementMode', 'release')}
+                          className={`${modeBtnBase} ${edit.replacementMode === 'release' ? modeActive : modeInactive}`}
+                        >
+                          GitHub Release
+                        </button>
+                      </div>
+                      {edit.replacementMode === 'upload' ? (
+                        <label className="flex cursor-pointer items-center justify-center rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-xs text-stone-500 hover:border-stone-400 hover:text-stone-700">
+                          <span className="truncate">
+                            {edit.firmware ? edit.firmware.name : 'Choose a replacement .bin...'}
+                          </span>
+                          <input
+                            type="file"
+                            accept=".bin"
+                            className="hidden"
+                            onChange={(e) => setEditField(b.id, 'firmware', e.target.files[0] || null)}
+                          />
+                        </label>
+                      ) : (
+                        <div className="space-y-1.5">
+                          <input
+                            type="text"
+                            value={edit.tag}
+                            onChange={(e) => setEditField(b.id, 'tag', e.target.value)}
+                            placeholder={currentTag ? 'New tag (current: ' + currentTag + ')' : 'Release tag'}
+                            className={inputClsXs}
+                          />
+                          <input
+                            type="text"
+                            value={edit.repo}
+                            onChange={(e) => setEditField(b.id, 'repo', e.target.value)}
+                            placeholder={currentRepo || 'crosspoint-reader/crosspoint-reader'}
+                            className={`${inputClsXs} text-stone-700`}
+                          />
+                          <p className="text-xs text-stone-400">
+                            Entering a tag fetches firmware.bin and replaces the stored binary.
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <DeviceVisibilityToggles
                       hiddenDevices={edit.hiddenDevices}
@@ -1186,9 +1280,10 @@ function BetaCard({ secret, log }) {
                       <button
                         type="button"
                         onClick={() => saveBetaEdit(b.id)}
-                        className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600"
+                        disabled={!edit.title.trim() || !edit.version.trim() || savingId === b.id}
+                        className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Save
+                        {savingId === b.id ? 'Saving...' : 'Save'}
                       </button>
                       <button
                         type="button"

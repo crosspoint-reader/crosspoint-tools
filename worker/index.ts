@@ -1,4 +1,6 @@
 import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, Accessory, FirmwareDevice, ReleaseVisibility } from './types';
+import { betaDevices, normalizeBetaBuildList } from './betas';
+import { reconcileBetaStatus } from './instatus';
 
 const ROYALTY_REPO_ID = 'SoFriendly/crosspoint-tools';
 
@@ -112,7 +114,7 @@ async function handleApi(
 ): Promise<Response> {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Build-Id, X-Build-Commit, X-Build-Version',
   };
 
@@ -226,7 +228,7 @@ async function handleApi(
 
       case '/api/beta':
         if (request.method === 'GET') return handleBetaList(env, corsHeaders);
-        if (request.method === 'POST') return handleBetaCreate(request, env, corsHeaders);
+        if (request.method === 'POST') return handleBetaCreate(request, env, ctx, corsHeaders);
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
       case '/api/release-visibility':
@@ -301,11 +303,11 @@ async function handleApi(
         }
         // /api/beta/{id} PATCH
         if (url.pathname.startsWith('/api/beta/') && request.method === 'PATCH') {
-          return handleBetaUpdate(request, url, env, corsHeaders);
+          return handleBetaUpdate(request, url, env, ctx, corsHeaders);
         }
         // /api/beta/{id} DELETE
         if (url.pathname.startsWith('/api/beta/') && request.method === 'DELETE') {
-          return handleBetaDelete(request, url, env, corsHeaders);
+          return handleBetaDelete(request, url, env, ctx, corsHeaders);
         }
         // Dynamic routes: /api/custom-build/fonts/{buildId}/{filename}
         if (url.pathname.startsWith('/api/custom-build/fonts/')) {
@@ -2915,14 +2917,41 @@ async function handleAccessoryImage(
 // --- Beta Testing ---
 
 const BETA_LIST_KEY = 'beta-builds';
+const MAX_BETA_FIRMWARE_SIZE = 32 * 1024 * 1024;
 
 async function getBetaList(env: Env): Promise<BetaBuild[]> {
   const raw = await env.BUILD_META.get(BETA_LIST_KEY);
-  return raw ? JSON.parse(raw) : [];
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return normalizeBetaBuildList(parsed);
+  } catch (error) {
+    console.error(JSON.stringify({
+      message: 'Failed to parse beta build metadata',
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    return [];
+  }
 }
 
 async function saveBetaList(env: Env, list: BetaBuild[]): Promise<void> {
   await env.BUILD_META.put(BETA_LIST_KEY, JSON.stringify(list));
+}
+
+function scheduleBetaStatusReconcile(
+  ctx: ExecutionContext,
+  env: Env,
+  builds: BetaBuild[],
+  notification?: { kind: 'created' | 'binary-replaced'; build: BetaBuild }
+): void {
+  ctx.waitUntil(
+    reconcileBetaStatus(env, builds, notification).catch(error => {
+      console.error(JSON.stringify({
+        message: 'Failed to reconcile beta releases with Instatus',
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    })
+  );
 }
 
 async function handleBetaList(
@@ -3062,6 +3091,7 @@ async function fetchReleaseFirmware(
 async function handleBetaCreate(
   request: Request,
   env: Env,
+  ctx: ExecutionContext,
   headers: Record<string, string>
 ): Promise<Response> {
   if (!isAuthorizedWebhookRequest(request, env)) {
@@ -3069,7 +3099,8 @@ async function handleBetaCreate(
   }
 
   const formData = await request.formData();
-  const name = formData.get('name');
+  const titleRaw = formData.get('title') ?? formData.get('name');
+  const versionRaw = formData.get('version');
   const notes = formData.get('notes');
   const firmware = formData.get('firmware') as string | File | null;
   const releaseTagRaw = formData.get('releaseTag');
@@ -3079,14 +3110,18 @@ async function handleBetaCreate(
     ? releaseRepoRaw.trim()
     : 'crosspoint-reader/crosspoint-reader';
 
-  if (!name || typeof name !== 'string' || !name.trim()) {
-    return json({ error: 'Name is required' }, 400, headers);
+  const title = typeof titleRaw === 'string' ? titleRaw.trim() : '';
+  const version = typeof versionRaw === 'string' ? versionRaw.trim() : '';
+  if (!title) {
+    return json({ error: 'Title is required' }, 400, headers);
+  }
+  if (!version) {
+    return json({ error: 'Version is required' }, 400, headers);
   }
 
-  const id = `beta-${Date.now().toString(36)}`;
+  const id = `beta-${crypto.randomUUID()}`;
   let data: ArrayBuffer;
   let source: BetaSource;
-  let version: string | undefined;
 
   const hasUpload = firmware && typeof firmware !== 'string';
   if (hasUpload && releaseTag) {
@@ -3094,6 +3129,12 @@ async function handleBetaCreate(
   }
 
   if (hasUpload) {
+    if ((firmware as File).size === 0) {
+      return json({ error: 'Firmware file is empty' }, 400, headers);
+    }
+    if ((firmware as File).size > MAX_BETA_FIRMWARE_SIZE) {
+      return json({ error: 'Firmware file exceeds the 32 MB limit' }, 413, headers);
+    }
     data = await (firmware as File).arrayBuffer();
     source = { type: 'upload' };
   } else if (releaseTag) {
@@ -3106,8 +3147,10 @@ async function handleBetaCreate(
       return json({ error: fetched.error }, fetched.status, headers);
     }
     data = fetched.data;
+    if (data.byteLength > MAX_BETA_FIRMWARE_SIZE) {
+      return json({ error: 'Release firmware exceeds the 32 MB limit' }, 413, headers);
+    }
     source = { type: 'github-release', owner, repo, tag: releaseTag, asset: fetched.assetName };
-    version = releaseTag;
   } else {
     return json({ error: 'Provide either a firmware .bin file or a release tag' }, 400, headers);
   }
@@ -3118,13 +3161,17 @@ async function handleBetaCreate(
   });
 
   const hiddenDevices = parseHiddenDevices(formData.get('hiddenDevices'));
+  const now = new Date().toISOString();
 
   const build: BetaBuild = {
     id,
-    name: name.trim(),
-    notes: (typeof notes === 'string' ? notes.trim() : '') || '',
+    title,
     version,
-    createdAt: new Date().toISOString(),
+    name: title,
+    notes: (typeof notes === 'string' ? notes.trim() : '') || '',
+    createdAt: now,
+    updatedAt: now,
+    binaryUpdatedAt: now,
     firmwareSize: data.byteLength,
     firmwareSha256: sha256,
     source,
@@ -3134,14 +3181,62 @@ async function handleBetaCreate(
   const list = await getBetaList(env);
   list.unshift(build);
   await saveBetaList(env, list);
+  scheduleBetaStatusReconcile(ctx, env, list, { kind: 'created', build });
 
   return json({ build }, 201, headers);
+}
+
+type BetaUpdateInput = {
+  title?: unknown;
+  version?: unknown;
+  notes?: unknown;
+  releaseTag?: unknown;
+  releaseRepo?: unknown;
+  hiddenDevices?: unknown;
+  firmware?: File;
+};
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function parseBetaUpdateInput(request: Request): Promise<BetaUpdateInput | null> {
+  const contentType = request.headers.get('Content-Type') || '';
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await request.formData();
+    const firmware = formData.get('firmware');
+    return {
+      ...(formData.has('title') || formData.has('name')
+        ? { title: formData.get('title') ?? formData.get('name') }
+        : {}),
+      ...(formData.has('version') ? { version: formData.get('version') } : {}),
+      ...(formData.has('notes') ? { notes: formData.get('notes') } : {}),
+      ...(formData.has('releaseTag') ? { releaseTag: formData.get('releaseTag') } : {}),
+      ...(formData.has('releaseRepo') ? { releaseRepo: formData.get('releaseRepo') } : {}),
+      ...(formData.has('hiddenDevices') ? { hiddenDevices: formData.get('hiddenDevices') } : {}),
+      ...(firmware instanceof File ? { firmware } : {}),
+    };
+  }
+
+  const parsed: unknown = await request.json().catch(() => null);
+  if (!isJsonObject(parsed)) return null;
+  return {
+    ...(Object.hasOwn(parsed, 'title') || Object.hasOwn(parsed, 'name')
+      ? { title: parsed.title ?? parsed.name }
+      : {}),
+    ...(Object.hasOwn(parsed, 'version') ? { version: parsed.version } : {}),
+    ...(Object.hasOwn(parsed, 'notes') ? { notes: parsed.notes } : {}),
+    ...(Object.hasOwn(parsed, 'releaseTag') ? { releaseTag: parsed.releaseTag } : {}),
+    ...(Object.hasOwn(parsed, 'releaseRepo') ? { releaseRepo: parsed.releaseRepo } : {}),
+    ...(Object.hasOwn(parsed, 'hiddenDevices') ? { hiddenDevices: parsed.hiddenDevices } : {}),
+  };
 }
 
 async function handleBetaUpdate(
   request: Request,
   url: URL,
   env: Env,
+  ctx: ExecutionContext,
   headers: Record<string, string>
 ): Promise<Response> {
   if (!isAuthorizedWebhookRequest(request, env)) {
@@ -3156,19 +3251,23 @@ async function handleBetaUpdate(
     return json({ error: 'Beta build not found' }, 404, headers);
   }
 
-  const body = await request.json() as {
-    name?: string;
-    notes?: string;
-    releaseTag?: string;
-    releaseRepo?: string;
-    hiddenDevices?: unknown;
-  };
+  const body = await parseBetaUpdateInput(request);
+  if (!body) {
+    return json({ error: 'Invalid beta update payload' }, 400, headers);
+  }
 
-  if (body.name !== undefined) {
-    if (typeof body.name !== 'string' || !body.name.trim()) {
-      return json({ error: 'Name cannot be empty' }, 400, headers);
+  if (body.title !== undefined) {
+    if (typeof body.title !== 'string' || !body.title.trim()) {
+      return json({ error: 'Title cannot be empty' }, 400, headers);
     }
-    build.name = body.name.trim();
+    build.title = body.title.trim();
+    build.name = build.title;
+  }
+  if (body.version !== undefined) {
+    if (typeof body.version !== 'string' || !body.version.trim()) {
+      return json({ error: 'Version cannot be empty' }, 400, headers);
+    }
+    build.version = body.version.trim();
   }
   if (body.notes !== undefined) {
     build.notes = typeof body.notes === 'string' ? body.notes.trim() : '';
@@ -3179,18 +3278,45 @@ async function handleBetaUpdate(
     else delete build.hiddenDevices;
   }
 
-  // Re-link to (or refresh from) a GitHub release. Replaces the R2 binary in place.
-  if (body.releaseTag !== undefined && body.releaseTag !== '') {
-    const repoSpec = (body.releaseRepo && body.releaseRepo.trim())
-      ? body.releaseRepo.trim()
+  const releaseTag = typeof body.releaseTag === 'string' ? body.releaseTag.trim() : '';
+  const hasUpload = body.firmware instanceof File;
+  if (hasUpload && releaseTag) {
+    return json({ error: 'Provide either a replacement firmware file OR a release tag, not both' }, 400, headers);
+  }
+
+  let binaryReplaced = false;
+  if (hasUpload) {
+    if (body.firmware!.size === 0) {
+      return json({ error: 'Firmware file is empty' }, 400, headers);
+    }
+    if (body.firmware!.size > MAX_BETA_FIRMWARE_SIZE) {
+      return json({ error: 'Firmware file exceeds the 32 MB limit' }, 413, headers);
+    }
+    const data = await body.firmware!.arrayBuffer();
+    const sha = await sha256Hex(data);
+    await env.FIRMWARE_BUCKET.put(`builds/beta/${build.id}/firmware.bin`, data, {
+      customMetadata: { sha256: sha },
+    });
+    await env.BUILD_META.delete(`sha256:beta:${build.id}`);
+    build.source = { type: 'upload' };
+    build.firmwareSize = data.byteLength;
+    build.firmwareSha256 = sha;
+    binaryReplaced = true;
+  } else if (releaseTag) {
+    const releaseRepo = typeof body.releaseRepo === 'string' ? body.releaseRepo.trim() : '';
+    const repoSpec = releaseRepo
+      ? releaseRepo
       : 'crosspoint-reader/crosspoint-reader';
     const [owner, repo] = repoSpec.split('/');
     if (!owner || !repo) {
       return json({ error: 'Invalid releaseRepo (use "owner/repo")' }, 400, headers);
     }
-    const fetched = await fetchReleaseFirmware(env, owner, repo, body.releaseTag);
+    const fetched = await fetchReleaseFirmware(env, owner, repo, releaseTag);
     if ('error' in fetched) {
       return json({ error: fetched.error }, fetched.status, headers);
+    }
+    if (fetched.data.byteLength > MAX_BETA_FIRMWARE_SIZE) {
+      return json({ error: 'Release firmware exceeds the 32 MB limit' }, 413, headers);
     }
     const sha = await sha256Hex(fetched.data);
     await env.FIRMWARE_BUCKET.put(`builds/beta/${build.id}/firmware.bin`, fetched.data, {
@@ -3199,13 +3325,23 @@ async function handleBetaUpdate(
     // Drop cached sha so the catalog recomputes against the new bytes.
     await env.BUILD_META.delete(`sha256:beta:${build.id}`);
 
-    build.source = { type: 'github-release', owner, repo, tag: body.releaseTag, asset: fetched.assetName };
-    build.version = body.releaseTag;
+    build.source = { type: 'github-release', owner, repo, tag: releaseTag, asset: fetched.assetName };
+    if (body.version === undefined) build.version = releaseTag;
     build.firmwareSize = fetched.data.byteLength;
     build.firmwareSha256 = sha;
+    binaryReplaced = true;
   }
 
+  const now = new Date().toISOString();
+  build.updatedAt = now;
+  if (binaryReplaced) build.binaryUpdatedAt = now;
   await saveBetaList(env, list);
+  scheduleBetaStatusReconcile(
+    ctx,
+    env,
+    list,
+    binaryReplaced ? { kind: 'binary-replaced', build } : undefined
+  );
   return json({ build }, 200, headers);
 }
 
@@ -3213,6 +3349,7 @@ async function handleBetaDelete(
   request: Request,
   url: URL,
   env: Env,
+  ctx: ExecutionContext,
   headers: Record<string, string>
 ): Promise<Response> {
   if (!isAuthorizedWebhookRequest(request, env)) {
@@ -3228,7 +3365,9 @@ async function handleBetaDelete(
   }
 
   await env.FIRMWARE_BUCKET.delete(`builds/beta/${id}/firmware.bin`);
+  await env.BUILD_META.delete(`sha256:beta:${id}`);
   await saveBetaList(env, filtered);
+  scheduleBetaStatusReconcile(ctx, env, filtered);
 
   return json({ ok: true }, 200, headers);
 }
@@ -3566,13 +3705,13 @@ async function fetchBetasForCatalog(env: Env): Promise<CatalogRelease[]> {
     out.push({
       id: b.id,
       channel: 'beta',
-      name: b.name,
-      version: b.version || b.name,
-      released_at: b.createdAt,
+      name: b.title,
+      version: b.version || b.title,
+      released_at: b.binaryUpdatedAt || b.updatedAt || b.createdAt,
       firmware_url: `${ORIGIN}/api/beta/${b.id}/firmware`,
       firmware_sha256: sha,
       size,
-      supported_devices: ['x3', 'x4'],
+      supported_devices: betaDevices(b),
     });
   }
   return out;

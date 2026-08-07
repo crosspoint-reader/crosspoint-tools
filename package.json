@@ -11,6 +11,7 @@
     "deploy": "npm run build && wrangler deploy",
     "tunnel": "node scripts/tunnel.js",
     "tail": "wrangler tail",
+    "test:betas": "node --experimental-strip-types --test worker/betas.test.mjs",
     "test:theme-builder": "node scripts/test-theme-builder.cjs"
   },
   "dependencies": {

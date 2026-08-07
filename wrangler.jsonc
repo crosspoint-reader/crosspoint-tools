@@ -41,6 +41,7 @@
   //   GITHUB_WEBHOOK_SECRET - for verifying webhook payloads
   //   CONTACT_CHAT_WEBHOOK - Google Chat incoming-webhook URL for contact form messages
   //   GITHUB_TOKEN - optional, for private repo access
+  //   INSTATUS_API_KEY - release status page API token
 
   // Workers AI binding
   "ai": {
@@ -52,6 +53,11 @@
   "send_email": [{ "name": "EMAIL" }],
 
   "vars": {
-    "REPO_URL": "https://github.com/crosspoint-reader/crosspoint-reader.git"
+    "REPO_URL": "https://github.com/crosspoint-reader/crosspoint-reader.git",
+    "INSTATUS_PAGE_ID": "cmshyken103uc0yn3r9stgjbh",
+    "INSTATUS_X3_GROUP_ID": "cmsi0ypoc04830rpb7tby0uz7",
+    "INSTATUS_X4_GROUP_ID": "cmsi0rjlo044h0rn3nouqubtu",
+    "INSTATUS_X3_BETA_COMPONENT_ID": "cmsi121t5048z0rpbgohluyc4",
+    "INSTATUS_X4_BETA_COMPONENT_ID": "cmshzjpas03qq0kpbi42wljnw"
   }
 }

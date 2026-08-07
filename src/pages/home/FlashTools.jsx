@@ -79,6 +79,14 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+function betaTitle(build) {
+  return build?.title || build?.name || 'CrossPoint Beta'
+}
+
+function betaLabel(build) {
+  return [betaTitle(build), build?.version].filter(Boolean).join(' ')
+}
+
 const FLASH_STEP_ICONS = { pending: '○', running: '◠', done: '✓', error: '✗' }
 const FLASH_STEP_COLORS = {
   pending: 'text-stone-400',
@@ -430,7 +438,7 @@ export default function FlashTools() {
     }
     if (action.startsWith('beta-')) {
       const beta = betaBuilds.find((build) => `beta-${build.id}` === action)
-      return { device: model, channel: 'beta', version: beta?.version || beta?.name }
+      return { device: model, channel: 'beta', version: beta?.version || betaTitle(beta) }
     }
     return { device: model, channel: 'custom', version: 'custom' }
   }
@@ -472,7 +480,10 @@ export default function FlashTools() {
       custom: 'Flashing Custom Firmware...',
       device: `Flashing ${MODELS.find((m) => m.id === model)?.name || 'Device'} Beta...`,
     }
-    const title = action.startsWith('beta-') ? 'Flashing Beta Firmware...' : titles[action]
+    const activeBeta = action.startsWith('beta-')
+      ? betaBuilds.find((build) => `beta-${build.id}` === action)
+      : null
+    const title = activeBeta ? `Flashing ${betaLabel(activeBeta)}...` : titles[action]
 
     const downloadMsgs = {
       crosspoint: 'Downloading firmware...',
@@ -778,8 +789,10 @@ export default function FlashTools() {
                     onClick={() => selectFw(`beta-${b.id}`)}
                     className={cardClass(fw === `beta-${b.id}`)}
                   >
-                    <div className="font-mono text-xs text-amber-600">CrossPoint Beta</div>
-                    <div className="mt-0.5 text-sm font-semibold text-stone-900">{b.name}</div>
+                    <div className="text-sm font-semibold text-stone-900">{betaTitle(b)}</div>
+                    <div className="mt-0.5 font-mono text-xs text-amber-600">
+                      {b.version || 'Beta'}
+                    </div>
                   </button>
                 ))}
                 <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
@@ -949,10 +962,19 @@ export default function FlashTools() {
                   {/* Beta panels */}
                   {selectedBeta && (
                     <div>
-                      <div className="text-sm font-semibold text-stone-900">{selectedBeta.name}</div>
+                      <div className="text-sm font-semibold text-stone-900">{betaTitle(selectedBeta)}</div>
                       <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">
+                        {selectedBeta.version && (
+                          <>
+                            <span className="text-amber-600">{selectedBeta.version}</span> &middot;{' '}
+                          </>
+                        )}
                         {(selectedBeta.firmwareSize / 1024 / 1024).toFixed(1)} MB &middot;{' '}
-                        {fmtDate(selectedBeta.createdAt)}
+                        {fmtDate(
+                          selectedBeta.binaryUpdatedAt ||
+                            selectedBeta.updatedAt ||
+                            selectedBeta.createdAt
+                        )}
                       </div>
                       {selectedBeta.notes && (
                         <div
@@ -967,7 +989,7 @@ export default function FlashTools() {
                         className="mt-4 inline-flex items-center justify-center rounded-md bg-amber-600 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <BoltIcon />
-                        Flash {selectedBeta.name}
+                        Flash {betaLabel(selectedBeta)}
                       </button>
                       <p className="mt-2 text-xs text-stone-400">
                         If you are coming from Stock or another firmware you may need to flash

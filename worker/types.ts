@@ -21,6 +21,14 @@ export interface Env {
   AI: Ai;
   GITHUB_WEBHOOK_SECRET: string;
   GITHUB_TOKEN?: string;
+  // Instatus release notification integration. The API key is a Worker secret;
+  // page, group, and component IDs are public configuration in wrangler.jsonc.
+  INSTATUS_API_KEY?: string;
+  INSTATUS_PAGE_ID?: string;
+  INSTATUS_X3_GROUP_ID?: string;
+  INSTATUS_X4_GROUP_ID?: string;
+  INSTATUS_X3_BETA_COMPONENT_ID?: string;
+  INSTATUS_X4_BETA_COMPONENT_ID?: string;
   WEBHOOK_BASE_URL?: string;
   ALLOW_INSECURE_DEV_WEBHOOKS?: string;
   GITHUB_ACTIONS_REPO?: string;
@@ -127,10 +135,14 @@ export type FirmwareDevice = 'x3' | 'x4';
 
 export interface BetaBuild {
   id: string;
+  title: string;
+  version: string;
+  // Compatibility alias for older clients. New code should use title.
   name: string;
   notes: string;
-  version?: string;
   createdAt: string;
+  updatedAt: string;
+  binaryUpdatedAt: string;
   firmwareSize: number;
   firmwareSha256?: string;
   // Absent on legacy entries; treat undefined as { type: 'upload' }.

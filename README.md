@@ -62,12 +62,14 @@ Built `.cpfont` files install on the device by copying to the SD card under `/fo
 
 ## Beta builds
 
-Beta builds appear in the catalog as a separate channel and are managed from the admin dashboard. Each entry has one of two sources:
+Beta builds appear in the catalog as a separate channel and are managed from the admin dashboard. A beta has a stable title plus a separate version, so updating `Page Turner` from `v9` to `v10` does not require deleting and recreating the entry. Each entry has one of two sources:
 
 - **Upload** — Admin attaches a local `.bin`. Stored verbatim in R2.
 - **GitHub release** — Admin enters a release tag (default repo `crosspoint-reader/crosspoint-reader`). The Worker resolves the release via the GitHub API, fetches its `firmware.bin` asset (or the first `.bin` asset if `firmware.bin` isn't present), and caches the bytes into R2 under the same key as an upload. The original release tag is recorded so the entry can be re-fetched later.
 
-Editing an entry lets you re-link it to a different release tag, which transparently replaces the stored binary. Existing upload-backed betas keep working — the source field is optional and absent legacy entries are treated as uploads.
+Editing an entry can update its title, version, notes, and device visibility. It can also replace the existing binary in place with either a newly uploaded `.bin` or the asset from a different release tag. Existing upload-backed betas keep working — legacy entries are normalized to the new model when read.
+
+When the Instatus variables in `wrangler.jsonc` and the `INSTATUS_API_KEY` Worker secret are configured, beta changes are mirrored to the persistent X3 and X4 Beta components. Creating a beta or replacing its binary also sends a subscriber notification containing the beta notes as its changelog; metadata-only edits and deletions update the component descriptions without sending an alert.
 
 ## Flashing
 
