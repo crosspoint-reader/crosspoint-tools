@@ -736,7 +736,7 @@ async function handleBuildUpload(
       name: version || `master-${commit.substring(0, 7)}`,
       version: version || `master-${commit.substring(0, 7)}`,
       fingerprint: commit !== 'unknown' ? commit : sha256,
-    }, true),
+    }),
     'Insider build'
   );
 
@@ -3923,7 +3923,6 @@ async function handleCatalog(
 
 type StatusReconcileOptions = {
   notifyStable?: boolean;
-  notifyInsider?: boolean;
 };
 
 async function readStoredDeviceBuild(env: Env, cfg: DeviceBuildConfig): Promise<StoredDeviceBuild | null> {
@@ -3984,7 +3983,6 @@ async function handleStatusReconcile(
   try {
     const result = await reconcileAllReleaseStatus(env, {
       notifyStable: notifyAll,
-      notifyInsider: notifyAll,
     });
     return json({ ok: true, ...result }, 200, headers);
   } catch (error) {

@@ -32,6 +32,12 @@ type InstatusConfig = {
   pageId: string;
 };
 
+type InstatusTranslations = {
+  name?: Record<string, string> | null;
+  description?: Record<string, string> | null;
+  [key: string]: unknown;
+};
+
 type InstatusComponent = {
   id?: string;
   name?: string;
@@ -41,7 +47,8 @@ type InstatusComponent = {
   order?: number;
   archived?: boolean;
   group?: string | { id?: string } | null;
-  translations?: unknown;
+  groupId?: string | null;
+  translations?: InstatusTranslations | null;
 };
 
 type ComponentTarget = {
@@ -62,7 +69,30 @@ function getInstatusConfig(env: Env): InstatusConfig | null {
 }
 
 function componentGroupId(component: InstatusComponent): string | undefined {
-  return typeof component.group === 'string' ? component.group : component.group?.id;
+  return (typeof component.group === 'string' ? component.group : component.group?.id)
+    || component.groupId
+    || undefined;
+}
+
+function localizedDescriptionsMatch(
+  translations: InstatusTranslations | null | undefined,
+  description: string
+): boolean {
+  const localized = translations?.description;
+  return !localized || Object.values(localized).every(value => value === description);
+}
+
+function translationsWithDescription(
+  translations: InstatusTranslations | null | undefined,
+  description: string
+): InstatusTranslations | undefined {
+  if (!translations) return undefined;
+  const localized = translations.description;
+  if (!localized) return translations;
+  return {
+    ...translations,
+    description: Object.fromEntries(Object.keys(localized).map(locale => [locale, description])),
+  };
 }
 
 function requireTarget(target: ComponentTarget, label: string): ComponentTarget {
@@ -275,10 +305,12 @@ async function updateComponent(
     current.description === description &&
     current.status === 'OPERATIONAL' &&
     componentGroupId(current) === target.groupId &&
-    current.archived !== true
+    current.archived !== true &&
+    localizedDescriptionsMatch(current.translations, description)
   ) {
     return current.id!;
   }
+  const translations = translationsWithDescription(current.translations, description);
   await instatusRequest(
     config,
     `/v2/${config.pageId}/components/${current.id}`,
@@ -293,11 +325,12 @@ async function updateComponent(
         grouped: true,
         groupId: componentGroupId(current) || target.groupId,
         archived: current.archived ?? false,
-        ...(current.translations ? { translations: current.translations } : {}),
+        ...(translations ? { translations } : {}),
       }),
     }
   );
   current.description = description;
+  current.translations = translations;
   return current.id!;
 }
 
@@ -349,7 +382,7 @@ function limitedNotes(notes?: string): string {
 export async function reconcileReleaseStatusSnapshot(
   env: Env,
   snapshot: ReleaseStatusSnapshot,
-  options: { notifyStable?: boolean; notifyInsider?: boolean } = {}
+  options: { notifyStable?: boolean } = {}
 ): Promise<void> {
   const config = getInstatusConfig(env);
   if (!config) return;
@@ -393,7 +426,7 @@ export async function reconcileReleaseStatusSnapshot(
 
   if (snapshot.insider) {
     const build = snapshot.insider;
-    const ids = await Promise.all((['x3', 'x4'] as const).map(device =>
+    await Promise.all((['x3', 'x4'] as const).map(device =>
       updateComponent(
         config,
         insiderTarget(env, device),
@@ -401,17 +434,6 @@ export async function reconcileReleaseStatusSnapshot(
         components
       )
     ));
-    if (options.notifyInsider) {
-      await publishNotificationOnce(
-        env,
-        config,
-        'insider',
-        build.fingerprint,
-        ids,
-        `New Insider build: ${build.version}`,
-        `CrossPoint Insider ${build.version} is now available for Xteink X3 and X4.\n\nDownload it at https://crosspointreader.com/insider`
-      );
-    }
   }
 
   await Promise.all((Object.keys(DEVICE_BUILD_COPY) as DeviceBuildStatusDevice[]).map(device => {
@@ -480,29 +502,17 @@ export async function reconcileStableStatus(
 
 export async function reconcileInsiderStatus(
   env: Env,
-  build: PublishedBuildStatus,
-  notify = false
+  build: PublishedBuildStatus
 ): Promise<void> {
   const config = getInstatusConfig(env);
   if (!config) return;
-  const ids = await Promise.all((['x3', 'x4'] as const).map(device =>
+  await Promise.all((['x3', 'x4'] as const).map(device =>
     updateComponent(
       config,
       insiderTarget(env, device),
       `Current version: ${build.version}. Nightly/Insider CrossPoint firmware for the Xteink ${device.toUpperCase()}.`
     )
   ));
-  if (notify) {
-    await publishNotificationOnce(
-      env,
-      config,
-      'insider',
-      build.fingerprint,
-      ids,
-      `New Insider build: ${build.version}`,
-      `CrossPoint Insider ${build.version} is now available for Xteink X3 and X4.\n\nDownload it at https://crosspointreader.com/insider`
-    );
-  }
 }
 
 const DEVICE_BUILD_COPY: Record<DeviceBuildStatusDevice, { label: string; description: string }> = {

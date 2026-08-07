@@ -16,12 +16,16 @@ test('creates a missing stable component and deduplicates release notifications'
     ['x4-stable', {
       id: 'x4-stable',
       name: 'Stable',
-      description: 'Old version',
+      description: 'Current version: v1.5.0. Stable CrossPoint firmware for the Xteink X4.',
       status: 'OPERATIONAL',
       showUptime: false,
       order: 0,
       archived: false,
       group: 'x4-group',
+      translations: {
+        name: { en: 'Stable' },
+        description: { en: 'Current version: 1.4.1. Stable CrossPoint firmware for the Xteink X4.' },
+      },
     }],
   ])
   const incidents = []
@@ -81,6 +85,7 @@ test('creates a missing stable component and deduplicates release notifications'
 
   assert.match(components.get('x3-stable-created').description, /v1\.5\.0.*X3/)
   assert.match(components.get('x4-stable').description, /v1\.5\.0.*X4/)
+  assert.match(components.get('x4-stable').translations.description.en, /v1\.5\.0.*X4/)
   assert.equal(incidents.length, 1)
   assert.deepEqual(new Set(incidents[0].components), new Set(['x3-stable-created', 'x4-stable']))
   assert.equal(kv.get('instatus:notified:stable'), 'sha-150')
@@ -109,8 +114,13 @@ test('full reconciliation lists components once instead of fetching each compone
   const components = definitions.map(([id, name, group]) => ({
     id, name, group, status: 'OPERATIONAL', showUptime: false, order: 0, archived: false,
   }))
+  components.push(
+    { id: 'x3-stable-duplicate-1', name: 'Stable', groupId: 'x3-group', status: 'OPERATIONAL' },
+    { id: 'x3-stable-duplicate-2', name: 'Stable', groupId: 'x3-group', status: 'OPERATIONAL' },
+  )
   let listRequests = 0
   let updates = 0
+  let deletes = 0
 
   const originalFetch = globalThis.fetch
   t.after(() => { globalThis.fetch = originalFetch })
@@ -128,6 +138,13 @@ test('full reconciliation lists components once instead of fetching each compone
       const component = components.find(item => item.id === id)
       Object.assign(component, body, { group: body.groupId })
       return jsonResponse(component)
+    }
+    if (method === 'DELETE' && url.pathname.startsWith('/v1/page/components/')) {
+      deletes += 1
+      const id = url.pathname.split('/').at(-1)
+      const index = components.findIndex(item => item.id === id)
+      if (index >= 0) components.splice(index, 1)
+      return jsonResponse({ id })
     }
     return jsonResponse({ error: `${method} ${url.pathname}` }, 404)
   }
@@ -172,6 +189,7 @@ test('full reconciliation lists components once instead of fetching each compone
 
   assert.equal(listRequests, 1)
   assert.equal(updates, 10)
+  assert.equal(deletes, 2)
 
   await reconcileReleaseStatusSnapshot(env, {
     stable,
@@ -186,4 +204,5 @@ test('full reconciliation lists components once instead of fetching each compone
   })
   assert.equal(listRequests, 2)
   assert.equal(updates, 10)
+  assert.equal(deletes, 2)
 })
