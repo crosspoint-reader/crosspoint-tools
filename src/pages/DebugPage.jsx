@@ -6,7 +6,7 @@ import {
   CrossPointFlasher,
   X3_PARTITION_TABLE,
   X4_PARTITION_TABLE,
-  CROSSPOINT_PARTITION_TABLE,
+  X4_PRO_PARTITION_TABLE,
   CROSSPOINT_KO_PARTITION_TABLE,
   downloadBlob,
   otaStateName,
@@ -35,7 +35,7 @@ const DEBUG_DEVICES = {
   x4pro: {
     name: 'Xteink X4 Pro',
     chip: 'ESP32-S3',
-    layouts: [{ value: 'X4PRO', label: 'CrossPoint (X4 Pro) layout', table: CROSSPOINT_PARTITION_TABLE }],
+    layouts: [{ value: 'X4PRO', label: 'Factory-compatible (X4 Pro) layout', table: X4_PRO_PARTITION_TABLE }],
   },
   x3: {
     name: 'Xteink X3',
@@ -116,6 +116,10 @@ function LayoutBadge({ matchedLayout }) {
     dot = 'bg-brand-500'
     wrap = 'bg-brand-50 text-brand-700'
     text = 'CrossPoint layout: ready to flash'
+  } else if (matchedLayout === 'X4PRO') {
+    dot = 'bg-brand-500'
+    wrap = 'bg-brand-50 text-brand-700'
+    text = 'X4 Pro factory-compatible layout: ready to flash'
   } else if (matchedLayout === 'KO') {
     dot = 'bg-brand-500'
     wrap = 'bg-brand-50 text-brand-700'
@@ -451,11 +455,12 @@ export default function DebugPage() {
 
       const layoutMeta = {
         X4: { name: 'CrossPoint', table: X4_PARTITION_TABLE },
+        X4PRO: { name: 'X4 Pro factory-compatible', table: X4_PRO_PARTITION_TABLE },
         X3: { name: 'Stock X3', table: X3_PARTITION_TABLE },
         KO: { name: 'CrossPoint KO fork', table: CROSSPOINT_KO_PARTITION_TABLE },
       }
       const meta = matchedLayout ? layoutMeta[matchedLayout] : null
-      const expectedTable = meta ? meta.table : X4_PARTITION_TABLE
+      const expectedTable = meta ? meta.table : device.layouts[0].table
       const expectedTableLabel = meta ? `${meta.name} layout` : 'No matching layout'
 
       setStatusText('')

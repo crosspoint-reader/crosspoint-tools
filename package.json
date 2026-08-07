@@ -12,6 +12,7 @@
     "tunnel": "node scripts/tunnel.js",
     "tail": "wrangler tail",
     "test:betas": "node --experimental-strip-types --test worker/betas.test.mjs",
+    "test:flasher": "node --test src/lib/flasher.test.mjs",
     "test:theme-builder": "node scripts/test-theme-builder.cjs"
   },
   "dependencies": {

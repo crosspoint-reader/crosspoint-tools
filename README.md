@@ -85,6 +85,7 @@ The browser-based flasher (`public/js/flasher.js`) uses [esptool-js](https://git
 `/debug` is a diagnostic tool for inspecting a device over WebSerial without flashing anything. It connects to the ESP32-C3, reads the partition table, and reports whether the layout matches a known profile:
 
 - **CrossPoint** — X4 CrossPoint layout, ready to flash
+- **X4 Pro factory-compatible** — Original X4 Pro layout with two 0x7e0000 OTA slots, ready to flash
 - **CrossPoint KO fork** — KO community fork layout, ready to flash
 - **Stock X3** — Needs repartition before CrossPoint can be flashed
 - **Unknown** — No match; the raw table is shown for inspection

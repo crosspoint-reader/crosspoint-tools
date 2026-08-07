@@ -249,6 +249,18 @@ export const X3_PARTITION_TABLE = [
   { type: 'data-coredump', offset: 0xff0000, size: 0x10000 },
 ];
 
+// Factory X4 Pro layout, verified against a 16 MB full-flash dump. Keep the
+// large stock OTA slots: the Pro's current stock image is larger than the
+// generic CrossPoint layout's 0x640000-byte slots.
+export const X4_PRO_PARTITION_TABLE = [
+  { type: 'data-nvs', offset: 0x9000, size: 0x5000 },
+  { type: 'data-ota', offset: 0xe000, size: 0x2000 },
+  { type: 'app-ota_0', offset: 0x10000, size: 0x7e0000 },
+  { type: 'app-ota_1', offset: 0x7f0000, size: 0x7e0000 },
+  { type: 'data-spiffs', offset: 0xfd0000, size: 0x14000 },
+  { type: 'data-coredump', offset: 0xfe4000, size: 0x1c000 },
+];
+
 // CrossPoint's partitions.csv (all envs: sticky, m5paper, lilygo) — same
 // values as the X4 layout, kept separate so non-Xteink device installs don't
 // couple to X4.
@@ -625,7 +637,8 @@ export class CrossPointFlasher {
     const data = await this.espLoader.readFlash(0x8000, 0x1000);
     const partitions = parsePartitionTable(data);
     let matchedLayout = null;
-    if (matchesPartitionTable(partitions, X3_PARTITION_TABLE)) matchedLayout = 'X3';
+    if (matchesPartitionTable(partitions, X4_PRO_PARTITION_TABLE)) matchedLayout = 'X4PRO';
+    else if (matchesPartitionTable(partitions, X3_PARTITION_TABLE)) matchedLayout = 'X3';
     else if (matchesPartitionTable(partitions, X4_PARTITION_TABLE)) matchedLayout = 'X4';
     else if (matchesPartitionTable(partitions, CROSSPOINT_KO_PARTITION_TABLE)) matchedLayout = 'KO';
     return { partitions, matchedLayout, raw: data };
