@@ -406,6 +406,7 @@ export default function DebugPage() {
   const repairLayoutRef = useRef(null)
   const repairBootloaderRef = useRef(null)
   const repairFlashOsRef = useRef(null)
+  const repairPreserveNvsRef = useRef(null)
   const fullFlashFileRef = useRef(null)
   const lastDownloadRef = useRef(null)
 
@@ -587,6 +588,7 @@ export default function DebugPage() {
       const { partitions } = await flasher.repairBootRegion(table, {
         bootloaderData,
         firmwareData,
+        preserveNvs: repairPreserveNvsRef.current?.checked ?? true,
         onProgress: setProgress,
         onStepChange: (idx, label, state) => {
           if (state === 'running') setStatusText(`${label}...`)
@@ -822,8 +824,8 @@ export default function DebugPage() {
           <ToolCard title="Repair boot region">
             <p className="mt-1 text-sm text-stone-600">
               Restores the bootloader at <Mono>0x0</Mono>, rewrites a known-good partition table at{' '}
-              <Mono>0x8000</Mono>, and blanks the NVS and OTA data partitions. Use this when the partition table has
-              been overwritten (e.g. firmware flashed to <Mono>0x0</Mono> by mistake) and flashing fails with{' '}
+              <Mono>0x8000</Mono>, preserves NVS by default, and resets the OTA selector. Use this when the partition
+              table has been overwritten (e.g. firmware flashed to <Mono>0x0</Mono> by mistake) and flashing fails with{' '}
               <span className="font-mono text-[13px]">"Partition table has no otadata partition"</span>.
             </p>
             <p className="mt-2 text-sm text-amber-600">
@@ -867,6 +869,18 @@ export default function DebugPage() {
                 ? 'Also flash the current X4 Pro build, so the device boots straight into CrossPoint'
                 : 'Also flash the latest stable CrossPoint firmware, so the device boots straight into CrossPoint'}
             </label>
+            <label className="mt-3 flex items-center gap-2 text-sm text-stone-600">
+              <input
+                ref={repairPreserveNvsRef}
+                type="checkbox"
+                defaultChecked
+                className="size-4 rounded border-stone-300 accent-brand-500"
+              />
+              Preserve device settings (NVS)
+            </label>
+            <p className="mt-1 text-xs text-stone-400">
+              Uncheck only when NVS itself is corrupt and you intentionally want to erase device settings.
+            </p>
             <p className="mt-3 text-xs text-stone-400">
               The bundled {device.chip} bootloader is used by default; supply a <Mono>bootloader.bin</Mono> above to
               override it. Uncheck the firmware option if you plan to flash stock or a beta build instead.
