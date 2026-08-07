@@ -399,9 +399,18 @@ export default function DebugPage() {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState({ text: '', error: false })
   const [result, setResult] = useState(null)
-  const [deviceId, setDeviceId] = useState('x4')
-  const device = DEBUG_DEVICES[deviceId]
-  const flasherOpts = { expectedChip: device.chip, deviceName: device.name }
+  const repairForStock =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('after') === 'stock'
+  const [repairDeviceId, setRepairDeviceId] = useState(() => {
+    if (typeof window === 'undefined') return 'x4'
+    const requested = new URLSearchParams(window.location.search).get('device')
+    return DEBUG_DEVICES[requested] ? requested : 'x4'
+  })
+  const [restoreDeviceId, setRestoreDeviceId] = useState('x4')
+  const repairDevice = DEBUG_DEVICES[repairDeviceId]
+  const restoreDevice = DEBUG_DEVICES[restoreDeviceId]
+  const defaultRepairLayout =
+    (repairForStock && repairDevice.layouts.find((layout) => layout.value === 'X3')) || repairDevice.layouts[0]
 
   const repairLayoutRef = useRef(null)
   const repairBootloaderRef = useRef(null)
@@ -419,9 +428,9 @@ export default function DebugPage() {
     if (lastDownloadRef.current) downloadBlob(lastDownloadRef.current, filename)
   }
 
-  async function withConnectedFlasher(operation) {
+  async function withConnectedFlasher(operation, options) {
     const port = await CrossPointFlasher.requestPort()
-    const flasher = new CrossPointFlasher(port, flasherOpts)
+    const flasher = new CrossPointFlasher(port, options)
     try {
       await flasher.connect()
       return await operation(flasher)
@@ -447,7 +456,7 @@ export default function DebugPage() {
     }
 
     setBusy(true)
-    const flasher = new CrossPointFlasher(port, flasherOpts)
+    const flasher = new CrossPointFlasher(port)
     try {
       setStatusText('Connecting...')
       await flasher.connect()
@@ -461,9 +470,6 @@ export default function DebugPage() {
         KO: { name: 'CrossPoint KO fork', table: CROSSPOINT_KO_PARTITION_TABLE },
       }
       const meta = matchedLayout ? layoutMeta[matchedLayout] : null
-      const expectedTable = meta ? meta.table : device.layouts[0].table
-      const expectedTableLabel = meta ? `${meta.name} layout` : 'No matching layout'
-
       setStatusText('')
       setResult(
         <>
@@ -472,7 +478,7 @@ export default function DebugPage() {
           </div>
           <div className="space-y-3">
             <PartitionTable partitions={partitions} title="On-device partition table" highlight />
-            <PartitionTable partitions={expectedTable} title={expectedTableLabel} />
+            {meta ? <PartitionTable partitions={meta.table} title={`${meta.name} layout`} /> : null}
           </div>
         </>
       )
@@ -499,7 +505,7 @@ export default function DebugPage() {
       return
     }
     setBusy(true)
-    const flasher = new CrossPointFlasher(port, flasherOpts)
+    const flasher = new CrossPointFlasher(port)
     try {
       const data = await flasher.saveFullFlash({ onProgress: setProgress })
       downloadBlob(data, 'flash.bin')
@@ -530,7 +536,10 @@ export default function DebugPage() {
       return
     }
     setBusy(true)
-    const flasher = new CrossPointFlasher(port, flasherOpts)
+    const flasher = new CrossPointFlasher(port, {
+      expectedChip: restoreDevice.chip,
+      deviceName: restoreDevice.name,
+    })
     try {
       setStatusText('Reading file...')
       const data = new Uint8Array(await file.arrayBuffer())
@@ -549,10 +558,10 @@ export default function DebugPage() {
   // -- Repair boot region ------------------------------------------------------
 
   async function repairBootRegion() {
-    const layoutKey = repairLayoutRef.current.value
-    const table = device.layouts.find((l) => l.value === layoutKey)?.table
+    const layoutKey = repairDevice.layouts.length === 1 ? defaultRepairLayout.value : repairLayoutRef.current?.value
+    const table = repairDevice.layouts.find((l) => l.value === layoutKey)?.table
     if (!table) {
-      setStatusText(`Unknown layout ${layoutKey} for the ${device.name}.`, true)
+      setStatusText(`Unknown layout ${layoutKey} for the ${repairDevice.name}.`, true)
       return
     }
     const bootloaderFile = repairBootloaderRef.current?.files[0]
@@ -567,7 +576,10 @@ export default function DebugPage() {
       return
     }
     setBusy(true)
-    const flasher = new CrossPointFlasher(port, flasherOpts)
+    const flasher = new CrossPointFlasher(port, {
+      expectedChip: repairDevice.chip,
+      deviceName: repairDevice.name,
+    })
     try {
       let bootloaderData
       if (bootloaderFile) {
@@ -576,14 +588,15 @@ export default function DebugPage() {
       } else {
         setStatusText('Downloading bundled bootloader...')
         bootloaderData =
-          deviceId === 'x4pro'
+          repairDeviceId === 'x4pro'
             ? await fetchFlashAsset('/firmware/x4pro-bootloader.bin', 'X4 Pro bootloader')
             : await fetchBundledBootloader()
       }
       let firmwareData = null
       if (repairFlashOsRef.current?.checked) {
-        setStatusText(deviceId === 'x4pro' ? 'Downloading X4 Pro build...' : 'Downloading CrossPoint firmware...')
-        firmwareData = deviceId === 'x4pro' ? await fetchDeviceBuildFirmware('x4pro') : await fetchReleaseFirmware()
+        setStatusText(repairDeviceId === 'x4pro' ? 'Downloading X4 Pro build...' : 'Downloading CrossPoint firmware...')
+        firmwareData =
+          repairDeviceId === 'x4pro' ? await fetchDeviceBuildFirmware('x4pro') : await fetchReleaseFirmware()
       }
       const { partitions } = await flasher.repairBootRegion(table, {
         bootloaderData,
@@ -599,7 +612,18 @@ export default function DebugPage() {
           ? 'Boot region repaired and CrossPoint flashed. The device should now boot into CrossPoint.'
           : 'Boot region repaired. Flash firmware from the flash page to finish recovery.'
       )
-      setResult(<PartitionTable partitions={partitions} title="On-device partition table after repair" highlight />)
+      setResult(
+        <div className="space-y-3">
+          <PartitionTable partitions={partitions} title="On-device partition table after repair" highlight />
+          {repairForStock ? (
+            <div className="flex justify-end">
+              <a href="/#flash-tools" className={btnOutline}>
+                Return to firmware flasher
+              </a>
+            </div>
+          ) : null}
+        </div>
+      )
     } catch (err) {
       setStatusText(err.message || err, true)
     } finally {
@@ -669,7 +693,7 @@ export default function DebugPage() {
       return
     }
     setBusy(true)
-    const flasher = new CrossPointFlasher(port, flasherOpts)
+    const flasher = new CrossPointFlasher(port)
     try {
       const data = await flasher.swapBootPartition({ onProgress: setProgress, skipReset: false })
       lastDownloadRef.current = data.data
@@ -774,165 +798,255 @@ export default function DebugPage() {
           Low-level tools for inspecting Xteink devices.
         </p>
 
-        <div className="mt-8 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 ring-1 ring-stone-950/5">
-          <label htmlFor="debug-device" className="text-sm font-semibold text-stone-900">
-            Device
-          </label>
-          <select
-            id="debug-device"
-            value={deviceId}
-            onChange={(e) => setDeviceId(e.target.value)}
-            disabled={busy}
-            className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
-          >
-            {Object.entries(DEBUG_DEVICES).map(([id, d]) => (
-              <option key={id} value={id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-          <span className="text-sm text-stone-500">
-            The connected chip is checked against this selection ({device.chip}) before anything is written.
-          </span>
-        </div>
-
-        <div className="mt-6 space-y-4">
-          <ToolCard title="Download firmware">
-            <p className="mt-1 text-sm text-stone-600">
-              Download a firmware <Mono>.bin</Mono> for your device (stable, insider, beta, or stock) to flash
-              manually or copy to an SD card.
-            </p>
-            <div className="mt-4 flex justify-end">
-              <button type="button" onClick={() => setDownloadOpen(true)} className={btnPrimary}>
-                Download firmware
-              </button>
+        <div className="mt-10 space-y-12">
+          <section aria-labelledby="inspect-tools-heading">
+            <div className="mb-4">
+              <h2 id="inspect-tools-heading" className="font-display text-xl font-semibold tracking-tight text-stone-900">
+                Inspect and back up
+              </h2>
+              <p className="mt-1 max-w-[68ch] text-base text-stone-600 sm:text-sm">
+                These tools read the connected device or download files. They do not require a device selection.
+              </p>
             </div>
-          </ToolCard>
+            <div className="space-y-4">
+              <ToolCard title="Download firmware">
+                <p className="mt-1 text-base text-stone-600 sm:text-sm">
+                  Download a firmware <Mono>.bin</Mono> for your device (stable, insider, beta, or stock) to flash
+                  manually or copy to an SD card.
+                </p>
+                <div className="mt-4 flex justify-end">
+                  <button type="button" onClick={() => setDownloadOpen(true)} className={btnOutline}>
+                    Download firmware
+                  </button>
+                </div>
+              </ToolCard>
 
-          <ToolCard title="Read partition table">
-            <p className="mt-1 text-sm text-stone-600">
-              Connects to a device, reads the partition table at <Mono>0x8000</Mono>, and compares it against the
-              known X3 and X4 layouts.
-            </p>
-            <div className="mt-4 flex justify-end">
-              <button type="button" onClick={readPartitionTable} disabled={busy} className={btnPrimary}>
-                Connect &amp; read
-              </button>
+              <ToolCard title="Read partition table">
+                <p className="mt-1 text-base text-stone-600 sm:text-sm">
+                  Reads the table at <Mono>0x8000</Mono> and automatically identifies known X3, X4, X4 Pro, and KO
+                  layouts.
+                </p>
+                <div className="mt-4 flex justify-end">
+                  <button type="button" onClick={readPartitionTable} disabled={busy} className={btnPrimary}>
+                    Connect &amp; read
+                  </button>
+                </div>
+              </ToolCard>
+
+              <ToolCard title="Back up full flash">
+                <p className="mt-1 text-base text-stone-600 sm:text-sm">
+                  Saves the complete 16 MB flash image as <Mono>flash.bin</Mono>. This can take around 25 minutes.
+                </p>
+                <div className="mt-4 flex justify-end">
+                  <button type="button" onClick={saveFullFlash} disabled={busy} className={btnOutline}>
+                    Save full flash
+                  </button>
+                </div>
+              </ToolCard>
+
+              <ToolCard title="Inspect app partitions">
+                <p className="mt-1 text-base text-stone-600 sm:text-sm">
+                  Uses the on-device partition table to locate otadata and both application slots.
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <button type="button" onClick={readOtadata} disabled={busy} className={btnOutline}>
+                    Read otadata partition
+                  </button>
+                  <button type="button" onClick={() => readAppPartition('app0')} disabled={busy} className={btnOutline}>
+                    Read app0 partition
+                  </button>
+                  <button type="button" onClick={() => readAppPartition('app1')} disabled={busy} className={btnOutline}>
+                    Read app1 partition
+                  </button>
+                  <button type="button" onClick={identifyFirmware} disabled={busy} className={btnOutline}>
+                    Identify installed firmware
+                  </button>
+                </div>
+              </ToolCard>
+
+              <SerialMonitorCard />
             </div>
-          </ToolCard>
+          </section>
 
-          <ToolCard title="Repair boot region">
-            <p className="mt-1 text-sm text-stone-600">
-              Restores the bootloader at <Mono>0x0</Mono>, rewrites a known-good partition table at{' '}
-              <Mono>0x8000</Mono>, preserves NVS by default, and resets the OTA selector. Use this when the partition
-              table has been overwritten (e.g. firmware flashed to <Mono>0x0</Mono> by mistake) and flashing fails with{' '}
-              <span className="font-mono text-[13px]">"Partition table has no otadata partition"</span>.
-            </p>
-            <p className="mt-2 text-sm text-amber-600">
-              This erases saved settings and Wi-Fi credentials. Firmware must be re-flashed afterwards from the flash
-              page.
-            </p>
+          <section id="repair" aria-labelledby="repair-tools-heading" className="scroll-mt-20">
+            <div className="mb-4">
+              <h2 id="repair-tools-heading" className="font-display text-xl font-semibold tracking-tight text-stone-900">
+                Repair a device
+              </h2>
+              <p className="mt-1 max-w-[68ch] text-base text-stone-600 sm:text-sm">
+                Choose the hardware here because repair writes a device-specific bootloader and partition layout.
+              </p>
+            </div>
+            <ToolCard title="Repair partition layout and boot region">
+              <p className="mt-1 text-base text-stone-600 sm:text-sm">
+                Use this when flashing reports a missing OTA partition or says stock firmware will not fit in an app
+                slot. The repair preserves NVS by default, rewrites the boot region, and resets the OTA selector.
+              </p>
+              {repairForStock ? (
+                <p className="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-base text-amber-800 sm:text-sm">
+                  Stock firmware did not fit the current app slot. Repair the layout, then return to the firmware
+                  flasher and retry the stock installation.
+                </p>
+              ) : null}
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <select
-                key={deviceId}
-                ref={repairLayoutRef}
-                defaultValue={device.layouts[0].value}
-                className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700"
-              >
-                {device.layouts.map((l) => (
-                  <option key={l.value} value={l.value}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-              <div className="flex gap-2">
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="repair-device" className="block text-sm font-semibold text-stone-900">
+                    Device to repair
+                  </label>
+                  <select
+                    id="repair-device"
+                    name="repair-device"
+                    value={repairDeviceId}
+                    onChange={(e) => setRepairDeviceId(e.target.value)}
+                    disabled={busy}
+                    className="mt-2 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
+                  >
+                    {Object.entries(DEBUG_DEVICES).map(([id, item]) => (
+                      <option key={id} value={id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <span className="block text-sm font-semibold text-stone-900">Partition layout</span>
+                  {repairDevice.layouts.length === 1 ? (
+                    <div className="mt-2 rounded-md bg-stone-50 px-3 py-2 text-sm text-stone-700 ring-1 ring-stone-200">
+                      {defaultRepairLayout.label}
+                    </div>
+                  ) : (
+                    <select
+                      key={repairDeviceId}
+                      ref={repairLayoutRef}
+                      name="repair-layout"
+                      aria-label="Partition layout"
+                      defaultValue={defaultRepairLayout.value}
+                      disabled={busy}
+                      className="mt-2 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
+                    >
+                      {repairDevice.layouts.map((layout) => (
+                        <option key={layout.value} value={layout.value}>
+                          {layout.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <label htmlFor="repair-bootloader" className="block text-sm font-semibold text-stone-900">
+                  Custom bootloader <span className="font-normal text-stone-400">(optional)</span>
+                </label>
                 <input
+                  id="repair-bootloader"
+                  name="repair-bootloader"
                   ref={repairBootloaderRef}
                   type="file"
                   accept=".bin,application/octet-stream"
-                  className={inputClass}
+                  className={`${inputClass} mt-2 w-full`}
                 />
-                <button type="button" onClick={repairBootRegion} disabled={busy} className={btnDark}>
-                  Repair
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <label className="flex items-start gap-2 text-base text-stone-600 sm:text-sm">
+                  <input
+                    ref={repairFlashOsRef}
+                    name="repair-flash-crosspoint"
+                    type="checkbox"
+                    defaultChecked={!repairForStock}
+                    className="mt-0.5 size-4 rounded border-stone-300 accent-brand-500"
+                  />
+                  <span>
+                    {repairDeviceId === 'x4pro'
+                      ? 'Flash the current X4 Pro build after repair'
+                      : 'Flash the latest stable CrossPoint firmware after repair'}
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-base text-stone-600 sm:text-sm">
+                  <input
+                    ref={repairPreserveNvsRef}
+                    name="repair-preserve-nvs"
+                    type="checkbox"
+                    defaultChecked
+                    className="mt-0.5 size-4 rounded border-stone-300 accent-brand-500"
+                  />
+                  <span>
+                    Preserve device settings (NVS)
+                    <span className="mt-0.5 block text-xs text-stone-400">
+                      Uncheck only if NVS is corrupt and you intentionally want to erase device settings.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div className="mt-5 flex flex-col gap-3 border-t border-stone-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-stone-400">
+                  The connected chip must match {repairDevice.name} ({repairDevice.chip}) before anything is written.
+                </p>
+                <button type="button" onClick={repairBootRegion} disabled={busy} className={`${btnDark} shrink-0`}>
+                  Repair {repairDevice.name}
                 </button>
               </div>
-            </div>
-            <label className="mt-4 flex items-center gap-2 text-sm text-stone-600">
-              <input
-                ref={repairFlashOsRef}
-                type="checkbox"
-                defaultChecked
-                className="size-4 rounded border-stone-300 accent-brand-500"
-              />
-              {deviceId === 'x4pro'
-                ? 'Also flash the current X4 Pro build, so the device boots straight into CrossPoint'
-                : 'Also flash the latest stable CrossPoint firmware, so the device boots straight into CrossPoint'}
-            </label>
-            <label className="mt-3 flex items-center gap-2 text-sm text-stone-600">
-              <input
-                ref={repairPreserveNvsRef}
-                type="checkbox"
-                defaultChecked
-                className="size-4 rounded border-stone-300 accent-brand-500"
-              />
-              Preserve device settings (NVS)
-            </label>
-            <p className="mt-1 text-xs text-stone-400">
-              Uncheck only when NVS itself is corrupt and you intentionally want to erase device settings.
-            </p>
-            <p className="mt-3 text-xs text-stone-400">
-              The bundled {device.chip} bootloader is used by default; supply a <Mono>bootloader.bin</Mono> above to
-              override it. Uncheck the firmware option if you plan to flash stock or a beta build instead.
-            </p>
-          </ToolCard>
+            </ToolCard>
+          </section>
 
-          <ToolCard title="Full flash controls">
-            <p className="mt-1 text-sm text-stone-600">
-              Save or restore the complete 16 MB flash image. Save full flash can take around 25 minutes.
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <button type="button" onClick={saveFullFlash} disabled={busy} className={btnPrimary}>
-                Save full flash
-              </button>
-              <div className="flex gap-2">
-                <input ref={fullFlashFileRef} type="file" accept=".bin,application/octet-stream" className={inputClass} />
-                <button type="button" onClick={writeFullFlash} disabled={busy} className={btnDark}>
-                  Write full flash
-                </button>
-              </div>
+          <section aria-labelledby="advanced-tools-heading">
+            <div className="mb-4">
+              <h2 id="advanced-tools-heading" className="font-display text-xl font-semibold tracking-tight text-stone-900">
+                Advanced writes
+              </h2>
+              <p className="mt-1 max-w-[68ch] text-base text-stone-600 sm:text-sm">
+                These operations modify existing flash data. Use a backup first when possible.
+              </p>
             </div>
-          </ToolCard>
+            <div className="space-y-4">
+              <ToolCard title="Restore full flash">
+                <p className="mt-1 text-base text-stone-600 sm:text-sm">
+                  Writes a complete 16 MB flash image. Select the target so the connected chip can be checked first.
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,0.65fr)_minmax(0,1.35fr)_auto]">
+                  <select
+                    name="restore-device"
+                    aria-label="Target device for full flash restore"
+                    value={restoreDeviceId}
+                    onChange={(e) => setRestoreDeviceId(e.target.value)}
+                    disabled={busy}
+                    className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
+                  >
+                    {Object.entries(DEBUG_DEVICES).map(([id, item]) => (
+                      <option key={id} value={id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    ref={fullFlashFileRef}
+                    name="full-flash-image"
+                    aria-label="Full flash image"
+                    type="file"
+                    accept=".bin,application/octet-stream"
+                    className={inputClass}
+                  />
+                  <button type="button" onClick={writeFullFlash} disabled={busy} className={btnDark}>
+                    Write full flash
+                  </button>
+                </div>
+              </ToolCard>
 
-          <ToolCard title="Partition debug controls">
-            <p className="mt-1 text-sm text-stone-600">
-              These reads use the on-device partition table for otadata and app slot offsets.
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <button type="button" onClick={readOtadata} disabled={busy} className={btnPrimary}>
-                Read otadata partition
-              </button>
-              <button type="button" onClick={swapBootPartition} disabled={busy} className={btnDark}>
-                Swap boot partitions
-              </button>
-              <button type="button" onClick={() => readAppPartition('app0')} disabled={busy} className={btnPrimary}>
-                Read app0 partition
-              </button>
-              <button type="button" onClick={() => readAppPartition('app1')} disabled={busy} className={btnPrimary}>
-                Read app1 partition
-              </button>
-              <button
-                type="button"
-                onClick={identifyFirmware}
-                disabled={busy}
-                className={`${btnPrimary} sm:col-span-2`}
-              >
-                Identify firmware in both partitions
-              </button>
+              <ToolCard title="Swap boot partition">
+                <p className="mt-1 text-base text-stone-600 sm:text-sm">
+                  Changes the OTA selector to boot the other app slot. The slot locations are read from the device.
+                </p>
+                <div className="mt-4 flex justify-end">
+                  <button type="button" onClick={swapBootPartition} disabled={busy} className={btnDark}>
+                    Swap boot partitions
+                  </button>
+                </div>
+              </ToolCard>
             </div>
-          </ToolCard>
-
-          <SerialMonitorCard />
+          </section>
 
           <ToolCard title="Output">
             {status.text ? (

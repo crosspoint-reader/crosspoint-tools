@@ -150,6 +150,10 @@ const MODEL_CHIPS = {
   lilygo: 'ESP32-S3',
 }
 
+// The debug repair flow has known bootloader and partition layouts for these
+// devices. A stock image that does not fit can be recovered there safely.
+const DEBUG_REPAIR_MODELS = new Set(['x3', 'x4', 'x4pro'])
+
 // Non-Xteink devices flash a single admin-uploaded build instead of the
 // release/nightly/stock catalog, and always through the full boot-region
 // install (bootloader + partition table + otadata + firmware): their stock
@@ -566,7 +570,20 @@ export default function FlashTools() {
         },
       }))
     } catch (err) {
-      setProgress((p) => ({ ...p, status: { kind: 'err', text: err.message } }))
+      const stockPartitionMismatch =
+        (action === 'stock-en' || action === 'stock-ch') &&
+        /^Firmware too large: .* won't fit in app\d+ \(\d+ bytes\)\.$/.test(err.message || '') &&
+        DEBUG_REPAIR_MODELS.has(model)
+      setProgress((p) => ({
+        ...p,
+        status: {
+          kind: 'err',
+          text: err.message,
+          repairUrl: stockPartitionMismatch
+            ? `/debug?device=${encodeURIComponent(model)}&after=stock#repair`
+            : null,
+        },
+      }))
     }
 
     setRunning(false)
@@ -1080,7 +1097,17 @@ export default function FlashTools() {
                     <div className="rounded-lg bg-brand-50 px-4 py-3 text-sm/6 text-brand-700">{progress.status.text}</div>
                   )}
                   {progress.status.kind === 'err' && (
-                    <div className="rounded-lg bg-red-50 px-4 py-3 text-sm/6 text-red-800">{progress.status.text}</div>
+                    <div className="rounded-lg bg-red-50 px-4 py-3 text-sm/6 text-red-800">
+                      <p>{progress.status.text}</p>
+                      {progress.status.repairUrl ? (
+                        <a
+                          href={progress.status.repairUrl}
+                          className="mt-3 inline-flex items-center justify-center rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                        >
+                          Open repair tool
+                        </a>
+                      ) : null}
+                    </div>
                   )}
                 </div>
               )}
