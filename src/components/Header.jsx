@@ -23,7 +23,7 @@ const NAV = [
     ],
   },
   { name: 'Get In Touch', short: 'Contact', href: '/contact', route: true },
-  { name: 'Unlock My Device', short: 'Unlock', href: '/unlock', route: true },
+  { name: 'CrossPoint Sync', short: 'Sync', href: 'https://sync.crosspoint.com' },
 ]
 
 const FUND_URL = 'https://app.royalty.dev/crosspoint-reader/crosspoint-reader'

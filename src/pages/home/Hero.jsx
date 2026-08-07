@@ -63,6 +63,12 @@ function GetCrossPointMenu() {
             </svg>
             Flash Firmware
           </a>
+          <Link role="menuitem" to="/unlock" className={itemCls} onClick={() => setOpen(false)}>
+            <svg className="size-4 shrink-0 text-stone-400" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a1.5 1.5 0 0 0 1.5-1.5v-6.75a1.5 1.5 0 0 0-1.5-1.5H3.75a1.5 1.5 0 0 0-1.5 1.5v6.75a1.5 1.5 0 0 0 1.5 1.5Z" />
+            </svg>
+            Unlock My Device
+          </Link>
           <a
             role="menuitem"
             href="https://github.com/crosspoint-reader/crosspoint-reader"
