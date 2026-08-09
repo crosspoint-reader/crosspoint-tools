@@ -51,7 +51,12 @@ function NavDropdown({ item }) {
   }, [open])
 
   return (
-    <div ref={ref} className="relative">
+    <div
+      ref={ref}
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -71,17 +76,19 @@ function NavDropdown({ item }) {
         </svg>
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-44 rounded-xl bg-white p-1.5 shadow-lg ring-1 ring-stone-950/5">
-          {item.items.map((sub) => (
-            <Link
-              key={sub.name}
-              to={sub.href}
-              onClick={() => setOpen(false)}
-              className="block rounded-lg px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 hover:text-stone-900"
-            >
-              {sub.name}
-            </Link>
-          ))}
+        <div className="absolute top-full left-0 pt-2 w-44">
+          <div className="rounded-xl bg-white p-1.5 shadow-lg ring-1 ring-stone-950/5">
+            {item.items.map((sub) => (
+              <Link
+                key={sub.name}
+                to={sub.href}
+                onClick={() => setOpen(false)}
+                className="block rounded-lg px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 hover:text-stone-900"
+              >
+                {sub.name}
+              </Link>
+            ))}
+          </div>
         </div>
       )}
     </div>

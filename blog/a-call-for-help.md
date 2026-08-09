@@ -3,6 +3,7 @@ title: A call for help
 summary: We need help reviewing PRs
 author: Uri Tauber
 github: Uri-Tauber
+date: 2026-07-26T01:00:57+03:00
 ---
 
 Eight months in, Crosspoint is one of the most popular ESP32 projects around, and a lot of the code in it came from you. Bug annoys someone, PR appears. Someone wants a feature, writes it. Someone reads a function they didn't write, decides it's slower than it needs to be, and opens PR. It feels like the early days of the Linux kernel, and I'm privileged to be part of it.

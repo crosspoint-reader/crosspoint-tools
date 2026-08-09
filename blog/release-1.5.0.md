@@ -3,6 +3,7 @@ title: CrossPoint 1.5.0
 summary: The new release is finally out
 author: Uri Tauber
 github: Uri-Tauber
+date: 2026-08-07T10:58:11+03:00
 ---
 
 This was the longest gap we've ever had between releases. Sorry for the wait — hopefully it was worth it. This one adds our first non-ESP32-C3 device, cuts big-book load times from minutes to seconds, brings offline dictionaries, and finishes the right-to-left work we started in 1.4.0.

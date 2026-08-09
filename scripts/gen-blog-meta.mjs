@@ -34,17 +34,17 @@ const blogDir = join(rootDir, 'blog')
 const metaOut = join(rootDir, 'src/pages/blog/meta.generated.json')
 const rssOut = join(rootDir, 'public/blog/rss.xml')
 
-// Publish date from the commit that first added `relPath` (ISO). --diff-filter=A
-// limits to the add; --follow tracks renames. Returns null for uncommitted files
-// (local preview) or when git is unavailable.
+// Publish date from the commit that first added `relPath` (ISO). `--follow`
+// tracks renames. Returns null for uncommitted files (local preview) or when git
+// is unavailable or shallow cloned.
 function gitAddDate(relPath) {
   try {
     const out = execSync(
-      `git log --diff-filter=A --follow --format=%aI -- "${relPath}"`,
+      `git log --follow --format=%aI -- "${relPath}"`,
       { cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
     ).trim()
     if (!out) return null
-    // Oldest (the add) is the last line if the file was ever re-added.
+    // Oldest (the creation commit) is the last line.
     return out.split(/\r?\n/).filter(Boolean).pop() || null
   } catch {
     return null

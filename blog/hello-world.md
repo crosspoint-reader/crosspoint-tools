@@ -3,6 +3,7 @@ title: CrossPoint Reader now has a blog
 summary: We're starting a blog to share important project updates — new device support, firmware milestones, and community news.
 author: Uri Tauber
 github: Uri-Tauber
+date: 2026-07-24T15:36:53+03:00
 ---
 
 Welcome to the CrossPoint Reader blog! This is where we'll post **important
