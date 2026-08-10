@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
-import { fetchReleaseVisibility, fetchBetaBuilds } from '../lib/flasher.js'
+import { fetchReleaseVisibility, fetchBetaBuilds, fetchDeviceBuildInfo, fetchStockFirmwareInfo } from '../lib/flasher.js'
 
 // Maps catalog channels to the release-visibility keys the admin panel uses.
 // Only the "real" stable release maps to `crosspoint`; recovery entries
@@ -12,6 +12,7 @@ const CHANNEL_VISIBILITY_KEY = { insider: 'nightly', 'stock-en': 'stock-en', 'st
 const MODELS = [
   { id: 'x4', name: 'Xteink X4', res: '480 × 800' },
   { id: 'x3', name: 'Xteink X3', res: '528 × 792' },
+  { id: 'x4pro', name: 'Xteink X4 Pro', res: '480 × 800' },
 ]
 
 const CHANNEL_ORDER = { stable: 0, insider: 1, beta: 2, 'stock-en': 3, 'stock-ch': 4 }
@@ -52,6 +53,9 @@ export default function DownloadModal({ open, onClose }) {
   // never blanks the list.
   const [visibility, setVisibility] = useState({ hidden: {} })
   const [betaHidden, setBetaHidden] = useState({})
+  // X4 Pro list: admin-uploaded beta build + pinned stock English build,
+  // mirroring the homepage flasher (the X4 Pro is not in /api/catalog).
+  const [x4proReleases, setX4proReleases] = useState(null)
   const [loadError, setLoadError] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const [status, setStatus] = useState({ text: '', error: false })
@@ -105,9 +109,51 @@ export default function DownloadModal({ open, onClose }) {
     }
   }, [open])
 
+  useEffect(() => {
+    if (!open || model !== 'x4pro' || x4proReleases) return
+    let cancelled = false
+    Promise.all([
+      fetchDeviceBuildInfo('x4pro').catch(() => null),
+      fetchStockFirmwareInfo('x4pro', 'en').catch(() => null),
+    ]).then(([build, stockInfo]) => {
+      if (cancelled) return
+      const list = []
+      if (build) {
+        list.push({
+          id: 'x4pro-beta',
+          name: build.name || 'X4 Pro Beta',
+          channel: 'beta',
+          version: '',
+          released_at: build.uploadedAt || '',
+          size: build.firmwareSize || 0,
+          firmware_url: '/api/device-build/x4pro/firmware',
+          filename: 'x4pro-firmware.bin',
+          supported_devices: ['x4pro'],
+        })
+      }
+      // Pinned stock build; English only — the X4 Pro has no Chinese variant.
+      list.push({
+        id: 'x4pro-stock-en',
+        name: 'Stock English Firmware',
+        channel: 'stock-en',
+        version: stockInfo?.version || '',
+        released_at: '',
+        size: 0,
+        firmware_url: '/api/firmware/stock?model=x4pro&lang=en',
+        filename: 'x4pro-stock-en.bin',
+        supported_devices: ['x4pro'],
+      })
+      setX4proReleases(list)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open, model, x4proReleases])
+
   // Order: stable, insider, betas, stock (newest first). Options hidden for the
   // selected device (via the admin panel) are filtered out first.
   const releases = useMemo(() => {
+    if (model === 'x4pro') return x4proReleases || []
     if (!model || !catalog) return []
     const hidden = visibility.hidden || {}
     const isHidden = (key) => (hidden[key] || []).includes(model)
@@ -128,7 +174,7 @@ export default function DownloadModal({ open, onClose }) {
       if (ca !== cb) return ca - cb
       return (b.released_at || '').localeCompare(a.released_at || '')
     })
-  }, [model, catalog, visibility, betaHidden])
+  }, [model, catalog, visibility, betaHidden, x4proReleases])
 
   // Default to the latest stable release (falling back to the top of the list,
   // e.g. for X3 which has no stable build) so SD flashing is one click away.
@@ -139,6 +185,9 @@ export default function DownloadModal({ open, onClose }) {
   }, [releases, selectedId])
 
   const selected = releases.find((r) => r.id === selectedId) || null
+  // X4 Pro images are raw app images flashed over USB, not SD-card update.bin
+  // payloads, so they keep a descriptive filename.
+  const downloadName = selected?.filename || 'update.bin'
 
   async function downloadSelected() {
     if (!selected || downloading) return
@@ -152,12 +201,12 @@ export default function DownloadModal({ open, onClose }) {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'update.bin'
+      a.download = downloadName
       document.body.appendChild(a)
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
-      setStatus({ text: 'Saved as update.bin', error: false })
+      setStatus({ text: `Saved as ${downloadName}`, error: false })
     } catch (err) {
       console.error(err)
       setStatus({ text: `Error: ${err.message}`, error: true })
@@ -170,12 +219,19 @@ export default function DownloadModal({ open, onClose }) {
     <Modal open={open} onClose={onClose} title="Download firmware">
       <div className="space-y-6">
         <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
-          <p>
-            To install via SD card, save the file as{' '}
-            <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px]">update.bin</code>{' '}
-            in the root of your SD card, then insert it into your device and follow the on-screen
-            prompts to flash.
-          </p>
+          {model === 'x4pro' ? (
+            <p>
+              X4 Pro firmware downloads are raw app images meant for USB flashing (for example from
+              the flash tool on the home page). They cannot be installed from an SD card.
+            </p>
+          ) : (
+            <p>
+              To install via SD card, save the file as{' '}
+              <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px]">update.bin</code>{' '}
+              in the root of your SD card, then insert it into your device and follow the on-screen
+              prompts to flash.
+            </p>
+          )}
         </div>
 
         <div>
@@ -203,9 +259,9 @@ export default function DownloadModal({ open, onClose }) {
           <div>
             <div className="text-sm font-semibold text-stone-900">Choose firmware</div>
             <div className="mt-3 space-y-2">
-              {!catalog ? (
+              {(model === 'x4pro' ? !x4proReleases : !catalog) ? (
                 <p className="text-sm text-stone-400">Loading...</p>
-              ) : loadError ? (
+              ) : model !== 'x4pro' && loadError ? (
                 <p className="text-sm text-red-600">Failed to load firmware list: {loadError}</p>
               ) : releases.length === 0 ? (
                 <p className="text-sm text-stone-400">No firmware available right now.</p>
@@ -256,8 +312,10 @@ export default function DownloadModal({ open, onClose }) {
             </button>
             <p className="mt-2 text-xs text-stone-400">
               Saves as{' '}
-              <code className="rounded bg-stone-100 px-1 py-0.5 font-mono text-[11px] text-stone-600">update.bin</code>,
-              ready to drop on your SD card root.
+              <code className="rounded bg-stone-100 px-1 py-0.5 font-mono text-[11px] text-stone-600">
+                {downloadName}
+              </code>
+              {model === 'x4pro' ? ', ready to flash over USB.' : ', ready to drop on your SD card root.'}
             </p>
             {status.text && (
               <p className={`mt-1 text-xs ${status.error ? 'text-red-600' : 'text-stone-400'}`}>{status.text}</p>
