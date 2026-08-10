@@ -185,8 +185,10 @@ export default function DownloadModal({ open, onClose }) {
   }, [releases, selectedId])
 
   const selected = releases.find((r) => r.id === selectedId) || null
-  // X4 Pro images are raw app images flashed over USB, not SD-card update.bin
-  // payloads, so they keep a descriptive filename.
+  // Stock firmware SD flashing requires the update.bin name; CrossPoint's SD
+  // Firmware Flash feature accepts any filename. X4/X3 downloads use update.bin
+  // so they work either way; X4 Pro downloads (CrossPoint- or USB-only) keep
+  // descriptive filenames.
   const downloadName = selected?.filename || 'update.bin'
 
   async function downloadSelected() {
@@ -221,8 +223,9 @@ export default function DownloadModal({ open, onClose }) {
         <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
           {model === 'x4pro' ? (
             <p>
-              X4 Pro firmware downloads are raw app images meant for USB flashing (for example from
-              the flash tool on the home page). They cannot be installed from an SD card.
+              On the X4 Pro, devices already running CrossPoint can flash these <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px]">.bin</code>{' '}
+              files from the SD card. Stock firmware cannot install them from SD — use the USB flash
+              tool on the home page instead.
             </p>
           ) : (
             <p>
@@ -315,7 +318,9 @@ export default function DownloadModal({ open, onClose }) {
               <code className="rounded bg-stone-100 px-1 py-0.5 font-mono text-[11px] text-stone-600">
                 {downloadName}
               </code>
-              {model === 'x4pro' ? ', ready to flash over USB.' : ', ready to drop on your SD card root.'}
+              {model === 'x4pro'
+                ? ', ready to flash from CrossPoint via SD or over USB.'
+                : ', ready to drop on your SD card root.'}
             </p>
             {status.text && (
               <p className={`mt-1 text-xs ${status.error ? 'text-red-600' : 'text-stone-400'}`}>{status.text}</p>
