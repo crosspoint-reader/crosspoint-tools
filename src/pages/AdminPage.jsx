@@ -118,6 +118,20 @@ function DeviceVisibilityToggles({ hiddenDevices, onChange }) {
   )
 }
 
+function NotifyToggle({ checked, onChange }) {
+  return (
+    <label className="flex items-center gap-1.5 text-sm text-stone-700">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="size-4 rounded border-stone-300 text-brand-500 focus:ring-brand-500/20"
+      />
+      Notify status page subscribers
+    </label>
+  )
+}
+
 // Compact label describing where an item is visible, or null when it's shown
 // everywhere (the default, so no badge is needed).
 function visibilityLabel(hiddenDevices) {
@@ -808,6 +822,7 @@ function BetaCard({ secret, log }) {
   const [releaseTag, setReleaseTag] = useState('')
   const [releaseRepo, setReleaseRepo] = useState('')
   const [hiddenDevices, setHiddenDevices] = useState([])
+  const [notify, setNotify] = useState(true)
   const [busy, setBusy] = useState(false)
   const [savingId, setSavingId] = useState(null)
   const [builds, setBuilds] = useState([])
@@ -856,6 +871,7 @@ function BetaCard({ secret, log }) {
       formData.append('version', trimmedVersion)
       formData.append('notes', notes.trim())
       formData.append('hiddenDevices', JSON.stringify(hiddenDevices))
+      formData.append('notify', String(notify))
       if (isRelease) {
         formData.append('releaseTag', tag)
         if (repo) formData.append('releaseRepo', repo)
@@ -932,6 +948,7 @@ function BetaCard({ secret, log }) {
           tag: '',
           repo: '',
           hiddenDevices: b.hiddenDevices || [],
+          notify: true,
         }
       }
       return next
@@ -957,6 +974,7 @@ function BetaCard({ secret, log }) {
     formData.append('version', editVersion)
     formData.append('notes', editNotes)
     formData.append('hiddenDevices', JSON.stringify(edit.hiddenDevices || []))
+    formData.append('notify', String(edit.notify !== false))
     if (edit.replacementMode === 'upload' && edit.firmware) {
       formData.append('firmware', edit.firmware)
     } else if (edit.replacementMode === 'release' && tag) {
@@ -1116,8 +1134,9 @@ function BetaCard({ secret, log }) {
           </div>
         )}
 
-        <div className="pt-1">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-1">
           <DeviceVisibilityToggles hiddenDevices={hiddenDevices} onChange={setHiddenDevices} />
+          <NotifyToggle checked={notify} onChange={setNotify} />
         </div>
       </div>
 
@@ -1276,6 +1295,10 @@ function BetaCard({ secret, log }) {
                       hiddenDevices={edit.hiddenDevices}
                       onChange={(next) => setEditField(b.id, 'hiddenDevices', next)}
                     />
+                    <NotifyToggle
+                      checked={edit.notify !== false}
+                      onChange={(next) => setEditField(b.id, 'notify', next)}
+                    />
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -1410,6 +1433,7 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
   const [name, setName] = useState('')
   const [notes, setNotes] = useState('')
   const [file, setFile] = useState(null)
+  const [notify, setNotify] = useState(true)
   const [busy, setBusy] = useState(false)
   const [build, setBuild] = useState(null)
   const [edit, setEdit] = useState(null) // { name, notes } when panel open
@@ -1439,6 +1463,7 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
       const formData = new FormData()
       formData.append('name', trimmedName)
       formData.append('notes', notes.trim())
+      formData.append('notify', String(notify))
       formData.append('firmware', file)
 
       const res = await fetch(uploadUrl, {
@@ -1562,6 +1587,7 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
             {busy ? 'Uploading...' : 'Upload'}
           </Button>
         </div>
+        <NotifyToggle checked={notify} onChange={setNotify} />
       </div>
 
       {build ? (

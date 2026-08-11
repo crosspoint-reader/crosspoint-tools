@@ -3326,8 +3326,10 @@ async function handleBetaCreate(
   const list = await getBetaList(env);
   list.unshift(build);
   await saveBetaList(env, list);
-  const notification: BetaNotification = { kind: 'created', build };
-  await queueBetaNotification(env, notification);
+  const notification: BetaNotification | undefined = notifyRequested(formData.get('notify'))
+    ? { kind: 'created', build }
+    : undefined;
+  if (notification) await queueBetaNotification(env, notification);
   scheduleBetaStatusReconcile(ctx, env, list, notification);
 
   return json({ build }, 201, headers);
@@ -3341,7 +3343,14 @@ type BetaUpdateInput = {
   releaseRepo?: unknown;
   hiddenDevices?: unknown;
   firmware?: File;
+  notify?: unknown;
 };
+
+// Admin forms can opt out of the Instatus subscriber notification; anything
+// that omits the flag (CI upload scripts) keeps notifying.
+function notifyRequested(value: unknown): boolean {
+  return value !== false && value !== 'false';
+}
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -3361,6 +3370,7 @@ async function parseBetaUpdateInput(request: Request): Promise<BetaUpdateInput |
       ...(formData.has('releaseTag') ? { releaseTag: formData.get('releaseTag') } : {}),
       ...(formData.has('releaseRepo') ? { releaseRepo: formData.get('releaseRepo') } : {}),
       ...(formData.has('hiddenDevices') ? { hiddenDevices: formData.get('hiddenDevices') } : {}),
+      ...(formData.has('notify') ? { notify: formData.get('notify') } : {}),
       ...(firmware instanceof File ? { firmware } : {}),
     };
   }
@@ -3376,6 +3386,7 @@ async function parseBetaUpdateInput(request: Request): Promise<BetaUpdateInput |
     ...(Object.hasOwn(parsed, 'releaseTag') ? { releaseTag: parsed.releaseTag } : {}),
     ...(Object.hasOwn(parsed, 'releaseRepo') ? { releaseRepo: parsed.releaseRepo } : {}),
     ...(Object.hasOwn(parsed, 'hiddenDevices') ? { hiddenDevices: parsed.hiddenDevices } : {}),
+    ...(Object.hasOwn(parsed, 'notify') ? { notify: parsed.notify } : {}),
   };
 }
 
@@ -3486,11 +3497,13 @@ async function handleBetaUpdate(
   if (binaryReplaced) build.binaryUpdatedAt = now;
   await saveBetaList(env, list);
   const versionChanged = build.version !== previousVersion;
-  const notification: BetaNotification | undefined = versionChanged
-    ? { kind: 'version-bumped', build }
-    : binaryReplaced
-      ? { kind: 'binary-replaced', build }
-      : undefined;
+  const notification: BetaNotification | undefined = !notifyRequested(body.notify)
+    ? undefined
+    : versionChanged
+      ? { kind: 'version-bumped', build }
+      : binaryReplaced
+        ? { kind: 'binary-replaced', build }
+        : undefined;
   if (notification) await queueBetaNotification(env, notification);
   else await refreshPendingBetaNotification(env, build);
   scheduleBetaStatusReconcile(ctx, env, list, notification);
@@ -3658,7 +3671,12 @@ async function handleDeviceBuildUpload(
 
   scheduleInstatusTask(
     ctx,
-    reconcileDeviceBuildStatus(env, cfg.statusDevice, deviceBuildStatus(build), true),
+    reconcileDeviceBuildStatus(
+      env,
+      cfg.statusDevice,
+      deviceBuildStatus(build),
+      notifyRequested(formData.get('notify'))
+    ),
     `${cfg.label} build`
   );
 
