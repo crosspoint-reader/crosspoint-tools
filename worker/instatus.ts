@@ -497,12 +497,7 @@ export async function reconcileReleaseStatusSnapshot(
   if (snapshot.stable) {
     const build = snapshot.stable;
     const ids = await Promise.all((['x3', 'x4'] as const).map(device =>
-      updateComponent(
-        config,
-        stableTarget(env, device),
-        `Current version: ${build.version}. Stable CrossPoint firmware for the Xteink ${device.toUpperCase()}.`,
-        components
-      )
+      updateComponent(config, stableTarget(env, device), build.version, components)
     ));
     if (options.notifyStable) {
       await publishNotificationOnce(
@@ -520,22 +515,16 @@ export async function reconcileReleaseStatusSnapshot(
   if (snapshot.insider) {
     const build = snapshot.insider;
     await Promise.all((['x3', 'x4'] as const).map(device =>
-      updateComponent(
-        config,
-        insiderTarget(env, device),
-        `Current version: ${build.version}. Nightly/Insider CrossPoint firmware for the Xteink ${device.toUpperCase()}.`,
-        components
-      )
+      updateComponent(config, insiderTarget(env, device), build.version, components)
     ));
   }
 
-  await Promise.all((Object.keys(DEVICE_BUILD_COPY) as DeviceBuildStatusDevice[]).map(device => {
+  await Promise.all((Object.keys(DEVICE_BUILD_LABELS) as DeviceBuildStatusDevice[]).map(device => {
     const build = snapshot.deviceBuilds[device] || null;
-    const copy = DEVICE_BUILD_COPY[device];
     return updateComponent(
       config,
       deviceBuildTarget(env, device),
-      build ? `Current version: ${build.name}. ${copy.description}` : 'No build is currently available.',
+      build ? build.name : 'No build is currently available.',
       components
     );
   }));
@@ -572,7 +561,7 @@ export async function reconcileStableStatus(
     updateComponent(
       config,
       stableTarget(env, device),
-      `Current version: ${build.version}. Stable CrossPoint firmware for the Xteink ${device.toUpperCase()}.`
+      build.version
     )
   ));
   if (notify) {
@@ -598,16 +587,16 @@ export async function reconcileInsiderStatus(
     updateComponent(
       config,
       insiderTarget(env, device),
-      `Current version: ${build.version}. Nightly/Insider CrossPoint firmware for the Xteink ${device.toUpperCase()}.`
+      build.version
     )
   ));
 }
 
-const DEVICE_BUILD_COPY: Record<DeviceBuildStatusDevice, { label: string; description: string }> = {
-  x4pro: { label: 'X4 Pro', description: 'CrossPoint beta firmware for the Xteink X4 Pro.' },
-  sticky: { label: 'Sticky', description: 'CrossPoint firmware for the Seeed Studio reTerminal E1001/E1002.' },
-  m5paper: { label: 'M5Paper', description: 'CrossPoint firmware for the M5Stack M5Paper.' },
-  lilygo: { label: 'LilyGo T5', description: 'CrossPoint firmware for the LilyGo T5.' },
+const DEVICE_BUILD_LABELS: Record<DeviceBuildStatusDevice, string> = {
+  x4pro: 'X4 Pro',
+  sticky: 'Sticky',
+  m5paper: 'M5Paper',
+  lilygo: 'LilyGo T5',
 };
 
 export async function reconcileDeviceBuildStatus(
@@ -618,10 +607,8 @@ export async function reconcileDeviceBuildStatus(
 ): Promise<void> {
   const config = getInstatusConfig(env);
   if (!config) return;
-  const copy = DEVICE_BUILD_COPY[device];
-  const description = build
-    ? `Current version: ${build.name}. ${copy.description}`
-    : 'No build is currently available.';
+  const label = DEVICE_BUILD_LABELS[device];
+  const description = build ? build.name : 'No build is currently available.';
   const id = await updateComponent(config, deviceBuildTarget(env, device), description);
   if (notify && build) {
     const notes = limitedNotes(build.notes);
@@ -631,9 +618,9 @@ export async function reconcileDeviceBuildStatus(
       `device:${device}`,
       build.fingerprint,
       [id],
-      `New ${copy.label} build: ${build.name}`,
+      `New ${label} build: ${build.name}`,
       [
-        `${build.name} is now available for ${copy.label}.`,
+        `${build.name} is now available for ${label}.`,
         ...(notes ? [`What's new:\n${notes}`] : []),
         'Flash it at https://crosspointreader.com/#flash-tools',
       ].join('\n\n')

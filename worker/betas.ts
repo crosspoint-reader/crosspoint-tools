@@ -91,8 +91,7 @@ export function betaComponentDescription(builds: BetaBuild[], device: FirmwareDe
     .map(betaDisplayName);
 
   if (labels.length === 0) return 'No active beta builds.';
-  if (labels.length === 1) return `Current build: ${labels[0]}.`;
-  return `Current builds: ${labels.join('; ')}.`;
+  return labels.join('; ');
 }
 
 export function betaNotificationMessage(

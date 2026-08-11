@@ -71,9 +71,9 @@ test('describes only active betas for each persistent device component', () => {
 
   assert.equal(
     betaComponentDescription(builds, 'x4'),
-    'Current builds: CrossPoint 1.5 RC5; Page Turner v10.'
+    'CrossPoint 1.5 RC5; Page Turner v10'
   )
-  assert.equal(betaComponentDescription(builds, 'x3'), 'Current build: CrossPoint 1.5 RC5.')
+  assert.equal(betaComponentDescription(builds, 'x3'), 'CrossPoint 1.5 RC5')
   assert.equal(betaComponentDescription([], 'x3'), 'No active beta builds.')
 })
 
