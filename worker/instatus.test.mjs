@@ -3,8 +3,10 @@ import test from 'node:test'
 
 import {
   flushPendingBetaNotifications,
+  flushPendingDeviceNotifications,
   queueBetaNotification,
   reconcileBetaStatus,
+  reconcileDeviceBuildStatus,
   reconcileReleaseStatusSnapshot,
   reconcileStableStatus,
 } from './instatus.ts'
@@ -89,9 +91,9 @@ test('creates a missing stable component and deduplicates release notifications'
   }
   await reconcileStableStatus(env, build, true)
 
-  assert.match(components.get('x3-stable-created').description, /v1\.5\.0.*X3/)
-  assert.match(components.get('x4-stable').description, /v1\.5\.0.*X4/)
-  assert.match(components.get('x4-stable').translations.description.en, /v1\.5\.0.*X4/)
+  assert.equal(components.get('x3-stable-created').description, 'v1.5.0')
+  assert.equal(components.get('x4-stable').description, 'v1.5.0')
+  assert.equal(components.get('x4-stable').translations.description.en, 'v1.5.0')
   assert.equal(incidents.length, 1)
   assert.deepEqual(new Set(incidents[0].components), new Set(['x3-stable-created', 'x4-stable']))
   assert.equal(kv.get('instatus:notified:stable'), 'sha-150')
@@ -286,5 +288,68 @@ test('keeps a failed beta notice queued and retries it without duplicates', asyn
   assert.equal(kv.has('instatus:pending:beta:page-turner'), false)
 
   await flushPendingBetaNotifications(env)
+  assert.equal(incidents.length, 1)
+})
+
+test('keeps a failed device build notice queued and retries it without duplicates', async (t) => {
+  const kv = new Map()
+  const components = new Map([
+    ['x4pro-beta', { id: 'x4pro-beta', name: 'Beta', group: 'x4pro-group', description: 'Old' }],
+  ])
+  let incidentAttempts = 0
+  const incidents = []
+
+  const originalFetch = globalThis.fetch
+  t.after(() => { globalThis.fetch = originalFetch })
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(String(input))
+    const method = init.method || 'GET'
+    const id = url.pathname.split('/').at(-1)
+    if (method === 'GET' && components.has(id)) return jsonResponse(components.get(id))
+    if (method === 'PUT' && components.has(id)) {
+      const body = JSON.parse(String(init.body))
+      Object.assign(components.get(id), body, { group: body.groupId })
+      return jsonResponse(components.get(id))
+    }
+    if (method === 'POST' && url.pathname === '/v1/page/incidents') {
+      incidentAttempts += 1
+      if (incidentAttempts === 1) return jsonResponse({ error: 'rate limited' }, 429)
+      incidents.push(JSON.parse(String(init.body)))
+      return jsonResponse({ id: 'incident-1' }, 201)
+    }
+    return jsonResponse({ error: `${method} ${url.pathname}` }, 404)
+  }
+
+  const env = {
+    INSTATUS_API_KEY: 'test-secret',
+    INSTATUS_PAGE_ID: 'page',
+    INSTATUS_X4_PRO_GROUP_ID: 'x4pro-group',
+    INSTATUS_X4_PRO_BETA_COMPONENT_ID: 'x4pro-beta',
+    INSTATUS_STICKY_GROUP_ID: 'sticky-group',
+    INSTATUS_M5PAPER_GROUP_ID: 'm5paper-group',
+    INSTATUS_LILYGO_GROUP_ID: 'lilygo-group',
+    BUILD_META: {
+      get: async key => kv.get(key) ?? null,
+      put: async (key, value) => { kv.set(key, value) },
+      delete: async key => { kv.delete(key) },
+    },
+  }
+  const build = {
+    name: 'X4 Pro Beta 18',
+    version: 'X4 Pro Beta 18',
+    fingerprint: 'beta-18-sha',
+    notes: 'SD plugin preview.',
+  }
+
+  await assert.rejects(reconcileDeviceBuildStatus(env, 'x4pro', build, true), /429/)
+  assert.ok(kv.has('instatus:pending:device:x4pro'))
+
+  await flushPendingDeviceNotifications(env)
+  assert.equal(incidents.length, 1)
+  assert.equal(incidents[0].name, 'New X4 Pro build: X4 Pro Beta 18')
+  assert.equal(components.get('x4pro-beta').description, 'X4 Pro Beta 18')
+  assert.equal(kv.has('instatus:pending:device:x4pro'), false)
+
+  await flushPendingDeviceNotifications(env)
   assert.equal(incidents.length, 1)
 })

@@ -2,6 +2,7 @@ import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeB
 import { betaDevices, normalizeBetaBuildList } from './betas';
 import {
   flushPendingBetaNotifications,
+  flushPendingDeviceNotifications,
   queueBetaNotification,
   reconcileBetaStatus,
   reconcileDeviceBuildStatus,
@@ -115,6 +116,14 @@ export default {
         } catch (error) {
           console.error(JSON.stringify({
             message: 'Scheduled Instatus beta notification retry failed',
+            error: error instanceof Error ? error.message : String(error),
+          }));
+        }
+        try {
+          await flushPendingDeviceNotifications(env);
+        } catch (error) {
+          console.error(JSON.stringify({
+            message: 'Scheduled Instatus device notification retry failed',
             error: error instanceof Error ? error.message : String(error),
           }));
         }

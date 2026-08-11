@@ -60,6 +60,7 @@ type ComponentTarget = {
 
 const NOTIFIED_KEY_PREFIX = 'instatus:notified:';
 const PENDING_BETA_NOTIFICATION_PREFIX = 'instatus:pending:beta:';
+const PENDING_DEVICE_NOTIFICATION_PREFIX = 'instatus:pending:device:';
 
 function getInstatusConfig(env: Env): InstatusConfig | null {
   if (!env.INSTATUS_API_KEY || !env.INSTATUS_PAGE_ID) return null;
@@ -204,7 +205,7 @@ async function instatusRequest<T = unknown>(
 
   if (!response.ok) {
     const responseText = await response.text();
-    throw new Error(`Instatus ${response.status}: ${responseText.slice(0, 300)}`);
+    throw new Error(`Instatus ${response.status} on ${apiPath}: ${responseText.slice(0, 300)}`);
   }
 
   const responseText = await response.text();
@@ -599,6 +600,38 @@ const DEVICE_BUILD_LABELS: Record<DeviceBuildStatusDevice, string> = {
   lilygo: 'LilyGo T5',
 };
 
+function pendingDeviceNotificationKey(device: DeviceBuildStatusDevice): string {
+  return `${PENDING_DEVICE_NOTIFICATION_PREFIX}${device}`;
+}
+
+// Release bursts (CI uploading several device builds plus insider/stock in the
+// same window) can trip Instatus's per-endpoint rate limit, so a notification
+// that fails here must survive to be retried by the cron flush below.
+async function deliverDeviceBuildNotification(
+  env: Env,
+  config: InstatusConfig,
+  device: DeviceBuildStatusDevice,
+  build: PublishedBuildStatus
+): Promise<void> {
+  const label = DEVICE_BUILD_LABELS[device];
+  const id = await updateComponent(config, deviceBuildTarget(env, device), build.name);
+  const notes = limitedNotes(build.notes);
+  await publishNotificationOnce(
+    env,
+    config,
+    `device:${device}`,
+    build.fingerprint,
+    [id],
+    `New ${label} build: ${build.name}`,
+    [
+      `${build.name} is now available for ${label}.`,
+      ...(notes ? [`What's new:\n${notes}`] : []),
+      'Flash it at https://crosspointreader.com/#flash-tools',
+    ].join('\n\n')
+  );
+  await env.BUILD_META.delete(pendingDeviceNotificationKey(device));
+}
+
 export async function reconcileDeviceBuildStatus(
   env: Env,
   device: DeviceBuildStatusDevice,
@@ -607,23 +640,34 @@ export async function reconcileDeviceBuildStatus(
 ): Promise<void> {
   const config = getInstatusConfig(env);
   if (!config) return;
-  const label = DEVICE_BUILD_LABELS[device];
-  const description = build ? build.name : 'No build is currently available.';
-  const id = await updateComponent(config, deviceBuildTarget(env, device), description);
   if (notify && build) {
-    const notes = limitedNotes(build.notes);
-    await publishNotificationOnce(
-      env,
-      config,
-      `device:${device}`,
-      build.fingerprint,
-      [id],
-      `New ${label} build: ${build.name}`,
-      [
-        `${build.name} is now available for ${label}.`,
-        ...(notes ? [`What's new:\n${notes}`] : []),
-        'Flash it at https://crosspointreader.com/#flash-tools',
-      ].join('\n\n')
-    );
+    await env.BUILD_META.put(pendingDeviceNotificationKey(device), JSON.stringify(build));
+    await deliverDeviceBuildNotification(env, config, device, build);
+    return;
+  }
+  const description = build ? build.name : 'No build is currently available.';
+  await updateComponent(config, deviceBuildTarget(env, device), description);
+}
+
+export async function flushPendingDeviceNotifications(env: Env): Promise<void> {
+  const config = getInstatusConfig(env);
+  if (!config) return;
+
+  for (const device of Object.keys(DEVICE_BUILD_LABELS) as DeviceBuildStatusDevice[]) {
+    const key = pendingDeviceNotificationKey(device);
+    const raw = await env.BUILD_META.get(key);
+    if (!raw) continue;
+    let build: PublishedBuildStatus;
+    try {
+      build = JSON.parse(raw) as PublishedBuildStatus;
+    } catch {
+      await env.BUILD_META.delete(key);
+      continue;
+    }
+    if (!build?.name || !build?.fingerprint) {
+      await env.BUILD_META.delete(key);
+      continue;
+    }
+    await deliverDeviceBuildNotification(env, config, device, build);
   }
 }
