@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  discardPendingBetaNotification,
   flushPendingBetaNotifications,
   flushPendingDeviceNotifications,
   queueBetaNotification,
+  refreshPendingBetaNotification,
   reconcileBetaStatus,
   reconcileDeviceBuildStatus,
   reconcileReleaseStatusSnapshot,
@@ -352,4 +354,75 @@ test('keeps a failed device build notice queued and retries it without duplicate
 
   await flushPendingDeviceNotifications(env)
   assert.equal(incidents.length, 1)
+})
+
+test('a title fix after queueing updates the pending notice before it fires', async (t) => {
+  const kv = new Map()
+  const components = new Map([
+    ['x3-beta', { id: 'x3-beta', name: 'Beta', group: 'x3-group', description: 'Old' }],
+    ['x4-beta', { id: 'x4-beta', name: 'Beta', group: 'x4-group', description: 'Old' }],
+  ])
+  const incidents = []
+
+  const originalFetch = globalThis.fetch
+  t.after(() => { globalThis.fetch = originalFetch })
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(String(input))
+    const method = init.method || 'GET'
+    const id = url.pathname.split('/').at(-1)
+    if (method === 'GET' && components.has(id)) return jsonResponse(components.get(id))
+    if (method === 'PUT' && components.has(id)) {
+      const body = JSON.parse(String(init.body))
+      Object.assign(components.get(id), body, { group: body.groupId })
+      return jsonResponse(components.get(id))
+    }
+    if (method === 'POST' && url.pathname === '/v1/page/incidents') {
+      incidents.push(JSON.parse(String(init.body)))
+      return jsonResponse({ id: 'incident-1' }, 201)
+    }
+    return jsonResponse({ error: `${method} ${url.pathname}` }, 404)
+  }
+
+  const env = {
+    INSTATUS_API_KEY: 'test-secret',
+    INSTATUS_PAGE_ID: 'page',
+    INSTATUS_X3_GROUP_ID: 'x3-group',
+    INSTATUS_X4_GROUP_ID: 'x4-group',
+    INSTATUS_X3_BETA_COMPONENT_ID: 'x3-beta',
+    INSTATUS_X4_BETA_COMPONENT_ID: 'x4-beta',
+    BUILD_META: {
+      get: async key => kv.get(key) ?? null,
+      put: async (key, value) => { kv.set(key, value) },
+      delete: async key => { kv.delete(key) },
+      list: async ({ prefix }) => ({
+        keys: [...kv.keys()].filter(key => key.startsWith(prefix)).map(name => ({ name })),
+        list_complete: true,
+        cacheStatus: null,
+      }),
+    },
+  }
+  const build = {
+    id: 'sd-plugins',
+    title: 'SD Plugs + Night Mode',
+    version: 'v1',
+    name: 'SD Plugs + Night Mode',
+    notes: 'Plugin preview.',
+    createdAt: '2026-08-11T02:00:00.000Z',
+    updatedAt: '2026-08-11T02:00:00.000Z',
+    binaryUpdatedAt: '2026-08-11T02:00:00.000Z',
+    firmwareSize: 1234,
+    firmwareSha256: 'sd-plugins-sha',
+    source: { type: 'upload' },
+  }
+
+  await queueBetaNotification(env, { kind: 'created', build })
+  await refreshPendingBetaNotification(env, { ...build, title: 'SD Plugins + Night Mode' })
+
+  await flushPendingBetaNotifications(env)
+  assert.equal(incidents.length, 1)
+  assert.equal(incidents[0].name, 'New beta: SD Plugins + Night Mode v1')
+
+  await discardPendingBetaNotification(env, 'sd-plugins')
+  await refreshPendingBetaNotification(env, build)
+  assert.equal(kv.has('instatus:pending:beta:sd-plugins'), false)
 })

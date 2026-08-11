@@ -396,6 +396,28 @@ export async function queueBetaNotification(
   );
 }
 
+// Edits that queue no notification of their own (e.g. a title typo fix) must
+// still reach any not-yet-delivered notice, or it fires with the stale copy.
+export async function refreshPendingBetaNotification(
+  env: Env,
+  build: BetaBuild
+): Promise<void> {
+  const key = pendingBetaNotificationKey(build.id);
+  const raw = await env.BUILD_META.get(key);
+  if (!raw) return;
+  let notification: BetaNotification;
+  try {
+    notification = JSON.parse(raw) as BetaNotification;
+  } catch {
+    return;
+  }
+  await env.BUILD_META.put(key, JSON.stringify({ ...notification, build }));
+}
+
+export async function discardPendingBetaNotification(env: Env, buildId: string): Promise<void> {
+  await env.BUILD_META.delete(pendingBetaNotificationKey(buildId));
+}
+
 async function deliverBetaNotification(
   env: Env,
   config: InstatusConfig,
@@ -644,6 +666,16 @@ export async function reconcileDeviceBuildStatus(
     await env.BUILD_META.put(pendingDeviceNotificationKey(device), JSON.stringify(build));
     await deliverDeviceBuildNotification(env, config, device, build);
     return;
+  }
+  // Metadata edits (e.g. a name typo fix) must also reach any queued notice
+  // still waiting on delivery, or it fires with the stale copy; a deleted
+  // build's queued notice must never fire at all.
+  if (build) {
+    if (await env.BUILD_META.get(pendingDeviceNotificationKey(device))) {
+      await env.BUILD_META.put(pendingDeviceNotificationKey(device), JSON.stringify(build));
+    }
+  } else {
+    await env.BUILD_META.delete(pendingDeviceNotificationKey(device));
   }
   const description = build ? build.name : 'No build is currently available.';
   await updateComponent(config, deviceBuildTarget(env, device), description);

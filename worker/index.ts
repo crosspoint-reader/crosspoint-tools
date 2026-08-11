@@ -1,9 +1,11 @@
 import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, Accessory, FirmwareDevice, ReleaseVisibility } from './types';
 import { betaDevices, normalizeBetaBuildList } from './betas';
 import {
+  discardPendingBetaNotification,
   flushPendingBetaNotifications,
   flushPendingDeviceNotifications,
   queueBetaNotification,
+  refreshPendingBetaNotification,
   reconcileBetaStatus,
   reconcileDeviceBuildStatus,
   reconcileInsiderStatus,
@@ -3490,6 +3492,7 @@ async function handleBetaUpdate(
       ? { kind: 'binary-replaced', build }
       : undefined;
   if (notification) await queueBetaNotification(env, notification);
+  else await refreshPendingBetaNotification(env, build);
   scheduleBetaStatusReconcile(ctx, env, list, notification);
   return json({ build }, 200, headers);
 }
@@ -3515,6 +3518,7 @@ async function handleBetaDelete(
 
   await env.FIRMWARE_BUCKET.delete(`builds/beta/${id}/firmware.bin`);
   await env.BUILD_META.delete(`sha256:beta:${id}`);
+  await discardPendingBetaNotification(env, id);
   await saveBetaList(env, filtered);
   scheduleBetaStatusReconcile(ctx, env, filtered);
 
