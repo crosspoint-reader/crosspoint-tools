@@ -986,7 +986,7 @@ export default function FlashTools() {
                       <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">
                         {selectedBeta.version && (
                           <>
-                            <span className="text-amber-600">{selectedBeta.version}</span> &middot;{' '}
+                            <span className="text-amber-600">Version: {selectedBeta.version}</span> &middot;{' '}
                           </>
                         )}
                         {(selectedBeta.firmwareSize / 1024 / 1024).toFixed(1)} MB &middot;{' '}
