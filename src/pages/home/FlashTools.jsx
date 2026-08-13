@@ -811,7 +811,7 @@ export default function FlashTools() {
                   >
                     <div className="text-sm font-semibold text-stone-900">{betaTitle(b)}</div>
                     <div className="mt-0.5 font-mono text-xs text-amber-600">
-                      {b.version || 'Beta'}
+                      {b.version ? `Version: ${b.version}` : 'Beta'}
                     </div>
                   </button>
                 ))}
