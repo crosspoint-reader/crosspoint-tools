@@ -901,13 +901,6 @@ export default function FlashTools() {
                 <StepBadge n={3} active />
                 <h3 className="font-display text-sm font-semibold text-stone-900">Flash</h3>
               </div>
-              {!DEVICE_INSTALLS[model] && (
-                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
-                  Make sure your device is not asleep and is sitting at the home screen before
-                  flashing. If the flasher fails to detect your device remove your sd card and try
-                  again.
-                </div>
-              )}
               <div className="mt-4">
                 <div className="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
                   {/* CrossPoint panel */}
