@@ -31,7 +31,23 @@ export function buildFirmwareFlashEventName({ device, channel, version } = {}) {
 // Fathom is deliberately optional: privacy tools and network policies may
 // block it, and analytics must never interfere with a successful flash.
 export function trackFirmwareFlash(details) {
-  if (typeof window === 'undefined' || typeof window.fathom?.trackEvent !== 'function') return
+  if (typeof window === 'undefined') return
+
+  // Bump the site's own flash counter (feeds the "devices running CrossPoint"
+  // stat) even when Fathom is blocked. The worker decides which channels
+  // count, so just report what was flashed.
+  try {
+    fetch('/api/stats/flash', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device: details?.device, channel: details?.channel }),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // Analytics failures are intentionally ignored.
+  }
+
+  if (typeof window.fathom?.trackEvent !== 'function') return
 
   const eventName = buildFirmwareFlashEventName(details)
   if (!eventName) return

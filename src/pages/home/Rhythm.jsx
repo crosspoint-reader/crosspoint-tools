@@ -4,20 +4,20 @@ import { Eyebrow } from '../../components/ui.jsx'
 
 const RELEASES = [
   {
-    version: '1.3',
-    date: 'May 2026',
-    blurb: 'Custom fonts, tilt-to-turn page turns, Focus Reading, and an OPDS overhaul with in-catalog search.',
-  },
-  {
     version: '1.4',
     date: 'June 2026',
     blurb: 'Bookmarks, right-to-left reading, Quick Resume, and live font previews.',
   },
   {
     version: '1.5',
+    date: 'August 2026',
+    blurb: 'A built-in dictionary, faster book opening, what-to-read-next suggestions, and Arabic reading.',
+  },
+  {
+    version: '1.6',
     date: 'In the works',
     upcoming: true,
-    blurb: 'A built-in dictionary, faster book opening, what-to-read-next suggestions, and Arabic reading.',
+    blurb: 'X4 Pro and PaperMono support, Reading Night Mode, transparent sleep screens, and styled dictionary definitions.',
   },
 ]
 

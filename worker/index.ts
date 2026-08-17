@@ -322,6 +322,9 @@ async function handleApi(
       case '/api/stats':
         return handleCommunityStats(env, corsHeaders);
 
+      case '/api/stats/flash':
+        return handleFlashCount(request, env, corsHeaders);
+
       default:
         // Device builds: /api/device-build/{device}[/upload|/info|/firmware]
         if (url.pathname.startsWith('/api/device-build/')) {
@@ -1477,6 +1480,41 @@ const STATS_CACHE_KEY = 'community-stats';
 const STATS_LAST_GOOD_KEY = 'community-stats:last';
 const STATS_TTL = 6 * 60 * 60; // 6 hours
 
+// Lifetime count of web-flasher flashes that GitHub's release download_count
+// never sees: nightly, beta, RC, device builds, and custom .bins all stream
+// from R2 or per-release assets. Stable flashes are excluded (the worker
+// proxies them from the GitHub asset, so GitHub already counts them) and so
+// are stock flashes (flashing stock is leaving CrossPoint, not running it).
+const WEB_FLASH_COUNT_KEY = 'web-flash-count';
+const UNCOUNTED_FLASH_CHANNELS = new Set(['stable', 'stock-en', 'stock-ch']);
+
+async function getWebFlashCount(env: Env): Promise<number> {
+  const raw = await env.BUILD_META.get(WEB_FLASH_COUNT_KEY);
+  const n = raw ? parseInt(raw, 10) : 0;
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+// Fired by the flasher alongside its Fathom event. KV has no atomic
+// increment, so concurrent flashes can occasionally lose a count — fine for
+// a marketing stat at this volume.
+async function handleFlashCount(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+  const body = await request.json().catch(() => null) as { channel?: unknown } | null;
+  const channel = typeof body?.channel === 'string' ? body.channel : '';
+  if (!channel || UNCOUNTED_FLASH_CHANNELS.has(channel)) {
+    return json({ counted: false }, 200, headers);
+  }
+  const count = await getWebFlashCount(env);
+  await env.BUILD_META.put(WEB_FLASH_COUNT_KEY, String(count + 1));
+  return json({ counted: true }, 200, headers);
+}
+
 interface CommunityStats {
   contributors: number;
   forks: number;
@@ -1559,9 +1597,11 @@ async function computeCommunityStats(env: Env): Promise<CommunityStats> {
 
   // Downloads of the biggest release, not the lifetime total: users re-download
   // the firmware on every update, so summing counts the same person many times.
+  // Web flashes that bypass GitHub assets (nightly/beta/RC/device/custom) are
+  // tracked in our own counter and added on top.
   const downloads = Math.max(
     ...releases.map(r => r.assets.reduce((sum, a) => sum + a.download_count, 0))
-  );
+  ) + await getWebFlashCount(env);
 
   return {
     contributors,
