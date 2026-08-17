@@ -2,7 +2,29 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eyebrow } from '../../components/ui.jsx'
 
+// The full release cycle since 1.0, oldest first. Dates and highlights come
+// from the GitHub releases on crosspoint-reader.
 const RELEASES = [
+  {
+    version: '1.0',
+    date: 'February 2026',
+    blurb: 'The 1.0 milestone: the new Lyra theme and in-firmware over-the-air updates.',
+  },
+  {
+    version: '1.1',
+    date: 'February 2026',
+    blurb: 'Images in EPUBs, a web-based settings editor, the interface in eight languages, and more Lyra screens.',
+  },
+  {
+    version: '1.2',
+    date: 'April 2026',
+    blurb: 'Kerning and ligatures, footnote navigation, and an on-device EPUB optimizer.',
+  },
+  {
+    version: '1.3',
+    date: 'May 2026',
+    blurb: 'Custom fonts, tilt-to-turn page turns, Focus Reading, and an OPDS overhaul with in-catalog search.',
+  },
   {
     version: '1.4',
     date: 'June 2026',
@@ -93,17 +115,24 @@ export default function Rhythm() {
           .
         </p>
 
-        {/* Release timeline */}
-        <ol className="mt-14 grid grid-cols-1 gap-10 sm:grid-cols-3 lg:gap-8">
+        {/* Release timeline: every release since 1.0, oldest first, running
+            down a rail so the whole cycle reads as one continuous journey. */}
+        <ol className="relative mt-14 max-w-3xl space-y-9 border-l-2 border-stone-200 pl-8">
           {RELEASES.map((r) => (
-            <li key={r.version} className={`border-t-2 pt-5 ${r.upcoming ? 'border-dashed border-brand-300' : 'border-brand-500/70'}`}>
+            <li key={r.version} className="relative">
+              <span
+                aria-hidden="true"
+                className={`absolute top-1 -left-[41px] size-4 rounded-full border-2 ${
+                  r.upcoming ? 'border-dashed border-brand-400 bg-brand-50' : 'border-brand-500/70 bg-white'
+                }`}
+              />
               <div className="flex items-baseline gap-x-3">
                 <span className="font-display text-2xl font-semibold text-stone-900">{r.version}</span>
                 <span className={`text-xs tracking-[0.15em] uppercase ${r.upcoming ? 'text-brand-600' : 'text-stone-400'}`}>
                   {r.date}
                 </span>
               </div>
-              <p className="mt-2.5 text-sm/6 text-pretty text-stone-600">{r.blurb}</p>
+              <p className="mt-1.5 text-sm/6 text-pretty text-stone-600">{r.blurb}</p>
               {r.upcoming && (
                 <Link
                   to="/insider"
