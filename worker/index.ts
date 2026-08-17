@@ -281,6 +281,16 @@ async function handleApi(
         if (request.method === 'PUT') return handleReleaseVisibilityUpdate(request, env, corsHeaders);
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
+      case '/api/rc/info':
+        return handleRcInfo(env, corsHeaders);
+
+      case '/api/rc/firmware':
+        return handleRcFirmware(url, env, corsHeaders);
+
+      case '/api/rc/settings':
+        if (request.method === 'PUT') return handleRcSettingsUpdate(request, env, corsHeaders);
+        return json({ error: 'Method not allowed' }, 405, corsHeaders);
+
       case '/api/banner':
         if (request.method === 'GET') return handleBannerGet(env, corsHeaders);
         if (request.method === 'PUT') return handleBannerUpdate(request, env, corsHeaders);
@@ -3773,6 +3783,164 @@ async function handleDeviceBuildFirmware(
       'Content-Type': 'application/octet-stream',
       'Content-Disposition': `attachment; filename="${cfg.filename}"`,
       'Content-Length': String(object.size),
+    },
+  });
+}
+
+// --- Release Candidate channel ---
+//
+// GitHub prereleases on crosspoint-reader (e.g. tag 1.6.0rc) ship one .bin
+// per device family, named `<prefix>-<build>.bin` (the split GH build action
+// produces xteink_x4_x3 / x4pro / sticky / papermono assets). The filename
+// prefix maps each asset to flasher device ids, so a new RC appears on the
+// right devices with no manual uploads. The channel is off by default: the
+// admin panel toggles it via /api/rc/settings, and both the flasher buttons
+// and the /api/rc/firmware proxy are gated on that flag.
+
+const RC_SETTINGS_KEY = 'rc-settings';
+
+// Asset filename prefix (everything before the first '-') -> flasher device
+// ids the build supports. Assets with an unknown prefix are skipped so a new
+// device in a future release can't be offered to the wrong hardware.
+const RC_ASSET_DEVICES: Record<string, string[]> = {
+  xteink_x4_x3: ['x4', 'x3'],
+  x4pro: ['x4pro'],
+  sticky: ['sticky'],
+  papermono: ['papermono'],
+};
+
+interface RcAsset {
+  name: string;
+  size: number;
+  devices: string[];
+  downloadUrl: string;
+}
+
+interface RcRelease {
+  tag: string;
+  name: string;
+  version: string;
+  publishedAt: string;
+  notesUrl: string;
+  assets: RcAsset[];
+}
+
+async function getRcSettings(env: Env): Promise<{ enabled: boolean }> {
+  const raw = await env.BUILD_META.get(RC_SETTINGS_KEY);
+  if (!raw) return { enabled: false };
+  try {
+    const parsed = JSON.parse(raw) as { enabled?: unknown };
+    return { enabled: parsed.enabled === true };
+  } catch {
+    return { enabled: false };
+  }
+}
+
+// Latest (non-draft) prerelease on crosspoint-reader with its assets mapped
+// to devices. Cached at the edge for 5 minutes like the stable release fetch,
+// so a freshly published RC shows up on its own shortly after.
+async function fetchRcRelease(env: Env): Promise<RcRelease | null> {
+  const res = await fetch(
+    'https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases?per_page=15',
+    { headers: ghFetchHeaders(env), cf: { cacheTtl: 300, cacheEverything: true } as RequestInitCfProperties }
+  );
+  if (!res.ok) return null;
+  const releases = await res.json() as Array<{
+    tag_name: string;
+    name: string;
+    prerelease: boolean;
+    draft: boolean;
+    published_at: string;
+    html_url: string;
+    assets: Array<{ name: string; size: number; browser_download_url: string }>;
+  }>;
+  const release = releases.find(r => r.prerelease && !r.draft);
+  if (!release) return null;
+
+  const assets: RcAsset[] = [];
+  for (const a of release.assets) {
+    if (!a.name.endsWith('.bin')) continue;
+    const devices = RC_ASSET_DEVICES[a.name.split('-')[0]];
+    if (!devices) {
+      console.warn(`RC asset with unknown device prefix skipped: ${a.name}`);
+      continue;
+    }
+    assets.push({ name: a.name, size: a.size, devices, downloadUrl: a.browser_download_url });
+  }
+  if (!assets.length) return null;
+
+  // User-facing version: the build id embedded in the asset filename
+  // (e.g. `1.6.0_beta_RC01`), falling back to the tag.
+  const version = assets[0].name.replace(/^[^-]+-/, '').replace(/\.bin$/, '') || release.tag_name;
+  return {
+    tag: release.tag_name,
+    name: release.name || release.tag_name,
+    version,
+    publishedAt: release.published_at,
+    notesUrl: release.html_url,
+    assets,
+  };
+}
+
+async function handleRcInfo(env: Env, headers: Record<string, string>): Promise<Response> {
+  const [settings, release] = await Promise.all([
+    getRcSettings(env),
+    fetchRcRelease(env).catch((err) => {
+      console.error('RC release fetch failed:', err);
+      return null;
+    }),
+  ]);
+  // Clients download through the /api/rc/firmware proxy, not GitHub directly.
+  const publicRelease = release
+    ? { ...release, assets: release.assets.map(({ downloadUrl: _omit, ...rest }) => rest) }
+    : null;
+  return json({ enabled: settings.enabled, release: publicRelease }, 200, headers);
+}
+
+async function handleRcSettingsUpdate(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+  const body = await request.json().catch(() => null) as { enabled?: unknown } | null;
+  if (!body || typeof body.enabled !== 'boolean') {
+    return json({ error: '`enabled` boolean is required' }, 400, headers);
+  }
+  await env.BUILD_META.put(RC_SETTINGS_KEY, JSON.stringify({ enabled: body.enabled }));
+  return json({ enabled: body.enabled }, 200, headers);
+}
+
+// Stream the RC asset for a device straight from GitHub. 404s while the
+// channel is disabled so a stale flasher tab can't keep pulling RC firmware
+// after the admin turns it off.
+async function handleRcFirmware(
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const device = url.searchParams.get('device') || '';
+  const settings = await getRcSettings(env);
+  if (!settings.enabled) {
+    return json({ error: 'RC channel is disabled' }, 404, headers);
+  }
+  const release = await fetchRcRelease(env).catch(() => null);
+  const asset = release?.assets.find(a => a.devices.includes(device));
+  if (!asset) {
+    return json({ error: `No RC firmware for device "${device}"` }, 404, headers);
+  }
+  const fwRes = await fetch(asset.downloadUrl, { headers: { 'User-Agent': 'crosspoint-tools' } });
+  if (!fwRes.ok) {
+    return json({ error: `RC firmware download failed: ${fwRes.status}` }, 502, headers);
+  }
+  return new Response(fwRes.body, {
+    headers: {
+      ...headers,
+      'Content-Type': 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${asset.name}"`,
+      'Content-Length': String(asset.size),
     },
   });
 }

@@ -1115,6 +1115,27 @@ export async function fetchReleaseVisibility() {
   }
 }
 
+// Release-candidate channel: the latest GitHub prerelease, mapped to devices
+// by asset filename prefix in the worker and gated behind an admin toggle.
+// Returns { enabled, release } and falls back to "disabled" on any failure so
+// the flasher simply omits the RC option.
+export async function fetchRcInfo() {
+  try {
+    const res = await fetch('/api/rc/info')
+    if (!res.ok) return { enabled: false, release: null }
+    const data = await res.json()
+    return { enabled: !!data.enabled, release: data.release || null }
+  } catch {
+    return { enabled: false, release: null }
+  }
+}
+
+export async function fetchRcFirmware(device) {
+  const res = await fetch(`/api/rc/firmware?device=${device}`);
+  if (!res.ok) throw new Error(`Failed to download RC firmware: ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 export async function fetchBetaFirmware(id) {
   const res = await fetch(`/api/beta/${id}/firmware`);
   if (!res.ok) throw new Error(`Failed to download beta firmware: ${res.status}`);

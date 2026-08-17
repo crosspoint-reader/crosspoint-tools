@@ -12,6 +12,8 @@ import {
   fetchBetaBuilds,
   fetchBetaFirmware,
   fetchReleaseVisibility,
+  fetchRcInfo,
+  fetchRcFirmware,
   fetchDeviceBuildInfo,
   fetchDeviceBuildFirmware,
   fetchFlashAsset,
@@ -241,6 +243,10 @@ export default function FlashTools() {
   // { hidden: { crosspoint: ['x3'], ... } }
   const [releaseVisibility, setReleaseVisibility] = useState({ hidden: {} })
 
+  // Release-candidate channel (latest GitHub prerelease, admin-gated).
+  // { enabled, release: { tag, version, publishedAt, notesUrl, assets } }
+  const [rc, setRc] = useState({ enabled: false, release: null })
+
   // Admin-uploaded build for DEVICE_BUILD_MODELS (sticky, m5paper, lilygo, x4pro)
   const [deviceBuild, setDeviceBuild] = useState(null)
 
@@ -299,6 +305,11 @@ export default function FlashTools() {
     fetchReleaseVisibility()
       .then((v) => {
         if (!cancelled && v) setReleaseVisibility(v)
+      })
+      .catch(() => {})
+    fetchRcInfo()
+      .then((info) => {
+        if (!cancelled && info) setRc(info)
       })
       .catch(() => {})
     return () => {
@@ -433,6 +444,9 @@ export default function FlashTools() {
     if (action === 'nightly') {
       return { device: model, channel: 'nightly', version: nightly.version }
     }
+    if (action === 'rc') {
+      return { device: model, channel: 'rc', version: rc.release?.version }
+    }
     if (action === 'stock-en' || action === 'stock-ch') {
       const lang = action === 'stock-en' ? 'en' : 'ch'
       return { device: model, channel: action, version: stock[lang].text }
@@ -473,12 +487,13 @@ export default function FlashTools() {
     // pointer. Avoid serial hard reset here; a clean unplug/replug matches the known-good flasher
     // behavior.
     const skipReset =
-      action === 'crosspoint' || action === 'nightly' || action === 'custom' ||
-      action === 'device' || action.startsWith('beta-')
+      action === 'crosspoint' || action === 'nightly' || action === 'rc' ||
+      action === 'custom' || action === 'device' || action.startsWith('beta-')
 
     const titles = {
       crosspoint: 'Flashing CrossPoint Firmware...',
       nightly: 'Flashing CrossPoint Nightly...',
+      rc: `Flashing CrossPoint ${rc.release?.tag || ''} RC...`,
       'stock-en': 'Flashing English Firmware...',
       'stock-ch': 'Flashing Chinese Firmware...',
       custom: 'Flashing Custom Firmware...',
@@ -492,6 +507,7 @@ export default function FlashTools() {
     const downloadMsgs = {
       crosspoint: 'Downloading firmware...',
       nightly: 'Downloading nightly build...',
+      rc: 'Downloading release candidate...',
       'stock-en': 'Downloading firmware...',
       'stock-ch': 'Downloading firmware...',
       device: 'Downloading beta firmware...',
@@ -528,6 +544,8 @@ export default function FlashTools() {
         firmware = await fetchReleaseFirmware(model)
       } else if (action === 'nightly') {
         firmware = await fetchEarlyAccessFirmware()
+      } else if (action === 'rc') {
+        firmware = await fetchRcFirmware(model)
       } else if (action === 'stock-en') {
         firmware = (await fetchStockFirmware(model, 'en')).data
       } else if (action === 'stock-ch') {
@@ -596,7 +614,12 @@ export default function FlashTools() {
   // Same flow the standalone Sticky page used: bootloader + partition table +
   // boot_app0 otadata + firmware in one write, then a serial hard reset.
   async function runDeviceInstall(install, action, serialPort) {
-    const buildName = action === 'custom' ? 'Custom Firmware' : deviceBuild?.name || `${install.name} Beta`
+    const buildName =
+      action === 'custom'
+        ? 'Custom Firmware'
+        : action === 'rc'
+          ? `CrossPoint ${rc.release?.tag || ''} RC`
+          : deviceBuild?.name || `${install.name} Beta`
     const steps = [
       'Connect to device',
       'Write bootloader + partition table + firmware',
@@ -622,6 +645,8 @@ export default function FlashTools() {
       if (action === 'custom') {
         if (!customFile) throw new Error('No file selected')
         firmware = new Uint8Array(await customFile.arrayBuffer())
+      } else if (action === 'rc') {
+        firmware = await fetchRcFirmware(model)
       } else {
         firmware = await fetchDeviceBuildFirmware(model)
       }
@@ -673,6 +698,13 @@ export default function FlashTools() {
   // the release-visibility config keyed by action id.
   const visibleBetas = betaBuilds.filter((b) => !(b.hiddenDevices || []).includes(model))
   const isReleaseHidden = (key) => (releaseVisibility.hidden?.[key] || []).includes(model)
+
+  // RC asset covering the selected device, when the admin-gated RC channel is
+  // on. The worker maps prerelease assets to device ids by filename prefix.
+  const rcAsset =
+    rc.enabled && rc.release
+      ? rc.release.assets.find((a) => a.devices.includes(model)) || null
+      : null
 
   const selectedBeta = fw?.startsWith('beta-') ? betaBuilds.find((b) => `beta-${b.id}` === fw) : null
 
@@ -761,6 +793,12 @@ export default function FlashTools() {
                     </div>
                     <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
                   </button>
+                  {rcAsset && (
+                    <button type="button" onClick={() => selectFw('rc')} className={cardClass(fw === 'rc')}>
+                      <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>
+                      <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
+                    </button>
+                  )}
                   {model === 'x4pro' && (
                     <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
                       <div className="text-sm font-semibold text-stone-900">Stock English</div>
@@ -788,6 +826,12 @@ export default function FlashTools() {
                   <button type="button" onClick={() => selectFw('nightly')} className={cardClass(fw === 'nightly')}>
                     <div className="text-sm font-semibold text-stone-900">CrossPoint Nightly</div>
                     <div className="mt-0.5 font-mono text-xs text-brand-600">Insider</div>
+                  </button>
+                )}
+                {rcAsset && (
+                  <button type="button" onClick={() => selectFw('rc')} className={cardClass(fw === 'rc')}>
+                    <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>
+                    <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
                   </button>
                 )}
                 {!isReleaseHidden('stock-en') && (
@@ -955,6 +999,45 @@ export default function FlashTools() {
                           )}
                         </ul>
                       </div>
+                    </div>
+                  )}
+
+                  {/* RC panel */}
+                  {fw === 'rc' && rcAsset && (
+                    <div>
+                      <div className="text-sm font-semibold text-stone-900">
+                        CrossPoint {rc.release.tag} Release Candidate
+                      </div>
+                      <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">
+                        <span className="text-amber-600">Version: {rc.release.version}</span> &middot;{' '}
+                        {(rcAsset.size / 1024 / 1024).toFixed(1)} MB &middot; {fmtDate(rc.release.publishedAt)}
+                      </div>
+                      <div className="mt-4 flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => runFlash('rc')}
+                          disabled={running}
+                          className="inline-flex items-center justify-center rounded-md bg-amber-600 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <BoltIcon />
+                          Flash {rc.release.tag} RC
+                        </button>
+                        {rc.release.notesUrl && (
+                          <a
+                            href={rc.release.notesUrl}
+                            target="_blank"
+                            rel="noopener"
+                            className="text-sm font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700"
+                          >
+                            Release Notes
+                          </a>
+                        )}
+                      </div>
+                      <p className="mt-2 text-xs text-stone-400">
+                        Pre-release build for testing before the stable release. If you are coming
+                        from Stock or another firmware you may need to flash twice for CrossPoint
+                        to show up.
+                      </p>
                     </div>
                   )}
 

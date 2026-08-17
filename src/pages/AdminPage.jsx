@@ -1328,6 +1328,134 @@ function BetaCard({ secret, log }) {
   )
 }
 
+// --- Release candidate channel ------------------------------------------------
+// Mirrors the latest GitHub prerelease on crosspoint-reader; the worker maps
+// its per-device assets by filename prefix (xteink_x4_x3 / x4pro / sticky /
+// papermono). The toggle gates both the RC buttons in the homepage flasher
+// and the /api/rc/firmware downloads, so turning it off takes effect even in
+// already-open tabs.
+
+const RC_DEVICE_LABELS = {
+  x4: 'X4',
+  x3: 'X3',
+  x4pro: 'X4 Pro',
+  sticky: 'Sticky',
+  papermono: 'PaperMono',
+}
+
+function RcChannelCard({ secret, log }) {
+  const [enabled, setEnabled] = useState(false)
+  const [release, setRelease] = useState(null)
+  const [loaded, setLoaded] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState(null) // { ok, text }
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/rc/info')
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled) {
+          setEnabled(!!data.enabled)
+          setRelease(data.release || null)
+          setLoaded(true)
+        }
+      } catch {
+        log('Failed to load RC channel info')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [log])
+
+  async function saveEnabled(next) {
+    setBusy(true)
+    setResult(null)
+    try {
+      const res = await fetch('/api/rc/settings', {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer ' + secret,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ enabled: next }),
+      })
+      if (res.ok) {
+        setEnabled(next)
+        setResult({ ok: true, text: next ? 'RC channel enabled' : 'RC channel disabled' })
+        log('RC channel ' + (next ? 'enabled' : 'disabled'))
+      } else {
+        const data = await res.json().catch(() => ({}))
+        setResult({ ok: false, text: data.error || 'Save failed' })
+      }
+    } catch {
+      setResult({ ok: false, text: 'Connection error' })
+    }
+    setBusy(false)
+  }
+
+  return (
+    <Card>
+      <CardTitle>Release Candidate</CardTitle>
+      <p className="mt-1 text-xs text-stone-400">
+        The latest GitHub prerelease, offered per device in the homepage flasher based on its asset
+        filenames. Enabling shows an RC option on every device the release ships a build for.
+      </p>
+
+      {release ? (
+        <div className="mt-3 rounded-lg bg-stone-50 px-3 py-2.5">
+          <div className="text-sm font-medium text-stone-700">
+            {release.name}{' '}
+            <span className="font-mono text-xs text-stone-400">({release.version})</span>
+          </div>
+          <div className="mt-0.5 text-xs text-stone-400">
+            Published {new Date(release.publishedAt).toLocaleDateString()} &middot;{' '}
+            <a
+              href={release.notesUrl}
+              target="_blank"
+              rel="noopener"
+              className="font-medium text-brand-500 underline underline-offset-2"
+            >
+              release notes
+            </a>
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {release.assets.flatMap((a) => a.devices).map((d) => (
+              <span
+                key={d}
+                className="rounded bg-stone-200 px-1.5 py-0.5 font-mono text-[11px] text-stone-600"
+              >
+                {RC_DEVICE_LABELS[d] || d}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-stone-400">
+          {loaded ? 'No prerelease found on GitHub' : 'Loading...'}
+        </p>
+      )}
+
+      <label className="mt-3 flex items-center gap-1.5 text-sm text-stone-700">
+        <input
+          type="checkbox"
+          checked={enabled}
+          disabled={busy || !loaded}
+          onChange={(e) => saveEnabled(e.target.checked)}
+          className="size-4 rounded border-stone-300 text-brand-500 focus:ring-brand-500/20"
+        />
+        Offer the release candidate in the flasher
+      </label>
+      {result && (
+        <p className={`mt-2 text-xs ${result.ok ? 'text-brand-600' : 'text-red-600'}`}>{result.text}</p>
+      )}
+    </Card>
+  )
+}
+
 // --- Official release visibility (x3 / x4) -----------------------------------
 // Per-device show/hide for the fixed release buttons the flasher renders for
 // the Xteink X3 and X4. Betas are controlled individually in the Beta Testing
@@ -1793,6 +1921,7 @@ export default function AdminPage() {
             <BannerCard secret={secret} log={log} />
             <AccessoriesCard secret={secret} log={log} />
             <BetaCard secret={secret} log={log} />
+            <RcChannelCard secret={secret} log={log} />
             <ReleaseVisibilityCard secret={secret} log={log} />
             <DeviceBuildCard
               secret={secret}
