@@ -67,6 +67,32 @@ function cardClass(active) {
     : 'group relative rounded-xl border border-stone-200 bg-white p-4 text-left hover:border-stone-300'
 }
 
+// Firmware-picker card holding a dropdown of related options (stock languages,
+// beta builds) instead of one card per option. Selecting an entry picks that
+// firmware the same way clicking a plain card does.
+function DropdownCard({ active, title, sub, subClass, value, options, onSelect }) {
+  return (
+    <div className={cardClass(active)}>
+      <div className="text-sm font-semibold text-stone-900">{title}</div>
+      <div className={`mt-0.5 font-mono text-xs ${subClass}`}>{sub}</div>
+      <select
+        value={value}
+        onChange={(e) => e.target.value && onSelect(e.target.value)}
+        className="mt-2 w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none"
+      >
+        <option value="" disabled>
+          Select...
+        </option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 function relativeTime(isoStr) {
   const diff = Date.now() - new Date(isoStr).getTime()
   const mins = Math.floor(diff / 60000)
@@ -819,7 +845,7 @@ export default function FlashTools() {
                     <div className="text-sm font-semibold text-stone-900">
                       {crosspoint.tag ? `CrossPoint ${crosspoint.tag}` : 'CrossPoint'}
                     </div>
-                    <div className="mt-0.5 font-mono text-xs text-brand-600">Community</div>
+                    <div className="mt-0.5 font-mono text-xs text-brand-600">Stable</div>
                   </button>
                 )}
                 {!isReleaseHidden('nightly') && (
@@ -834,31 +860,34 @@ export default function FlashTools() {
                     <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
                   </button>
                 )}
-                {!isReleaseHidden('stock-en') && (
-                  <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
-                    <div className="text-sm font-semibold text-stone-900">Stock English</div>
-                    <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
-                  </button>
+                {(!isReleaseHidden('stock-en') || !isReleaseHidden('stock-ch')) && (
+                  <DropdownCard
+                    active={fw === 'stock-en' || fw === 'stock-ch'}
+                    title="Stock Firmware"
+                    sub="Official"
+                    subClass="text-stone-400"
+                    value={fw === 'stock-en' || fw === 'stock-ch' ? fw : ''}
+                    onSelect={selectFw}
+                    options={[
+                      !isReleaseHidden('stock-en') && { value: 'stock-en', label: 'Stock English' },
+                      !isReleaseHidden('stock-ch') && { value: 'stock-ch', label: 'Stock Chinese' },
+                    ].filter(Boolean)}
+                  />
                 )}
-                {!isReleaseHidden('stock-ch') && (
-                  <button type="button" onClick={() => selectFw('stock-ch')} className={cardClass(fw === 'stock-ch')}>
-                    <div className="text-sm font-semibold text-stone-900">Stock Chinese</div>
-                    <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
-                  </button>
+                {visibleBetas.length > 0 && (
+                  <DropdownCard
+                    active={!!selectedBeta}
+                    title="Official Betas"
+                    sub="Beta"
+                    subClass="text-amber-600"
+                    value={selectedBeta ? `beta-${selectedBeta.id}` : ''}
+                    onSelect={selectFw}
+                    options={visibleBetas.map((b) => ({
+                      value: `beta-${b.id}`,
+                      label: betaLabel(b),
+                    }))}
+                  />
                 )}
-                {visibleBetas.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => selectFw(`beta-${b.id}`)}
-                    className={cardClass(fw === `beta-${b.id}`)}
-                  >
-                    <div className="text-sm font-semibold text-stone-900">{betaTitle(b)}</div>
-                    <div className="mt-0.5 font-mono text-xs text-amber-600">
-                      {b.version ? `Version: ${b.version}` : 'Beta'}
-                    </div>
-                  </button>
-                ))}
                 <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
                   <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
                   <div className="mt-0.5 font-mono text-xs text-stone-400">Upload file</div>
