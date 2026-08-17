@@ -848,11 +848,22 @@ export default function FlashTools() {
                     <div className="mt-0.5 font-mono text-xs text-brand-600">Stable</div>
                   </button>
                 )}
-                {!isReleaseHidden('nightly') && (
-                  <button type="button" onClick={() => selectFw('nightly')} className={cardClass(fw === 'nightly')}>
-                    <div className="text-sm font-semibold text-stone-900">CrossPoint Nightly</div>
-                    <div className="mt-0.5 font-mono text-xs text-brand-600">Insider</div>
-                  </button>
+                {(!isReleaseHidden('nightly') || visibleBetas.length > 0) && (
+                  <DropdownCard
+                    active={fw === 'nightly' || !!selectedBeta}
+                    title="Insider Builds & Betas"
+                    sub="Insider"
+                    subClass="text-amber-600"
+                    value={fw === 'nightly' ? 'nightly' : selectedBeta ? `beta-${selectedBeta.id}` : ''}
+                    onSelect={selectFw}
+                    options={[
+                      !isReleaseHidden('nightly') && { value: 'nightly', label: 'CrossPoint Nightly' },
+                      ...visibleBetas.map((b) => ({
+                        value: `beta-${b.id}`,
+                        label: betaLabel(b),
+                      })),
+                    ].filter(Boolean)}
+                  />
                 )}
                 {rcAsset && (
                   <button type="button" onClick={() => selectFw('rc')} className={cardClass(fw === 'rc')}>
@@ -872,20 +883,6 @@ export default function FlashTools() {
                       !isReleaseHidden('stock-en') && { value: 'stock-en', label: 'Stock English' },
                       !isReleaseHidden('stock-ch') && { value: 'stock-ch', label: 'Stock Chinese' },
                     ].filter(Boolean)}
-                  />
-                )}
-                {visibleBetas.length > 0 && (
-                  <DropdownCard
-                    active={!!selectedBeta}
-                    title="Official Betas"
-                    sub="Beta"
-                    subClass="text-amber-600"
-                    value={selectedBeta ? `beta-${selectedBeta.id}` : ''}
-                    onSelect={selectFw}
-                    options={visibleBetas.map((b) => ({
-                      value: `beta-${b.id}`,
-                      label: betaLabel(b),
-                    }))}
                   />
                 )}
                 <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
