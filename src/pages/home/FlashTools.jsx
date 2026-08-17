@@ -808,6 +808,12 @@ export default function FlashTools() {
               </div>
               {DEVICE_BUILD_MODELS.includes(model) ? (
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {rcAsset && (
+                    <button type="button" onClick={() => selectFw('rc')} className={cardClass(fw === 'rc')}>
+                      <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>
+                      <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => selectFw('device')}
@@ -819,12 +825,6 @@ export default function FlashTools() {
                     </div>
                     <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
                   </button>
-                  {rcAsset && (
-                    <button type="button" onClick={() => selectFw('rc')} className={cardClass(fw === 'rc')}>
-                      <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>
-                      <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
-                    </button>
-                  )}
                   {model === 'x4pro' && (
                     <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
                       <div className="text-sm font-semibold text-stone-900">Stock English</div>
@@ -840,6 +840,12 @@ export default function FlashTools() {
                 </div>
               ) : (
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {rcAsset && (
+                  <button type="button" onClick={() => selectFw('rc')} className={cardClass(fw === 'rc')}>
+                    <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>
+                    <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
+                  </button>
+                )}
                 {!isReleaseHidden('crosspoint') && (
                   <button type="button" onClick={() => selectFw('crosspoint')} className={cardClass(fw === 'crosspoint')}>
                     <div className="text-sm font-semibold text-stone-900">
@@ -864,12 +870,6 @@ export default function FlashTools() {
                       })),
                     ].filter(Boolean)}
                   />
-                )}
-                {rcAsset && (
-                  <button type="button" onClick={() => selectFw('rc')} className={cardClass(fw === 'rc')}>
-                    <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>
-                    <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
-                  </button>
                 )}
                 {(!isReleaseHidden('stock-en') || !isReleaseHidden('stock-ch')) && (
                   <DropdownCard
