@@ -108,7 +108,10 @@ function EinkShot({ src, screenClass = '', x3 = false }) {
 
 export default function Hero() {
   return (
-    <section className="eink relative overflow-hidden">
+    // overflow-x-clip (not overflow-hidden): the rotated device cutouts must
+    // still be clipped at the sides, but the Get CrossPoint dropdown needs to
+    // hang below the section edge without being cut off.
+    <section className="eink relative overflow-x-clip">
       {/* soft brand wash + faint paper grain behind the hero */}
       <div
         aria-hidden="true"
