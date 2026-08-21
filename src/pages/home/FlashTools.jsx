@@ -801,11 +801,13 @@ export default function FlashTools() {
                   <div className="text-sm font-semibold text-stone-900">{m.name}</div>
                   <div className="mt-0.5 font-mono text-xs text-stone-400">
                     {(() => {
-                      // Device builds show their upload date; Xteink cards show
-                      // the stable release date; resolution is the fallback
-                      // while either is still loading.
+                      // Device builds show their upload date (falling back to
+                      // the RC publish date when only an RC covers the device);
+                      // Xteink cards show the stable release date; resolution
+                      // is the fallback while either is still loading.
                       const date = DEVICE_BUILD_MODELS.includes(m.id)
-                        ? deviceAvailability[m.id]?.uploadedAt
+                        ? deviceAvailability[m.id]?.uploadedAt ||
+                          (rcCoversDevice(m.id) ? rc.release.publishedAt : null)
                         : releaseDate
                       return date ? `Updated ${fmtDate(date)}` : m.res
                     })()}
