@@ -801,14 +801,17 @@ export default function FlashTools() {
                   <div className="text-sm font-semibold text-stone-900">{m.name}</div>
                   <div className="mt-0.5 font-mono text-xs text-stone-400">
                     {(() => {
-                      // Device builds show their upload date (falling back to
-                      // the RC publish date when only an RC covers the device);
-                      // Xteink cards show the stable release date; resolution
-                      // is the fallback while either is still loading.
-                      const date = DEVICE_BUILD_MODELS.includes(m.id)
-                        ? deviceAvailability[m.id]?.uploadedAt ||
-                          (rcCoversDevice(m.id) ? rc.release.publishedAt : null)
+                      // Cards date themselves by the newest build offered: an
+                      // RC covering the device vs the beta upload date (device
+                      // builds) or the stable release date (Xteink). Resolution
+                      // is the fallback while these are still loading.
+                      const rcDate = rcCoversDevice(m.id) ? rc.release.publishedAt : null
+                      const ownDate = DEVICE_BUILD_MODELS.includes(m.id)
+                        ? deviceAvailability[m.id]?.uploadedAt
                         : releaseDate
+                      const date = [rcDate, ownDate]
+                        .filter(Boolean)
+                        .sort((a, b) => new Date(b) - new Date(a))[0]
                       return date ? `Updated ${fmtDate(date)}` : m.res
                     })()}
                   </div>
