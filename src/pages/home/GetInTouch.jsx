@@ -55,6 +55,18 @@ export default function GetInTouch() {
           development</strong>, we&rsquo;d love to hear from you. Reach out and let&rsquo;s
           build something together.
         </p>
+        <p className="mx-auto mt-5 max-w-[52ch] font-serif text-base/7 text-pretty text-stone-500">
+          For feature requests and bug reports, please{' '}
+          <a
+            href="https://github.com/crosspoint-reader/crosspoint-reader/issues"
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-brand-600 underline decoration-brand-400/60 underline-offset-4 hover:text-brand-700"
+          >
+            open an issue on GitHub
+          </a>
+          .
+        </p>
 
         <form onSubmit={onSubmit} className="mx-auto mt-10 max-w-xl space-y-3 text-left">
           <div className="grid gap-3 sm:grid-cols-2">
