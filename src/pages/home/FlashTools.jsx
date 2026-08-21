@@ -304,7 +304,8 @@ export default function FlashTools() {
   }, [])
 
   // Uploaded build per non-Xteink device; their cards stay hidden from the
-  // device grid until one exists, and show the build's upload date.
+  // device grid until one exists (or an RC asset covers the device), and show
+  // the build's upload date.
   const [deviceAvailability, setDeviceAvailability] = useState({})
 
   useEffect(() => {
@@ -738,6 +739,8 @@ export default function FlashTools() {
 
   // RC asset covering the selected device, when the admin-gated RC channel is
   // on. The worker maps prerelease assets to device ids by filename prefix.
+  const rcCoversDevice = (id) =>
+    rc.enabled && rc.release ? rc.release.assets.some((a) => a.devices.includes(id)) : false
   const rcAsset =
     rc.enabled && rc.release
       ? rc.release.assets.find((a) => a.devices.includes(model)) || null
@@ -785,7 +788,9 @@ export default function FlashTools() {
               <h3 className="font-display text-sm font-semibold text-stone-900">Select your device</h3>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {MODELS.filter((m) => !DEVICE_BUILD_MODELS.includes(m.id) || deviceAvailability[m.id]).map((m) => (
+              {MODELS.filter(
+                (m) => !DEVICE_BUILD_MODELS.includes(m.id) || deviceAvailability[m.id] || rcCoversDevice(m.id)
+              ).map((m) => (
                 <button
                   key={m.id}
                   type="button"
