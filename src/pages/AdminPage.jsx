@@ -1964,6 +1964,16 @@ export default function AdminPage() {
             <DeviceBuildCard
               secret={secret}
               log={log}
+              label="M5PaperMono"
+              namePlaceholder="Build name (e.g. M5PaperMono Beta v1)"
+              infoUrl="/api/device-build/papermono/info"
+              uploadUrl="/api/device-build/papermono/upload"
+              baseUrl="/api/device-build/papermono"
+              description="Upload the M5PaperMono build offered in the homepage web flasher. Uploading replaces the current build."
+            />
+            <DeviceBuildCard
+              secret={secret}
+              log={log}
               label="LilyGo T5"
               namePlaceholder="Build name (e.g. LilyGo T5 Beta v1)"
               infoUrl="/api/device-build/lilygo/info"

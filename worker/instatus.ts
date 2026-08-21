@@ -11,7 +11,7 @@ export type BetaNotification = {
   build: BetaBuild;
 };
 
-export type DeviceBuildStatusDevice = 'x4pro' | 'sticky' | 'm5paper' | 'lilygo';
+export type DeviceBuildStatusDevice = 'x4pro' | 'sticky' | 'm5paper' | 'lilygo' | 'papermono';
 
 export type PublishedBuildStatus = {
   name: string;
@@ -159,8 +159,8 @@ function insiderTarget(env: Env, device: FirmwareDevice): ComponentTarget {
   );
 }
 
-function deviceBuildTarget(env: Env, device: DeviceBuildStatusDevice): ComponentTarget {
-  const targets: Record<DeviceBuildStatusDevice, ComponentTarget> = {
+function deviceBuildTargets(env: Env): Record<DeviceBuildStatusDevice, ComponentTarget> {
+  return {
     x4pro: {
       name: 'Beta',
       groupId: env.INSTATUS_X4_PRO_GROUP_ID,
@@ -185,8 +185,17 @@ function deviceBuildTarget(env: Env, device: DeviceBuildStatusDevice): Component
       componentId: env.INSTATUS_LILYGO_BETA_COMPONENT_ID,
       order: 0,
     },
+    papermono: {
+      name: 'Beta',
+      groupId: env.INSTATUS_PAPERMONO_GROUP_ID,
+      componentId: env.INSTATUS_PAPERMONO_BETA_COMPONENT_ID,
+      order: 0,
+    },
   };
-  return requireTarget(targets[device], `${device} beta`);
+}
+
+function deviceBuildTarget(env: Env, device: DeviceBuildStatusDevice): ComponentTarget {
+  return requireTarget(deviceBuildTargets(env)[device], `${device} beta`);
 }
 
 async function instatusRequest<T = unknown>(
@@ -542,15 +551,20 @@ export async function reconcileReleaseStatusSnapshot(
     ));
   }
 
-  await Promise.all((Object.keys(DEVICE_BUILD_LABELS) as DeviceBuildStatusDevice[]).map(device => {
-    const build = snapshot.deviceBuilds[device] || null;
-    return updateComponent(
-      config,
-      deviceBuildTarget(env, device),
-      build ? build.name : 'No build is currently available.',
-      components
-    );
-  }));
+  // Devices without a configured Instatus group yet (no component to update)
+  // are skipped so one unconfigured device doesn't fail the whole snapshot.
+  const targets = deviceBuildTargets(env);
+  await Promise.all((Object.keys(DEVICE_BUILD_LABELS) as DeviceBuildStatusDevice[])
+    .filter(device => targets[device].groupId)
+    .map(device => {
+      const build = snapshot.deviceBuilds[device] || null;
+      return updateComponent(
+        config,
+        deviceBuildTarget(env, device),
+        build ? build.name : 'No build is currently available.',
+        components
+      );
+    }));
 }
 
 export async function reconcileBetaStatus(
@@ -620,6 +634,7 @@ const DEVICE_BUILD_LABELS: Record<DeviceBuildStatusDevice, string> = {
   sticky: 'Sticky',
   m5paper: 'M5Paper',
   lilygo: 'LilyGo T5',
+  papermono: 'M5PaperMono',
 };
 
 function pendingDeviceNotificationKey(device: DeviceBuildStatusDevice): string {

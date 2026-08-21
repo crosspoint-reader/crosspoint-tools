@@ -3625,7 +3625,7 @@ interface DeviceBuildConfig {
   defaultName: string;
   filename: string;
   label: string;
-  statusDevice: 'x4pro' | 'sticky' | 'm5paper' | 'lilygo';
+  statusDevice: 'x4pro' | 'sticky' | 'm5paper' | 'lilygo' | 'papermono';
 }
 
 const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
@@ -3660,6 +3660,14 @@ const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
     filename: 'x4pro-firmware.bin',
     label: 'X4 Pro',
     statusDevice: 'x4pro',
+  },
+  papermono: {
+    r2Key: 'builds/papermono/firmware.bin',
+    metaKey: 'papermono-build',
+    defaultName: 'M5PaperMono Beta',
+    filename: 'papermono-firmware.bin',
+    label: 'M5PaperMono',
+    statusDevice: 'papermono',
   },
 };
 
