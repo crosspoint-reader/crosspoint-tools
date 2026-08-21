@@ -3900,7 +3900,7 @@ async function fetchRcRelease(env: Env): Promise<RcRelease | null> {
     draft: boolean;
     published_at: string;
     html_url: string;
-    assets: Array<{ name: string; size: number; browser_download_url: string }>;
+    assets: Array<{ name: string; size: number; browser_download_url: string; updated_at?: string }>;
   }>;
   const release = releases.find(r => r.prerelease && !r.draft);
   if (!release) return null;
@@ -3920,11 +3920,19 @@ async function fetchRcRelease(env: Env): Promise<RcRelease | null> {
   // User-facing version: the build id embedded in the asset filename
   // (e.g. `1.6.0_beta_RC01`), falling back to the tag.
   const version = assets[0].name.replace(/^[^-]+-/, '').replace(/\.bin$/, '') || release.tag_name;
+  // A new RC pushed to the same prerelease replaces its assets without moving
+  // published_at, so date the release by its newest asset upload instead.
+  const publishedAt = release.assets
+    .map(a => a.updated_at)
+    .filter((d): d is string => Boolean(d))
+    .concat(release.published_at)
+    .sort()
+    .pop() as string;
   return {
     tag: release.tag_name,
     name: release.name || release.tag_name,
     version,
-    publishedAt: release.published_at,
+    publishedAt,
     notesUrl: release.html_url,
     assets,
   };
