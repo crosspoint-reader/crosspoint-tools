@@ -830,17 +830,12 @@ export default function FlashTools() {
                       <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => selectFw('device')}
-                    disabled={!deviceBuild}
-                    className={`${cardClass(fw === 'device')} disabled:cursor-not-allowed disabled:opacity-60`}
-                  >
-                    <div className="text-sm font-semibold text-stone-900">
-                      {deviceBuild ? deviceBuild.name : 'No build available'}
-                    </div>
-                    <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
-                  </button>
+                  {deviceBuild && (
+                    <button type="button" onClick={() => selectFw('device')} className={cardClass(fw === 'device')}>
+                      <div className="text-sm font-semibold text-stone-900">{deviceBuild.name}</div>
+                      <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
+                    </button>
+                  )}
                   {model === 'x4pro' && (
                     <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
                       <div className="text-sm font-semibold text-stone-900">Stock English</div>
