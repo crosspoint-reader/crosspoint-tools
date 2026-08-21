@@ -2,7 +2,8 @@ const DEVICE_LABELS = {
   x3: 'Xteink X3',
   x4: 'Xteink X4',
   sticky: 'Seeed Sticky',
-  m5paper: 'M5Paper',
+  m5paper: 'M5Paper v1.1',
+  papermono: 'M5PaperMono',
   lilygo: 'LilyGo T5',
 }
 

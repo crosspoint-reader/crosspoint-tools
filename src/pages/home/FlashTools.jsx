@@ -160,21 +160,23 @@ const MODELS = [
   { id: 'x4pro', name: 'Xteink X4 Pro', res: '480 × 800' },
   { id: 'x3', name: 'Xteink X3', res: '528 × 792' },
   { id: 'sticky', name: 'Seeed Sticky', res: '480 × 800' },
-  { id: 'm5paper', name: 'M5Paper', res: '540 × 960' },
+  { id: 'm5paper', name: 'M5Paper v1.1', res: '540 × 960' },
+  { id: 'papermono', name: 'M5PaperMono', res: '480 × 800' },
   { id: 'lilygo', name: 'LilyGo T5', res: '540 × 960' },
 ]
 
 // esptool chip identity each device must report before we write anything.
 // Stops firmware for one board from landing on another (e.g. the Sticky's
-// ESP32-S3 build onto an ESP32-C3 Xteink). Sticky and LilyGo share a chip,
-// so this can't tell those two apart — but it fences off the Xteinks and
-// the M5Paper.
+// ESP32-S3 build onto an ESP32-C3 Xteink). Sticky, PaperMono and LilyGo
+// share a chip, so this can't tell those apart — but it fences off the
+// Xteinks and the M5Paper.
 const MODEL_CHIPS = {
   x4: 'ESP32-C3',
   x4pro: 'ESP32-S3',
   x3: 'ESP32-C3',
   sticky: 'ESP32-S3',
   m5paper: 'ESP32',
+  papermono: 'ESP32-S3',
   lilygo: 'ESP32-S3',
 }
 
@@ -212,11 +214,20 @@ const DEVICE_INSTALLS = {
     after: 'Press and hold the power button (top right) until the device boots.',
   },
   m5paper: {
-    name: 'M5Paper',
+    name: 'M5Paper v1.1',
     bootloader: '/firmware/m5paper-bootloader.bin',
     bootloaderOffset: 0x1000,
     baudrate: 460800,
     after: 'Press and hold the rotary dial to boot.',
+  },
+  papermono: {
+    name: 'M5PaperMono',
+    // No packaged partition table: the papermono PlatformIO env uses the
+    // standard CrossPoint 16MB layout, so the client-generated table matches.
+    bootloader: '/firmware/papermono-bootloader.bin',
+    bootloaderOffset: 0x0,
+    baudrate: 921600,
+    after: 'Press the power button to boot the device.',
   },
   lilygo: {
     name: 'LilyGo T5',
