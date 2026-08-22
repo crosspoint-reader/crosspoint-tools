@@ -20,12 +20,26 @@ pub struct DnsConfig {
 }
 
 impl DnsConfig {
-    pub fn for_locale(locale: Locale, bridge_ip: Ipv4Addr, port: u16) -> Self {
+    pub fn for_locale(_locale: Locale, bridge_ip: Ipv4Addr, port: u16) -> Self {
+        // `_locale` no longer selects the api host — we spoof both regional
+        // hosts unconditionally (see below) so telemetry to either is captured.
         Self {
             bind_ip: IpAddr::V4(bridge_ip),
             port,
             spoofed_hosts: vec![
-                locale.api_host().to_string(),
+                // Spoof BOTH regional API hosts, not just the one for the
+                // selected locale. The stock firmware carries two api bases —
+                // `api-prod.xteink.cc` (overseas) and `api-prod.xteink.cn`
+                // (domestic) — and its OTA/telemetry paths don't all follow the
+                // active region: the OTA-failure event (`{"event":
+                // "download_task_failed",...}` → `/debug/submit`) can be reported
+                // to the *other* host. If we only answer the active one, that
+                // report goes to an unspoofed name, never reaches us, and the
+                // device's internal `ota_cloud` error code (‑114/‑116/‑118 …)
+                // stays invisible. Answer both so the report always lands in
+                // `catch_all`, which logs the body.
+                "api-prod.xteink.cc".to_string(),
+                "api-prod.xteink.cn".to_string(),
                 // CrossPoint OTA checks api.github.com for updates.
                 "api.github.com".to_string(),
                 // Firmware download URL uses our cert's hostname.

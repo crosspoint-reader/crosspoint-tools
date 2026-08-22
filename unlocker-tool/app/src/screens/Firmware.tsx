@@ -110,7 +110,9 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
     const isHidden = (r: CrossPointRelease) =>
       (HIDDEN_RELEASES[r.id] ?? []).includes(model);
     const isHiddenChannel = (r: CrossPointRelease) =>
-      !showPrereleaseFirmware && (r.channel === "beta" || r.channel === "insider");
+      model !== "x4pro" &&
+      !showPrereleaseFirmware &&
+      (r.channel === "beta" || r.channel === "insider");
     const eligible = catalog.releases.filter(
       (r) =>
         supportsModel(r) &&
@@ -207,107 +209,6 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
     }
   }
 
-  // X4 Pro (ESP32-S3): its stock updater only accepts an encrypted `.xota`, and
-  // the shared firmware catalog doesn't carry X4 Pro builds. The path here is a
-  // local `.bin` (the escape-hatch bridge, or a CrossPoint image) which the
-  // install pipeline wraps into an `encrypted_v1` `.xota` on the fly and serves
-  // through the spoofed OTA. Surface the sideload picker directly rather than
-  // the channel cards.
-  if (model === "x4pro") {
-    const busy = !!pendingId;
-    // Hosted X4 Pro escape-hatch bridge, if the catalog is serving it for this
-    // model. One-click flash goes through the normal install pipeline, which
-    // wraps it into an encrypted `.xota` on the way to the device.
-    const x4proHatch =
-      catalog.releases.find(
-        (r) =>
-          r.id === ESCAPE_HATCH_X4PRO_ID &&
-          (!r.supported_devices ||
-            r.supported_devices.length === 0 ||
-            r.supported_devices.includes("x4pro")),
-      ) ?? null;
-
-    return (
-      <div className="space-y-5">
-        <div>
-          <Eyebrow>Step 3 · X4 Pro firmware</Eyebrow>
-          <Heading>Choose a firmware image</Heading>
-        </div>
-
-        <Callout variant="info" title="Encrypted OTA — packaged automatically">
-          The X4 Pro only accepts an encrypted <code>.xota</code> over OTA. Pick a
-          plain firmware <code>.bin</code> below and the unlocker encrypts it into
-          a package the device will accept, verify, and flash — no manual
-          conversion needed. Start with the <strong>Escape Hatch</strong> bridge
-          firmware, then flash your real build.
-        </Callout>
-
-        <div className="rounded-xl border border-stone-300 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="font-serif text-sm font-medium text-stone-900">
-                Escape Hatch (recovery bridge)
-              </div>
-              <div className="mt-1 text-xs text-stone-500">
-                The recommended first step. Flashes a small bridge build over the
-                spoofed OTA so you can then load any firmware.
-              </div>
-            </div>
-            {x4proHatch ? (
-              <button
-                type="button"
-                onClick={() => install(x4proHatch)}
-                disabled={busy && pendingId !== x4proHatch.id}
-                className={`shrink-0 rounded-md border px-3 py-1 text-xs font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-50 ${
-                  pendingId === x4proHatch.id
-                    ? "border-brand-500 bg-brand-500 text-white"
-                    : "border-brand-500 bg-brand-500/90 text-white hover:bg-brand-500"
-                }`}
-              >
-                {pendingId === x4proHatch.id ? "Flashing…" : "Flash Escape Hatch"}
-              </button>
-            ) : (
-              <span className="shrink-0 text-xs text-stone-400">unavailable</span>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-stone-300 bg-white p-4 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="font-serif text-sm font-medium text-stone-900">
-                Firmware image (.bin)
-              </div>
-              <div className="mt-1 text-xs text-stone-500">
-                Sideload a plain ESP32-S3 firmware <code>.bin</code> from this
-                computer. It's encrypted to <code>.xota</code> and served over the
-                spoofed X4 Pro OTA.
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={installLocal}
-              disabled={busy && pendingId !== "local"}
-              className={`shrink-0 rounded-md border px-3 py-1 text-xs font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-50 ${
-                pendingId === "local"
-                  ? "border-brand-500 bg-brand-500 text-white"
-                  : "border-stone-300 bg-stone-50 text-stone-700 hover:bg-stone-100"
-              }`}
-            >
-              {pendingId === "local" ? "Preparing…" : "Choose file"}
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <Callout variant="error" title="Couldn't start install">
-            {error}
-          </Callout>
-        )}
-      </div>
-    );
-  }
-
   if (bySource.sources.length === 0) {
     return (
       <p className="text-sm text-stone-500">
@@ -322,10 +223,12 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
   // The Escape Hatch recovery firmware, if the catalog is serving it and it
   // supports this model. Surfaced only from the recovery panel below, never in
   // the channel cards (filtered out of `eligible` by `isRecoveryRelease`).
+  const escapeHatchId =
+    model === "x4pro" ? ESCAPE_HATCH_X4PRO_ID : ESCAPE_HATCH_ID;
   const escapeHatch =
     catalog.releases.find(
       (r) =>
-        r.id === ESCAPE_HATCH_ID &&
+        r.id === escapeHatchId &&
         (!r.supported_devices ||
           r.supported_devices.length === 0 ||
           r.supported_devices.includes(model)),
@@ -337,6 +240,14 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
         <Eyebrow>Step 3 · Firmware channel</Eyebrow>
         <Heading>Pick a release</Heading>
       </div>
+
+      {model === "x4pro" && (
+        <Callout variant="info" title="Encrypted OTA — packaged automatically">
+          Choose the latest stable or release-candidate build. The unlocker
+          automatically wraps its X4 Pro <code>.bin</code> in the stock encrypted
+          <code>.xota</code> format before flashing it.
+        </Callout>
+      )}
 
       <div className="flex items-center gap-3">
         <label
@@ -388,11 +299,9 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
           </summary>
           <div className="space-y-3 px-4 pb-4 pl-8">
             <p>
-              Some firmware (such as crosspet 1.8.3+) forces an encrypted OTA
-              download that these devices can't reliably finish — the update
-              starts, then stalls or drops partway. If a normal install keeps
-              failing, flash the <strong>Escape Hatch</strong> firmware instead,
-              then flash your real firmware directly from the SD card.
+              {model === "x4pro"
+                ? "If a normal stable or release-candidate install fails, use Escape Hatch as a recovery path, then flash your real firmware from the SD card."
+                : "Some firmware (such as crosspet 1.8.3+) forces an encrypted OTA download that these devices can't reliably finish. If a normal install keeps failing, flash Escape Hatch instead, then flash your real firmware directly from the SD card."}
             </p>
             {escapeHatch ? (
               <>

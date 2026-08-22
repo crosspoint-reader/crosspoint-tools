@@ -21,7 +21,7 @@
 //!
 //! Decrypted metadata (182 bytes), fixed offsets:
 //! ```text
-//!   [0:4]     header 0x00 0x67 0xa5 0x60 (bytes 60 a5 67 00)
+//!   [0:4]     plaintext firmware length as little-endian u32
 //!   [4:36]    plain_sha256 as raw 32 bytes
 //!   [36:38]   flags 0x01 0x00
 //!   [38:..]   version string  (NUL-terminated, e.g. "V7.0.9")
@@ -54,7 +54,6 @@ const KEY_TABLE: [u8; 16] = [
     0xea, 0x91, 0x56, 0x60, 0xe4, 0x2d, 0x51, 0x76, 0xc2, 0x33, 0x3d, 0xea, 0x48, 0x2a, 0x53, 0xfa,
 ];
 
-const META_HEADER: [u8; 4] = [0x60, 0xa5, 0x67, 0x00];
 const META_FLAGS: [u8; 2] = [0x01, 0x00];
 
 /// Firmware key derivation: `key[i] = table[i] ^ ((17*i - 0x5b) & 0xff)`.
@@ -75,9 +74,15 @@ fn derive_key() -> [u8; 16] {
 /// `version`/`device_type`/`panel` are written at their fixed offsets and
 /// NUL-padded. Callers pass the values the target device expects; for the X4
 /// Pro that's `ESP32S3_X4_TL` / `SSD1677`.
-fn build_metadata(plain_sha256: &[u8; 32], version: &str, device_type: &str, panel: &str) -> [u8; META_LEN] {
+fn build_metadata(
+    plain_size: u32,
+    plain_sha256: &[u8; 32],
+    version: &str,
+    device_type: &str,
+    panel: &str,
+) -> [u8; META_LEN] {
     let mut m = [0u8; META_LEN];
-    m[0..4].copy_from_slice(&META_HEADER);
+    m[0..4].copy_from_slice(&plain_size.to_le_bytes());
     m[4..36].copy_from_slice(plain_sha256);
     m[36..38].copy_from_slice(&META_FLAGS);
     write_cstr(&mut m, 38, version);
@@ -121,12 +126,19 @@ pub struct EncryptedXota {
 /// `iv` is normally `None` (a fresh random nonce is generated); it exists so
 /// tests can reproduce a known package. `version` populates the metadata
 /// version string.
-pub fn encrypt(model: Model, plain: &[u8], version: &str, iv: Option<[u8; 16]>) -> anyhow::Result<EncryptedXota> {
+pub fn encrypt(
+    model: Model,
+    plain: &[u8],
+    version: &str,
+    iv: Option<[u8; 16]>,
+) -> anyhow::Result<EncryptedXota> {
     let device_type = model.device_type();
     let panel = model.panel().unwrap_or("");
 
+    let plain_size = u32::try_from(plain.len())
+        .map_err(|_| anyhow::anyhow!("plain firmware is larger than the XOTA u32 size field"))?;
     let plain_digest: [u8; 32] = Sha256::digest(plain).into();
-    let meta = build_metadata(&plain_digest, version, device_type, panel);
+    let meta = build_metadata(plain_size, &plain_digest, version, device_type, panel);
 
     let iv = iv.unwrap_or_else(random_iv);
     let key = derive_key();
@@ -178,9 +190,16 @@ pub fn inspect(xota: &[u8]) -> anyhow::Result<XotaInfo> {
     let mut meta = xota[20..202].to_vec();
     let mut cipher = Aes128Ctr::new((&key).into(), (&iv).into());
     cipher.apply_keystream(&mut meta);
+    let declared_plain_size = u32::from_le_bytes(meta[0..4].try_into().unwrap()) as u64;
+    let actual_plain_size = (xota.len() - 202) as u64;
+    if declared_plain_size != actual_plain_size {
+        anyhow::bail!(
+            "invalid .xota plaintext length: metadata declares {declared_plain_size}, package contains {actual_plain_size}"
+        );
+    }
     let plain_sha256 = hex::encode(&meta[4..36]); // raw 32-byte sha at [4:36]
     Ok(XotaInfo {
-        plain_size: (xota.len() - 202) as u64,
+        plain_size: declared_plain_size,
         plain_sha256,
         xota_sha256: hex::encode(Sha256::digest(xota)),
         xota_crc32: crc32_ieee(xota),
@@ -225,7 +244,10 @@ mod tests {
     /// The derived key must equal the published constant.
     #[test]
     fn key_derivation_matches_reference() {
-        assert_eq!(hex::encode(derive_key()), "4f2791b80dd75a6aef0d728a39a8c05e");
+        assert_eq!(
+            hex::encode(derive_key()),
+            "4f2791b80dd75a6aef0d728a39a8c05e"
+        );
     }
 
     /// Decrypt is the inverse of encrypt — recover the plain image and the
@@ -248,10 +270,13 @@ mod tests {
         let (meta, body) = whole.split_at(META_LEN);
 
         assert_eq!(body, &plain[..], "body must decrypt to the original image");
-        assert_eq!(&meta[0..4], &META_HEADER);
+        assert_eq!(&meta[0..4], &(plain.len() as u32).to_le_bytes());
         let sha: [u8; 32] = Sha256::digest(&plain).into();
         assert_eq!(&meta[4..36], &sha, "metadata carries the plain sha256");
         assert_eq!(out.plain_sha256, hex::encode(sha));
+        let inspected = inspect(&out.bytes).expect("newly encrypted package must inspect");
+        assert_eq!(inspected.plain_size, plain.len() as u64);
+        assert_eq!(inspected.plain_sha256, hex::encode(sha));
         // version at offset 38, device_type at 70, panel at 94
         assert_eq!(&meta[38..44], b"V9.9.9");
         assert_eq!(&meta[70..83], b"ESP32S3_X4_TL");

@@ -238,7 +238,15 @@ where
 
     fn accept(&self, stream: TcpStream, service: S) -> Self::Future {
         let peer = stream.peer_addr().ok();
-        Box::pin(async move { Ok((ResponseHeadLogStream { inner: stream, peer }, service)) })
+        Box::pin(async move {
+            Ok((
+                ResponseHeadLogStream {
+                    inner: stream,
+                    peer,
+                },
+                service,
+            ))
+        })
     }
 }
 
@@ -617,7 +625,8 @@ async fn log_request(req: AxRequest<Body>, next: Next) -> Response {
         "http request (full capture)"
     );
 
-    next.run(AxRequest::from_parts(parts, Body::from(bytes))).await
+    next.run(AxRequest::from_parts(parts, Body::from(bytes)))
+        .await
 }
 
 async fn check_update(
@@ -688,7 +697,11 @@ async fn check_update(
 /// extra `ota_format`/`ota_type`/`plain_size`/`plain_sha256`/`force_update`
 /// fields drive the device's decrypt-then-verify path. The version is forced
 /// high so the device always considers our image newer than what it's running.
-fn x4pro_check_update(cfg: &ServerConfig, xota: &XotaOta, q: &UpdateQuery) -> Json<serde_json::Value> {
+fn x4pro_check_update(
+    cfg: &ServerConfig,
+    xota: &XotaOta,
+    q: &UpdateQuery,
+) -> Json<serde_json::Value> {
     // Serve the `.xota` over plain HTTP from the bridge IP: the device fetches
     // `download_url` directly (api-prod.xteink.cc is a plain-HTTP host for this
     // device), and the OTA payload's integrity is covered by the checksum +
@@ -907,7 +920,10 @@ async fn serve_firmware(
                 // and has been observed to reset the connection mid-stream when it
                 // gets chunked. A sized `Bytes` body guarantees identity framing.
                 builder = builder.header(header::CONNECTION, "close");
-                tracing::info!(size, "serving X4 Pro .xota as fixed-length body (identity, connection: close)");
+                tracing::info!(
+                    size,
+                    "serving X4 Pro .xota as fixed-length body (identity, connection: close)"
+                );
                 Body::new(LoggedSizedBody::new(Bytes::from(bytes), path_for_log))
             } else {
                 Body::from_stream(LoggedFirmwareStream::new(Bytes::from(bytes), path_for_log))
@@ -1155,10 +1171,7 @@ fn build_release(cfg: &ServerConfig, repo: &str) -> serde_json::Value {
 /// and `size`; everything else (name, sha256, source, builds, …) is ignored.
 /// Download uses `esp_http_client`/`HttpDownloader`, not `esp_https_ota`, so
 /// the plain-HTTP firmware URL works without `CONFIG_OTA_ALLOW_HTTP`.
-async fn vcodex_manifest(
-    State(cfg): State<Arc<ServerConfig>>,
-    headers: HeaderMap,
-) -> Response {
+async fn vcodex_manifest(State(cfg): State<Arc<ServerConfig>>, headers: HeaderMap) -> Response {
     tracing::info!(
         host = ?headers.get(header::HOST),
         user_agent = ?headers.get(header::USER_AGENT),
@@ -1231,8 +1244,29 @@ async fn device_activate(headers: HeaderMap, body: String) -> Json<serde_json::V
 /// on Xteink API paths we don't yet know about. Logging at `warn` keeps the
 /// URI visible so we can add a real handler the next time the firmware adds
 /// an endpoint.
-async fn catch_all(method: Method, headers: HeaderMap, uri: axum::http::Uri) -> Response {
-    tracing::warn!(%method, ?uri, ?headers, "unknown request — returning ok stub");
+async fn catch_all(
+    method: Method,
+    headers: HeaderMap,
+    uri: axum::http::Uri,
+    body: axum::body::Bytes,
+) -> Response {
+    // The device reports OTA/download failures back to its cloud with a JSON
+    // telemetry POST — e.g. `{"event":"download_task_failed","error_code":%d,
+    // "http_code":%d,...}` — and those requests land here (their host is DNS
+    // spoofed to us). Logging the body surfaces the *exact* `ota_cloud` error
+    // code (target mismatch / hash mismatch / ota write failed / …) instead of
+    // the generic on-screen "network error", so we can see why a package was
+    // rejected. Bodies are small telemetry blobs; cap the log to be safe.
+    let body_str = String::from_utf8_lossy(&body);
+    let body_preview: String = body_str.chars().take(2048).collect();
+    tracing::warn!(
+        %method,
+        ?uri,
+        ?headers,
+        body = %body_preview,
+        body_len = body.len(),
+        "unknown request — returning ok stub"
+    );
     Json(serde_json::json!({
         "code": 0,
         "message": "ok",
@@ -1649,7 +1683,9 @@ mod tests {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
-            axum::serve(listener, app.into_make_service()).await.unwrap();
+            axum::serve(listener, app.into_make_service())
+                .await
+                .unwrap();
         });
 
         let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
@@ -1693,7 +1729,8 @@ mod tests {
     async fn firmware_headers_are_title_case_on_the_wire() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-        let path = std::env::temp_dir().join(format!("x4pro-case-test-{}.xota", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("x4pro-case-test-{}.xota", std::process::id()));
         let bytes = vec![0x22u8; 2048];
         std::fs::write(&path, &bytes).unwrap();
         let sha = hex::encode(Sha256::digest(&bytes));
@@ -1722,7 +1759,9 @@ mod tests {
             .preserve_header_case(true);
         // Route through the same head-logging acceptor start() uses, to confirm
         // the stream wrapper serves headers + body intact.
-        let server = server.acceptor(HttpHeadLoggingAcceptor).handle(handle.clone());
+        let server = server
+            .acceptor(HttpHeadLoggingAcceptor)
+            .handle(handle.clone());
         let h = handle.clone();
         tokio::spawn(async move { server.serve(app.into_make_service()).await.unwrap() });
         handle.listening().await;
@@ -1739,7 +1778,9 @@ mod tests {
 
         let text = String::from_utf8_lossy(&buf);
         let head = text.split("\r\n\r\n").next().unwrap().to_string();
-        eprintln!("--- wire head (title-case check) ---\n{head}\n------------------------------------");
+        eprintln!(
+            "--- wire head (title-case check) ---\n{head}\n------------------------------------"
+        );
         // Exact, case-sensitive: the OTA driver looks for "Content-Length".
         assert!(
             head.contains("Content-Length: 2048"),

@@ -194,7 +194,7 @@ async function handleApi(
         return handleLatestRelease(env, corsHeaders);
 
       case '/api/release/firmware':
-        return handleReleaseFirmware(env, corsHeaders);
+        return handleReleaseFirmware(url, env, corsHeaders);
 
       case '/api/recovery/escape-hatch/firmware':
         return handleEscapeHatchFirmware(env, corsHeaders);
@@ -837,6 +837,7 @@ async function handleLatestRelease(
 }
 
 async function handleReleaseFirmware(
+  url: URL,
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
@@ -853,9 +854,12 @@ async function handleReleaseFirmware(
     tag_name: string;
     assets: Array<{ name: string; browser_download_url: string }>;
   };
-  const firmwareAsset = release.assets.find(a => a.name.endsWith('firmware.bin'));
+  const requestedAsset = url.searchParams.get('asset');
+  const firmwareAsset = requestedAsset
+    ? release.assets.find(a => a.name === requestedAsset && stableAssetDevices(a.name).length > 0)
+    : release.assets.find(a => a.name === 'firmware.bin');
   if (!firmwareAsset) {
-    return json({ error: 'No firmware.bin in latest release' }, 404, headers);
+    return json({ error: 'Requested firmware is not in the latest release' }, 404, headers);
   }
 
   // Download and proxy the firmware binary
@@ -3883,6 +3887,19 @@ const RC_ASSET_DEVICES: Record<string, string[]> = {
   papermono: ['papermono'],
 };
 
+// Stable releases historically used a bare `firmware.bin` for the shared
+// X3/X4 image. New multi-device releases use the same filename prefixes as the
+// RC channel, so each catalog entry must point at the matching GitHub asset.
+function stableAssetDevices(name: string): ('x3' | 'x4' | 'x4pro')[] {
+  if (name === 'firmware.bin') return ['x3', 'x4'];
+  if (!name.endsWith('.bin')) return [];
+  const devices = RC_ASSET_DEVICES[name.split('-')[0]] || [];
+  return devices.filter(
+    (device): device is 'x3' | 'x4' | 'x4pro' =>
+      device === 'x3' || device === 'x4' || device === 'x4pro'
+  );
+}
+
 interface RcAsset {
   name: string;
   size: number;
@@ -4078,13 +4095,13 @@ async function computeR2Sha(env: Env, r2Key: string): Promise<{ sha: string; siz
   };
 }
 
-async function fetchStableForCatalog(env: Env): Promise<CatalogRelease | null> {
+async function fetchStableForCatalog(env: Env): Promise<CatalogRelease[]> {
   try {
     const res = await fetch(
       'https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases/latest',
       { headers: ghFetchHeaders(env), cf: { cacheTtl: 300, cacheEverything: true } as RequestInitCfProperties }
     );
-    if (!res.ok) return null;
+    if (!res.ok) return [];
     const release = await res.json() as {
       tag_name: string;
       name: string;
@@ -4092,36 +4109,70 @@ async function fetchStableForCatalog(env: Env): Promise<CatalogRelease | null> {
       body: string;
       assets: Array<{ name: string; browser_download_url: string; size: number }>;
     };
-    const asset = release.assets.find(a => a.name.endsWith('firmware.bin'));
-    if (!asset) return null;
+    const out: CatalogRelease[] = [];
+    for (const asset of release.assets) {
+      const devices = stableAssetDevices(asset.name);
+      if (!devices.length) continue;
 
-    const cacheKey = `sha256:stable:${release.tag_name}`;
-    let sha = await env.BUILD_META.get(cacheKey);
-    if (!sha) {
-      const fwRes = await fetch(asset.browser_download_url, {
-        headers: { 'User-Agent': 'crosspoint-tools' },
+      const cacheKey = `sha256:stable:${release.tag_name}:${asset.name}`;
+      let sha = await env.BUILD_META.get(cacheKey);
+      if (!sha) {
+        const fwRes = await fetch(asset.browser_download_url, {
+          headers: { 'User-Agent': 'crosspoint-tools' },
+        });
+        if (!fwRes.ok) continue;
+        sha = await sha256Hex(await fwRes.arrayBuffer());
+        await env.BUILD_META.put(cacheKey, sha);
+      }
+
+      const suffix = devices.includes('x4pro') ? '-x4pro' : '';
+      out.push({
+        id: `stable-${release.tag_name}${suffix}`,
+        channel: 'stable',
+        name: release.name || release.tag_name,
+        version: release.tag_name,
+        released_at: release.published_at,
+        firmware_url: `${ORIGIN}/api/release/firmware?asset=${encodeURIComponent(asset.name)}`,
+        firmware_sha256: sha,
+        size: asset.size,
+        supported_devices: devices,
       });
-      if (!fwRes.ok) return null;
-      const buf = await fwRes.arrayBuffer();
-      sha = await sha256Hex(buf);
-      await env.BUILD_META.put(cacheKey, sha);
     }
-
-    return {
-      id: `stable-${release.tag_name}`,
-      channel: 'stable',
-      name: release.name || release.tag_name,
-      version: release.tag_name,
-      released_at: release.published_at,
-      firmware_url: `${ORIGIN}/api/release/firmware`,
-      firmware_sha256: sha,
-      size: asset.size,
-      supported_devices: ['x3', 'x4'],
-    };
+    return out;
   } catch (err) {
     console.error('Stable catalog fetch failed:', err);
-    return null;
+    return [];
   }
+}
+
+// Offer the latest GitHub RC directly to X4 Pro users while stable releases do
+// not yet carry an X4 Pro asset. The unlocker wraps this plain binary into XOTA.
+async function fetchRcX4ProForCatalog(env: Env): Promise<CatalogRelease | null> {
+  const [settings, release] = await Promise.all([getRcSettings(env), fetchRcRelease(env)]);
+  if (!settings.enabled || !release) return null;
+  const asset = release.assets.find(a => a.devices.includes('x4pro'));
+  if (!asset) return null;
+
+  const cacheKey = `sha256:rc:${release.tag}:${asset.name}`;
+  let sha = await env.BUILD_META.get(cacheKey);
+  if (!sha) {
+    const fwRes = await fetch(asset.downloadUrl, { headers: { 'User-Agent': 'crosspoint-tools' } });
+    if (!fwRes.ok) return null;
+    sha = await sha256Hex(await fwRes.arrayBuffer());
+    await env.BUILD_META.put(cacheKey, sha);
+  }
+
+  return {
+    id: `rc-${release.tag}-x4pro`,
+    channel: 'beta',
+    name: release.name,
+    version: release.version,
+    released_at: release.publishedAt,
+    firmware_url: `${ORIGIN}/api/rc/firmware?device=x4pro`,
+    firmware_sha256: sha,
+    size: asset.size,
+    supported_devices: ['x4pro'],
+  };
 }
 
 async function fetchInsiderForCatalog(env: Env): Promise<CatalogRelease | null> {
@@ -4221,8 +4272,9 @@ async function handleCatalog(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const [stable, insider, betas, escapeHatch, escapeHatchX4Pro] = await Promise.all([
+  const [stable, rcX4Pro, insider, betas, escapeHatch, escapeHatchX4Pro] = await Promise.all([
     fetchStableForCatalog(env),
+    fetchRcX4ProForCatalog(env),
     fetchInsiderForCatalog(env),
     fetchBetasForCatalog(env),
     fetchEscapeHatchForCatalog(env),
@@ -4230,7 +4282,8 @@ async function handleCatalog(
   ]);
 
   const releases: CatalogRelease[] = [];
-  if (stable) releases.push(stable);
+  releases.push(...stable);
+  if (rcX4Pro) releases.push(rcX4Pro);
   if (insider) releases.push(insider);
   for (const b of betas) releases.push(b);
   if (escapeHatch) releases.push(escapeHatch);
@@ -4266,6 +4319,7 @@ async function reconcileAllReleaseStatus(
     getBetaList(env),
     ...deviceConfigs.map(cfg => readStoredDeviceBuild(env, cfg)),
   ]);
+  const primaryStable = stable.find(release => release.supported_devices.includes('x4')) || stable[0] || null;
 
   const statusDeviceBuilds: Partial<Record<DeviceBuildConfig['statusDevice'], ReturnType<typeof deviceBuildStatus> | null>> = {};
   deviceConfigs.forEach((cfg, index) => {
@@ -4274,10 +4328,10 @@ async function reconcileAllReleaseStatus(
   });
 
   await reconcileReleaseStatusSnapshot(env, {
-    stable: stable ? {
-      name: stable.name,
-      version: stable.version,
-      fingerprint: stable.firmware_sha256 || stable.id,
+    stable: primaryStable ? {
+      name: primaryStable.name,
+      version: primaryStable.version,
+      fingerprint: primaryStable.firmware_sha256 || primaryStable.id,
     } : null,
     insider: insider ? {
       name: insider.name,
@@ -4288,7 +4342,7 @@ async function reconcileAllReleaseStatus(
     deviceBuilds: statusDeviceBuilds,
   }, options);
   return {
-    stable: stable?.version || null,
+    stable: primaryStable?.version || null,
     insider: insider?.version || null,
     betas: betas.length,
     deviceBuilds: deviceBuilds.filter(Boolean).length,
