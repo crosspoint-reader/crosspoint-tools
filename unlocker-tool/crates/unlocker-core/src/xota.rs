@@ -56,6 +56,180 @@ const KEY_TABLE: [u8; 16] = [
 
 const META_FLAGS: [u8; 2] = [0x01, 0x00];
 
+const ESP_IMAGE_MAGIC: u8 = 0xe9;
+const ESP_IMAGE_HEADER_LEN: usize = 24;
+const ESP_SEGMENT_HEADER_LEN: usize = 8;
+const ESP_APP_DESC_LEN: usize = 256;
+const ESP_APP_DESC_MAGIC: u32 = 0xabcd_5432;
+const ESP_CHECKSUM_SEED: u8 = 0xef;
+const ESP_MAX_SEGMENTS: usize = 16;
+const APP_DESC_OFFSET: usize = ESP_IMAGE_HEADER_LEN + ESP_SEGMENT_HEADER_LEN;
+const APP_VERSION_OFFSET: usize = APP_DESC_OFFSET + 0x10;
+const APP_PROJECT_OFFSET: usize = APP_DESC_OFFSET + 0x30;
+const APP_IDENTITY_FIELD_LEN: usize = 32;
+
+/// Stock-compatible identity used for custom X4 Pro application images. The
+/// stock updater accepts the encrypted transport metadata independently, but
+/// rejects a first application block whose embedded project/version identify
+/// it as a lower-version third-party build.
+pub const STOCK_APP_PROJECT: &str = "xteink_app";
+pub const STOCK_APP_VERSION: &str = "7.9.9";
+
+#[derive(Debug, Clone)]
+pub struct NormalizedAppImage {
+    pub bytes: Vec<u8>,
+    pub changed: bool,
+    pub original_project: String,
+    pub original_version: String,
+}
+
+/// Normalize a custom ESP32-S3 app image to the identity accepted by the stock
+/// X4 Pro OTA validator, repairing both ESP image integrity fields afterward.
+/// Genuine `xteink_app` images are returned byte-for-byte unchanged.
+pub fn normalize_x4pro_app_identity(plain: &[u8]) -> anyhow::Result<NormalizedAppImage> {
+    if plain.len() < APP_DESC_OFFSET + ESP_APP_DESC_LEN {
+        anyhow::bail!("X4 Pro firmware is too short to contain an ESP app descriptor");
+    }
+    if plain[0] != ESP_IMAGE_MAGIC {
+        anyhow::bail!(
+            "X4 Pro firmware has invalid ESP image magic 0x{:02x}",
+            plain[0]
+        );
+    }
+    let segment_count = plain[1] as usize;
+    if segment_count == 0 || segment_count > ESP_MAX_SEGMENTS {
+        anyhow::bail!("X4 Pro firmware has invalid segment count {segment_count}");
+    }
+    let app_desc_magic = u32::from_le_bytes(
+        plain[APP_DESC_OFFSET..APP_DESC_OFFSET + 4]
+            .try_into()
+            .unwrap(),
+    );
+    if app_desc_magic != ESP_APP_DESC_MAGIC {
+        anyhow::bail!("X4 Pro firmware has invalid app descriptor magic 0x{app_desc_magic:08x}");
+    }
+    verify_esp_image_integrity(plain, segment_count)?;
+
+    let original_version =
+        read_fixed_cstr(&plain[APP_VERSION_OFFSET..APP_VERSION_OFFSET + APP_IDENTITY_FIELD_LEN]);
+    let original_project =
+        read_fixed_cstr(&plain[APP_PROJECT_OFFSET..APP_PROJECT_OFFSET + APP_IDENTITY_FIELD_LEN]);
+    if original_project == STOCK_APP_PROJECT {
+        return Ok(NormalizedAppImage {
+            bytes: plain.to_vec(),
+            changed: false,
+            original_project,
+            original_version,
+        });
+    }
+
+    let mut bytes = plain.to_vec();
+    write_fixed_cstr(
+        &mut bytes[APP_VERSION_OFFSET..APP_VERSION_OFFSET + APP_IDENTITY_FIELD_LEN],
+        STOCK_APP_VERSION,
+        "app version",
+    )?;
+    write_fixed_cstr(
+        &mut bytes[APP_PROJECT_OFFSET..APP_PROJECT_OFFSET + APP_IDENTITY_FIELD_LEN],
+        STOCK_APP_PROJECT,
+        "project name",
+    )?;
+    repair_esp_image_integrity(&mut bytes, segment_count)?;
+
+    Ok(NormalizedAppImage {
+        bytes,
+        changed: true,
+        original_project,
+        original_version,
+    })
+}
+
+fn read_fixed_cstr(field: &[u8]) -> String {
+    let end = field.iter().position(|&b| b == 0).unwrap_or(field.len());
+    String::from_utf8_lossy(&field[..end]).into_owned()
+}
+
+fn write_fixed_cstr(field: &mut [u8], value: &str, name: &str) -> anyhow::Result<()> {
+    let value = value.as_bytes();
+    if value.len() >= field.len() {
+        anyhow::bail!("{name} is too long for the ESP app descriptor");
+    }
+    field.fill(0);
+    field[..value.len()].copy_from_slice(value);
+    Ok(())
+}
+
+fn esp_image_integrity_layout(
+    bytes: &[u8],
+    segment_count: usize,
+) -> anyhow::Result<(usize, bool, u8)> {
+    let mut checksum = ESP_CHECKSUM_SEED;
+    let mut pos = ESP_IMAGE_HEADER_LEN;
+    for segment in 0..segment_count {
+        let header_end = pos
+            .checked_add(ESP_SEGMENT_HEADER_LEN)
+            .ok_or_else(|| anyhow::anyhow!("ESP segment {segment} header offset overflow"))?;
+        if header_end > bytes.len() {
+            anyhow::bail!("ESP segment {segment} header is truncated");
+        }
+        let data_len = u32::from_le_bytes(bytes[pos + 4..pos + 8].try_into().unwrap()) as usize;
+        pos = header_end;
+        let data_end = pos
+            .checked_add(data_len)
+            .ok_or_else(|| anyhow::anyhow!("ESP segment {segment} length overflow"))?;
+        if data_end > bytes.len() {
+            anyhow::bail!("ESP segment {segment} data is truncated");
+        }
+        for &byte in &bytes[pos..data_end] {
+            checksum ^= byte;
+        }
+        pos = data_end;
+    }
+
+    // ESP images always reserve at least one byte after the segment data for
+    // the checksum, then pad the region to a 16-byte boundary.
+    let pad_end = pos
+        .checked_add(16)
+        .ok_or_else(|| anyhow::anyhow!("ESP checksum offset overflow"))?
+        & !15;
+    let hash_appended = bytes[23] != 0;
+    let expected_len = pad_end + if hash_appended { 32 } else { 0 };
+    if bytes.len() != expected_len {
+        anyhow::bail!(
+            "ESP image length mismatch: file has {} bytes, parsed image requires {expected_len}",
+            bytes.len()
+        );
+    }
+    Ok((pad_end, hash_appended, checksum))
+}
+
+fn verify_esp_image_integrity(bytes: &[u8], segment_count: usize) -> anyhow::Result<()> {
+    let (pad_end, hash_appended, checksum) = esp_image_integrity_layout(bytes, segment_count)?;
+    if bytes[pad_end - 1] != checksum {
+        anyhow::bail!(
+            "ESP image checksum mismatch: expected 0x{checksum:02x}, found 0x{:02x}",
+            bytes[pad_end - 1]
+        );
+    }
+    if hash_appended {
+        let digest: [u8; 32] = Sha256::digest(&bytes[..pad_end]).into();
+        if bytes[pad_end..] != digest {
+            anyhow::bail!("ESP image appended SHA-256 is invalid");
+        }
+    }
+    Ok(())
+}
+
+fn repair_esp_image_integrity(bytes: &mut [u8], segment_count: usize) -> anyhow::Result<()> {
+    let (pad_end, hash_appended, checksum) = esp_image_integrity_layout(bytes, segment_count)?;
+    bytes[pad_end - 1] = checksum;
+    if hash_appended {
+        let digest: [u8; 32] = Sha256::digest(&bytes[..pad_end]).into();
+        bytes[pad_end..].copy_from_slice(&digest);
+    }
+    Ok(())
+}
+
 /// Firmware key derivation: `key[i] = table[i] ^ ((17*i - 0x5b) & 0xff)`.
 /// Yields `4f2791b80dd75a6aef0d728a39a8c05e` for the shipped table.
 fn derive_key() -> [u8; 16] {
@@ -241,6 +415,43 @@ fn crc32_ieee(data: &[u8]) -> u32 {
 mod tests {
     use super::*;
 
+    fn synthetic_esp_app(project: &str, version: &str) -> Vec<u8> {
+        let segment_data_len = 320usize;
+        let segment_end = ESP_IMAGE_HEADER_LEN + ESP_SEGMENT_HEADER_LEN + segment_data_len;
+        let pad_end = (segment_end + 16) & !15;
+        let mut image = vec![0u8; pad_end + 32];
+        image[0] = ESP_IMAGE_MAGIC;
+        image[1] = 1;
+        image[12..14].copy_from_slice(&9u16.to_le_bytes()); // ESP32-S3
+        image[23] = 1; // appended SHA-256
+        image[ESP_IMAGE_HEADER_LEN..ESP_IMAGE_HEADER_LEN + 4]
+            .copy_from_slice(&0x3c00_0020u32.to_le_bytes());
+        image[ESP_IMAGE_HEADER_LEN + 4..APP_DESC_OFFSET]
+            .copy_from_slice(&(segment_data_len as u32).to_le_bytes());
+        image[APP_DESC_OFFSET..APP_DESC_OFFSET + 4]
+            .copy_from_slice(&ESP_APP_DESC_MAGIC.to_le_bytes());
+        write_fixed_cstr(
+            &mut image[APP_VERSION_OFFSET..APP_VERSION_OFFSET + APP_IDENTITY_FIELD_LEN],
+            version,
+            "app version",
+        )
+        .unwrap();
+        write_fixed_cstr(
+            &mut image[APP_PROJECT_OFFSET..APP_PROJECT_OFFSET + APP_IDENTITY_FIELD_LEN],
+            project,
+            "project name",
+        )
+        .unwrap();
+        for (i, byte) in image[APP_DESC_OFFSET + ESP_APP_DESC_LEN..segment_end]
+            .iter_mut()
+            .enumerate()
+        {
+            *byte = i.wrapping_mul(37) as u8;
+        }
+        repair_esp_image_integrity(&mut image, 1).unwrap();
+        image
+    }
+
     /// The derived key must equal the published constant.
     #[test]
     fn key_derivation_matches_reference() {
@@ -248,6 +459,53 @@ mod tests {
             hex::encode(derive_key()),
             "4f2791b80dd75a6aef0d728a39a8c05e"
         );
+    }
+
+    #[test]
+    fn normalizes_custom_app_identity_and_repairs_integrity() {
+        let original = synthetic_esp_app("crosspoint-reader", "1.6.0rc-11-gabc");
+        let original_sha = Sha256::digest(&original);
+        let normalized = normalize_x4pro_app_identity(&original).unwrap();
+
+        assert!(normalized.changed);
+        assert_eq!(normalized.original_project, "crosspoint-reader");
+        assert_eq!(normalized.original_version, "1.6.0rc-11-gabc");
+        assert_eq!(normalized.bytes.len(), original.len());
+        assert_ne!(Sha256::digest(&normalized.bytes), original_sha);
+        assert_eq!(
+            read_fixed_cstr(
+                &normalized.bytes[APP_PROJECT_OFFSET..APP_PROJECT_OFFSET + APP_IDENTITY_FIELD_LEN]
+            ),
+            STOCK_APP_PROJECT
+        );
+        assert_eq!(
+            read_fixed_cstr(
+                &normalized.bytes[APP_VERSION_OFFSET..APP_VERSION_OFFSET + APP_IDENTITY_FIELD_LEN]
+            ),
+            STOCK_APP_VERSION
+        );
+        verify_esp_image_integrity(&normalized.bytes, 1).unwrap();
+
+        let second = normalize_x4pro_app_identity(&normalized.bytes).unwrap();
+        assert!(!second.changed);
+        assert_eq!(second.bytes, normalized.bytes);
+    }
+
+    #[test]
+    fn preserves_genuine_xteink_app_byte_for_byte() {
+        let original = synthetic_esp_app(STOCK_APP_PROJECT, "7.0.8");
+        let normalized = normalize_x4pro_app_identity(&original).unwrap();
+        assert!(!normalized.changed);
+        assert_eq!(normalized.bytes, original);
+        assert_eq!(normalized.original_version, "7.0.8");
+    }
+
+    #[test]
+    fn rejects_corrupt_custom_app_before_normalizing() {
+        let mut corrupt = synthetic_esp_app("crosspoint-reader", "1.6.0rc");
+        corrupt[APP_DESC_OFFSET + ESP_APP_DESC_LEN + 3] ^= 0x80;
+        let error = normalize_x4pro_app_identity(&corrupt).unwrap_err();
+        assert!(error.to_string().contains("checksum mismatch"));
     }
 
     /// Decrypt is the inverse of encrypt — recover the plain image and the

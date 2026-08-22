@@ -927,6 +927,27 @@ async fn prepare_x4pro_xota(
         ));
     }
 
+    // The stock updater also validates the embedded ESP app identity before it
+    // accepts the first decrypted application block. Normalize third-party
+    // builds (for example `crosspoint-reader` / `1.6.0rc`) to the identity used
+    // by the successfully tested direct-stock Escape Hatch image, and repair
+    // the ESP checksum + appended SHA-256 before XOTA encryption.
+    let normalized = unlocker_core::xota::normalize_x4pro_app_identity(&plain)?;
+    if normalized.changed {
+        log.push(
+            "info",
+            format!(
+                "normalized X4 Pro app identity: project {:?} -> {:?}, version {:?} -> {:?}",
+                normalized.original_project,
+                unlocker_core::xota::STOCK_APP_PROJECT,
+                normalized.original_version,
+                unlocker_core::xota::STOCK_APP_VERSION,
+            ),
+            None,
+        )
+        .await;
+    }
+
     // The `.xota` metadata version must be a value the device accepts as an
     // upgrade. The real 7.0.8 package (which flashes fine through our server)
     // carries metadata version "V7.0.9"; our own "V99.9.9" is rejected during
@@ -935,7 +956,7 @@ async fn prepare_x4pro_xota(
     // — still far newer than the device's V0.0.7, and identical to the working
     // real package. (The manifest's advertised version stays V99.9.9; the device
     // accepts the real package with exactly that manifest/metadata combination.)
-    let enc = unlocker_core::xota::encrypt(Model::X4Pro, &plain, "V7.0.9", None)?;
+    let enc = unlocker_core::xota::encrypt(Model::X4Pro, &normalized.bytes, "V7.0.9", None)?;
 
     // Cache the `.xota` under its own sha so repeated runs reuse it and the
     // helper (root) reads it from the app cache dir rather than a TCC-guarded
