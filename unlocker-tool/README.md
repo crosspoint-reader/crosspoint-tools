@@ -61,9 +61,9 @@ Firmware is delivered **encrypted** (`ota_format: encrypted_v1`, `.xota`). There
 
 ### `.xota` encryption
 
-- Layout: 4-byte magic `XOTA`, then a **202-byte header** (includes an IV; no plaintext EC point), then the encrypted body of exactly `plain_size` bytes (size-preserving cipher, so the body decrypts in place).
-- Scheme (from strings in the app: `xteink.xtapp.appdek.wrap.v2`, `P256-ECDH-HKDF-SHA256-AESKW`, `crypto_chunk`): ECIES-family — P-256 ECDH → HKDF-SHA256 → AES-Key-Wrap of a content key → AES body cipher. The recipient key is **firmware-global** (one `.xota` decrypts on every X4 Pro — proven because the published `plain_sha256` is the same for all units), so the key is a constant baked into the app image, not per-device.
-- The decryption key/format has **not** been fully extracted yet (RE in progress). Blind brute-force of the obvious layouts failed; it needs disassembly of the app's XOTA parser.
+- Layout: `XOTA` magic (4 bytes), IV (16 bytes), encrypted metadata (182 bytes), then the encrypted firmware body. AES-128-CTR runs continuously across `metadata || body`.
+- Decrypted metadata bytes `[0:4]` are the firmware body length as a little-endian `u32`; `[4:36]` are its raw SHA-256. Treating the stock bytes `60 a5 67 00` as fixed magic is incorrect: they decode to `6,792,544`, the stock image's exact length.
+- The firmware-global AES key and complete metadata layout are implemented in `crates/unlocker-core/src/xota.rs`. The unlocker can wrap any valid X4 Pro app image into the stock `encrypted_v1` transport format locally.
 - **You don't need to decrypt to get a plain image.** Once installed, the decrypted firmware lives in the device's app partition, so an app-slot dump over USB yields the plain, flashable image. Verified: the first `plain_size` bytes of a dumped `app0` hash to the server's `plain_sha256`. This is how `crosspointreader.com` currently pins the plain X4 Pro stock build.
 
 ### Flash layout & OTA state
