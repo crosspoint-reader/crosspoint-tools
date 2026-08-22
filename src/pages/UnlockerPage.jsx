@@ -63,6 +63,13 @@ export default function UnlockerPage() {
           . Only reach for the Unlocker if your firmware won't flash from the SD card.
         </div>
 
+        {/* X4 Pro: no SD flash path exists — Unlocker is the only route */}
+        <div className="my-6 rounded-lg border border-stone-300 bg-stone-50 px-4 py-3 text-sm/6 text-stone-700">
+          <span className="font-semibold">Xteink X4 Pro:</span> there's no known way to flash the X4
+          Pro from an SD card. The Unlocker is the only supported route — it packages firmware into
+          the encrypted OTA format the X4 Pro requires and installs it over the air.
+        </div>
+
         {/* How it works */}
         <div className="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
           <h2 className="font-display text-lg font-semibold tracking-tight text-stone-900 sm:text-base/6">

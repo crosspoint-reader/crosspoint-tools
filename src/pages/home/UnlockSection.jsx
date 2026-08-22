@@ -73,6 +73,17 @@ export default function UnlockSection() {
             </Link>
             .
           </p>
+          <p className="mt-3 text-sm/6 text-pretty text-stone-500">
+            <strong className="font-medium text-stone-900">Xteink X4 Pro?</strong> There&rsquo;s no
+            known way to SD flash it — you must use the{' '}
+            <Link
+              to="/unlocker"
+              className="font-medium text-brand-600 underline decoration-brand-300 underline-offset-4 hover:text-brand-700 hover:decoration-brand-500"
+            >
+              OTA Unlocker Tool
+            </Link>
+            .
+          </p>
         </div>
 
         {/* Primary path: SD card flashing */}
