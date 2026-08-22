@@ -221,6 +221,94 @@ where
     }
 }
 
+/// Fixed-length variant of `LoggedFirmwareStream` for the X4 Pro `.xota`.
+///
+/// Implements `http_body::Body` with an *exact* `size_hint`, so hyper frames
+/// the response with `Content-Length` (identity) instead of falling back to
+/// `Transfer-Encoding: chunked` the way an unsized `Body::from_stream` does —
+/// the factory OTA client resets the connection on chunked. Keeps the same
+/// progress + clean-vs-early-close logging as the streaming variant, so the
+/// server still tells us whether the device pulled the whole package (the only
+/// instrument we have — the stock firmware's serial console is silent).
+struct LoggedSizedBody {
+    bytes: Bytes,
+    offset: usize,
+    total: usize,
+    next_log_at: usize,
+    path: String,
+    finished: bool,
+}
+
+impl LoggedSizedBody {
+    fn new(bytes: Bytes, path: String) -> Self {
+        let total = bytes.len();
+        Self {
+            bytes,
+            offset: 0,
+            total,
+            next_log_at: 0,
+            path,
+            finished: false,
+        }
+    }
+}
+
+impl http_body::Body for LoggedSizedBody {
+    type Data = Bytes;
+    type Error = std::io::Error;
+
+    fn poll_frame(
+        mut self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<http_body::Frame<Bytes>, Self::Error>>> {
+        if self.offset >= self.total {
+            self.finished = true;
+            return Poll::Ready(None);
+        }
+        let end = (self.offset + FIRMWARE_CHUNK_SIZE).min(self.total);
+        let chunk = self.bytes.slice(self.offset..end);
+        self.offset = end;
+        if self.offset >= self.next_log_at {
+            tracing::info!(
+                path = %self.path,
+                written = self.offset,
+                total = self.total,
+                "xota stream progress"
+            );
+            self.next_log_at = self.offset + (self.total / 10).max(FIRMWARE_CHUNK_SIZE);
+        }
+        Poll::Ready(Some(Ok(http_body::Frame::data(chunk))))
+    }
+
+    fn is_end_stream(&self) -> bool {
+        self.offset >= self.total
+    }
+
+    fn size_hint(&self) -> http_body::SizeHint {
+        http_body::SizeHint::with_exact((self.total - self.offset) as u64)
+    }
+}
+
+impl Drop for LoggedSizedBody {
+    fn drop(&mut self) {
+        if self.finished {
+            tracing::info!(
+                path = %self.path,
+                written = self.offset,
+                total = self.total,
+                "xota stream complete (device pulled the whole package)"
+            );
+        } else {
+            tracing::warn!(
+                path = %self.path,
+                written = self.offset,
+                total = self.total,
+                "xota stream closed early (device disconnected mid-download)"
+            );
+        }
+    }
+}
+
 impl Stream for LoggedFirmwareStream {
     type Item = Result<Bytes, std::io::Error>;
 
@@ -333,6 +421,7 @@ pub struct ManifestData {
 pub fn router(cfg: Arc<ServerConfig>) -> Router {
     Router::new()
         .route("/api/v1/check-update", get(check_update))
+        .route("/api/v1/device/binding/query", get(device_binding_query))
         .route("/api/v1/device/activate", post(device_activate))
         .route("/firmware/{filename}", get(serve_firmware))
         // GitHub-shaped OTA: CrossPoint, CrossInk, and CrossPoint KO all hit
@@ -504,18 +593,24 @@ fn x4pro_check_update(cfg: &ServerConfig, xota: &XotaOta, q: &UpdateQuery) -> Js
         date = chrono::Utc::now().format("%m%d"),
     );
     let download_url = format!("http://{}/firmware/{}", cfg.bridge_ip, filename);
-    // Echo the requested ota_type (default "1", the alternate path the device
-    // used in every capture); the image is identical either way.
-    let ota_type = if q.ota_type.is_empty() { "1" } else { q.ota_type.as_str() };
+    // Echo the requested ota_type as an integer (default 1 — the alternate path
+    // the device used in every capture). The real server emits a JSON number,
+    // not a string, so match that; the image is identical either way.
+    let ota_type: i64 = q.ota_type.trim().parse().unwrap_or(1);
 
     tracing::info!(
         %download_url,
         xota_size = cfg.firmware_size,
         plain_size = xota.plain_size,
-        %ota_type,
+        ota_type,
         "serving X4 Pro encrypted_v1 manifest"
     );
 
+    // The real check-update sets `checksum.sha256` == `plain_sha256` (both are
+    // the sha256 of the *decrypted* image, which the device verifies after
+    // decrypting the `.xota`) and `checksum.crc32` == null. Serving the `.xota`'s
+    // own sha here is a guaranteed post-decrypt verification failure — use the
+    // plain image sha to match the device's check.
     Json(serde_json::json!({
         "code": 0,
         "message": "Update available",
@@ -526,8 +621,8 @@ fn x4pro_check_update(cfg: &ServerConfig, xota: &XotaOta, q: &UpdateQuery) -> Js
             "size": cfg.firmware_size,
             "upload_time": chrono::Utc::now().to_rfc3339(),
             "checksum": {
-                "crc32": xota.xota_crc32,
-                "sha256": cfg.firmware_sha256,
+                "crc32": serde_json::Value::Null,
+                "sha256": xota.plain_sha256,
             },
             "force_update": true,
             "ota_format": "encrypted_v1",
@@ -597,16 +692,30 @@ async fn serve_firmware(
 
     log_image_metadata(&bytes);
 
+    // The X4 Pro OTA driver validates the `Content-Length` header (rejects with
+    // -104 "content length invalid" otherwise). Keep its response lean and
+    // identical in spirit to the real OSS download — just content-type,
+    // accept-ranges, and a bare `attachment` disposition — so nothing crowds
+    // out or confuses the device's header parse. The X3/X4 path keeps the extra
+    // diagnostic headers it's always had.
     let mut builder = Response::builder()
         .header(header::CONTENT_TYPE, "application/octet-stream")
-        .header(header::ACCEPT_RANGES, "bytes")
-        .header(header::CACHE_CONTROL, "no-store")
-        .header("X-Firmware-Sha256", served_sha256)
-        .header("X-Firmware-Head24", head24)
-        .header(
+        .header(header::ACCEPT_RANGES, "bytes");
+    if cfg.xota.is_some() {
+        builder = builder.header(
             header::CONTENT_DISPOSITION,
-            HeaderValue::from_static("attachment; filename=firmware.bin"),
+            HeaderValue::from_static("attachment"),
         );
+    } else {
+        builder = builder
+            .header(header::CACHE_CONTROL, "no-store")
+            .header("X-Firmware-Sha256", served_sha256)
+            .header("X-Firmware-Head24", head24)
+            .header(
+                header::CONTENT_DISPOSITION,
+                HeaderValue::from_static("attachment; filename=firmware.bin"),
+            );
+    }
 
     let path_for_log = cfg.firmware_path.display().to_string();
     let body = match range {
@@ -626,7 +735,20 @@ async fn serve_firmware(
         }
         None => {
             builder = builder.header(header::CONTENT_LENGTH, size);
-            Body::from_stream(LoggedFirmwareStream::new(Bytes::from(bytes), path_for_log))
+            if cfg.xota.is_some() {
+                // X4 Pro: serve the whole `.xota` as a single fixed-length body,
+                // exactly like the real OSS download (Content-Length + Connection:
+                // close, no chunked). `Body::from_stream` yields an unknown-length
+                // body, so hyper falls back to `Transfer-Encoding: chunked` — but
+                // the factory OTA client advertises `identity;q=1,chunked;q=0.1`
+                // and has been observed to reset the connection mid-stream when it
+                // gets chunked. A sized `Bytes` body guarantees identity framing.
+                builder = builder.header(header::CONNECTION, "close");
+                tracing::info!(size, "serving X4 Pro .xota as fixed-length body (identity, connection: close)");
+                Body::new(LoggedSizedBody::new(Bytes::from(bytes), path_for_log))
+            } else {
+                Body::from_stream(LoggedFirmwareStream::new(Bytes::from(bytes), path_for_log))
+            }
         }
     };
 
@@ -898,6 +1020,23 @@ async fn vcodex_manifest(
         "size": cfg.firmware_size,
     }))
     .into_response()
+}
+
+/// `GET /api/v1/device/binding/query` — the device asks whether it's bound to
+/// an Xteink account. The real server answers `{"success":false,"data":null}`
+/// for an unbound device (a distinct envelope from the `{code,data,message}`
+/// used by check-update — this endpoint is on the newer FastAPI stack). A
+/// factory device OTAs *before* it's bound, so mirror the real "not bound"
+/// response verbatim: the generic `catch_all` stub (`{code:0,...,data:{}}`)
+/// returns a non-null `data`, which the firmware could misread as "bound" and
+/// branch into an account-only path that then fails.
+async fn device_binding_query(headers: HeaderMap) -> Json<serde_json::Value> {
+    tracing::info!(
+        device_id = ?headers.get("device_id"),
+        device_type = ?headers.get("device_type"),
+        "device binding query (answering not-bound)"
+    );
+    Json(serde_json::json!({ "success": false, "data": serde_json::Value::Null }))
 }
 
 /// Stub for `POST /api/v1/device/activate` — V5.5.3+ stock firmware POSTs here
@@ -1279,16 +1418,86 @@ mod tests {
         let data = &v["data"];
         assert_eq!(data["version"], "V99.9.9");
         assert_eq!(data["ota_format"], "encrypted_v1");
-        assert_eq!(data["ota_type"], "1");
+        // ota_type is echoed as a JSON number (matches the real server), not a string.
+        assert_eq!(data["ota_type"], 1);
         assert_eq!(data["force_update"], true);
         assert_eq!(data["size"], TEST_FIRMWARE_SIZE);
         assert_eq!(data["plain_size"], 518_560);
         assert_eq!(data["plain_sha256"], "cd".repeat(32));
-        assert_eq!(data["checksum"]["sha256"], "ab".repeat(32));
-        assert_eq!(data["checksum"]["crc32"], 0x1234_5678u32);
+        // checksum.sha256 mirrors plain_sha256 (device verifies the decrypted
+        // image), and crc32 is null — exactly like the real check-update.
+        assert_eq!(data["checksum"]["sha256"], "cd".repeat(32));
+        assert!(data["checksum"]["crc32"].is_null());
         let url = data["download_url"].as_str().unwrap();
         assert!(url.starts_with("http://192.168.137.1/firmware/V99.9.9-X4Pro-EN-PROD-"));
         assert!(url.ends_with(".xota"));
+    }
+
+    /// Ground-truth wire check for the X4 Pro `.xota` download: the device's OTA
+    /// driver rejects with `-104` ("content length invalid"), so the response
+    /// must carry exactly one `Content-Length` equal to the served size, with no
+    /// `Transfer-Encoding: chunked`. Reads the raw HTTP response off a socket
+    /// rather than through a client that would normalize the framing.
+    #[tokio::test]
+    async fn x4pro_firmware_response_is_identity_with_single_content_length() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let path = std::env::temp_dir().join(format!(
+            "x4pro-wire-test-{}-{}.xota",
+            std::process::id(),
+            TEST_FIRMWARE_SIZE
+        ));
+        let bytes = vec![0x11u8; 4096];
+        std::fs::write(&path, &bytes).unwrap();
+        let sha = hex::encode(Sha256::digest(&bytes));
+
+        let mut cfg = (*test_config(false)).clone();
+        cfg.model = Model::X4Pro;
+        cfg.firmware_path = path.clone();
+        cfg.firmware_size = bytes.len() as u64;
+        cfg.firmware_sha256 = sha;
+        cfg.xota = Some(XotaOta {
+            plain_size: 4000,
+            plain_sha256: "00".repeat(32),
+            xota_crc32: 0,
+        });
+        let app = router(Arc::new(cfg));
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app.into_make_service()).await.unwrap();
+        });
+
+        let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        stream
+            .write_all(b"GET /firmware/test.xota HTTP/1.1\r\nHost: 192.168.2.1\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut buf = Vec::new();
+        stream.read_to_end(&mut buf).await.unwrap();
+        std::fs::remove_file(&path).ok();
+
+        let text = String::from_utf8_lossy(&buf);
+        let head = text.split("\r\n\r\n").next().unwrap().to_lowercase();
+        eprintln!("--- response head ---\n{head}\n---------------------");
+
+        assert_eq!(
+            head.matches("content-length:").count(),
+            1,
+            "exactly one Content-Length required; head:\n{head}"
+        );
+        assert!(
+            head.contains("content-length: 4096"),
+            "Content-Length must equal served .xota size; head:\n{head}"
+        );
+        assert!(
+            !head.contains("transfer-encoding"),
+            "must be identity framing, not chunked; head:\n{head}"
+        );
+        assert!(head.contains("connection: close"), "head:\n{head}");
+        // The whole body must arrive (head + 4096 bytes).
+        assert_eq!(buf.len(), text.find("\r\n\r\n").unwrap() + 4 + 4096);
     }
 
     #[test]

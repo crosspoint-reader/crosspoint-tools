@@ -49,6 +49,19 @@ impl DnsConfig {
                 "time.windows.com".to_string(),
                 "time.cloudflare.com".to_string(),
                 "time.nist.gov".to_string(),
+                // The X4 Pro *factory* app (app0, V0.0.7) syncs against a
+                // different NTP set than the main app (which uses pool.ntp.org):
+                // ntp{N}.aliyun.com, ntp.ntsc.ac.cn, time{N}.apple.com,
+                // time{N}.google.com. Without these the factory device can't get
+                // a clock on the internet-less hotspot and stalls before / during
+                // OTA. The `ntp*.aliyun.com` and `time{N}.{apple,google}.com`
+                // families are matched by pattern in `is_spoofed`; the exact
+                // hosts below are listed for clarity and startup logging.
+                "ntp.ntsc.ac.cn".to_string(),
+                "ntp1.aliyun.com".to_string(),
+                "ntp2.aliyun.com".to_string(),
+                "time1.apple.com".to_string(),
+                "time1.google.com".to_string(),
             ],
             answer_with: bridge_ip,
         }
@@ -125,6 +138,40 @@ fn is_spoofed(qname_norm: &str, spoofed_hosts: &[String]) -> bool {
         .iter()
         .any(|h| h.eq_ignore_ascii_case(qname_norm))
         || qname_norm.ends_with(".pool.ntp.org")
+        // NTP host families the X4 Pro factory app uses (see DnsConfig): any
+        // numbered `ntp{N}.aliyun.com` and any `time{N}.apple.com` /
+        // `time{N}.google.com`. Scoped to the ntp/time prefixes so we don't
+        // hijack unrelated aliyun/google/apple subdomains.
+        || (qname_norm.starts_with("ntp") && qname_norm.ends_with(".aliyun.com"))
+        || (qname_norm.starts_with("time")
+            && (qname_norm.ends_with(".apple.com") || qname_norm.ends_with(".google.com")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_spoofed;
+
+    #[test]
+    fn spoofs_x4pro_factory_ntp_hosts() {
+        let hosts = vec![
+            "api-prod.xteink.cc".to_string(),
+            "ntp.ntsc.ac.cn".to_string(),
+        ];
+        // exact list entry
+        assert!(is_spoofed("ntp.ntsc.ac.cn", &hosts));
+        // ntp{N}.aliyun.com family (not in the list, matched by pattern)
+        assert!(is_spoofed("ntp1.aliyun.com", &hosts));
+        assert!(is_spoofed("ntp7.aliyun.com", &hosts));
+        // time{N}.apple.com / time{N}.google.com family
+        assert!(is_spoofed("time1.apple.com", &hosts));
+        assert!(is_spoofed("time.google.com", &hosts));
+        // pool.ntp.org numbered subdomains still covered
+        assert!(is_spoofed("0.pool.ntp.org", &hosts));
+        // must NOT hijack unrelated aliyun/google/apple subdomains
+        assert!(!is_spoofed("oss.aliyun.com", &hosts));
+        assert!(!is_spoofed("www.google.com", &hosts));
+        assert!(!is_spoofed("push.apple.com", &hosts));
+    }
 }
 
 async fn handle_query(

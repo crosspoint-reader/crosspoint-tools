@@ -26,6 +26,7 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 dirs = { workspace = true }
 bytes = { workspace = true }
+http-body = "1"
 futures = { workspace = true }
 tokio-util = { version = "0.7", features = ["io"] }
 tokio-rustls = "0.26"
