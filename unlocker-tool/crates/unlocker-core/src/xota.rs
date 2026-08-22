@@ -46,6 +46,9 @@ type Aes128Ctr = ctr::Ctr128BE<aes::Aes128>;
 const MAGIC: &[u8; 4] = b"XOTA";
 /// Encrypted metadata region length (`xota[20..202]`).
 const META_LEN: usize = 182;
+/// Synthetic upgrade version used in both the manifest and encrypted metadata.
+/// `V8.2.0` is accepted by the stock parser and remains above current V7 builds.
+pub const UNLOCKER_X4PRO_VERSION: &str = "V8.2.0";
 
 /// Key tables for OTA channels 0 and 1 at DROM `0x3c2f0530` and `0x3c2f0540`.
 const KEY_TABLES: [[u8; 16]; 2] = [

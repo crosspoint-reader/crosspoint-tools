@@ -928,17 +928,18 @@ async fn prepare_x4pro_xota(
         }]);
     }
 
-    // The `.xota` metadata version must be a value the device accepts as an
-    // upgrade. The real 7.0.8 package (which flashes fine through our server)
-    // carries metadata version "V7.0.9"; our own "V99.9.9" is rejected during
-    // the metadata read (likely a version-range/parse guard) and surfaces as the
-    // generic "server did not return any messages". Use the known-good "V7.0.9"
-    // — still far newer than the device's V0.0.7, and identical to the working
-    // real package. (The manifest's advertised version stays V99.9.9; the device
-    // accepts the real package with exactly that manifest/metadata combination.)
+    // Keep the manifest and encrypted metadata on the same realistic version.
+    // `V7.0.9` is no longer an upgrade for devices that already received our
+    // diagnostic build; `V8.2.0` is the known-accepted synthetic version.
     let mut variants = Vec::with_capacity(2);
     for ota_type in 0..=1 {
-        let enc = unlocker_core::xota::encrypt(Model::X4Pro, &plain, "V7.0.9", ota_type, None)?;
+        let enc = unlocker_core::xota::encrypt(
+            Model::X4Pro,
+            &plain,
+            unlocker_core::xota::UNLOCKER_X4PRO_VERSION,
+            ota_type,
+            None,
+        )?;
         let dest = catalog::cache_dir()?.join(format!("{}-ota{ota_type}.xota", firmware.sha));
         tokio::fs::write(&dest, &enc.bytes)
             .await

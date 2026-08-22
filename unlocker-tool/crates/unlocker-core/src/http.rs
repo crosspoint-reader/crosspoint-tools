@@ -713,7 +713,8 @@ fn x4pro_check_update(cfg: &ServerConfig, q: &UpdateQuery) -> Json<serde_json::V
         );
     }
     let filename = format!(
-        "V99.9.9-X4Pro-{locale}-OTA{ota_type}-PROD-{date}.xota",
+        "{version}-X4Pro-{locale}-OTA{ota_type}-PROD-{date}.xota",
+        version = crate::xota::UNLOCKER_X4PRO_VERSION,
         locale = cfg.locale.short(),
         date = chrono::Utc::now().format("%m%d"),
     );
@@ -740,7 +741,7 @@ fn x4pro_check_update(cfg: &ServerConfig, q: &UpdateQuery) -> Json<serde_json::V
         "code": 0,
         "message": "Update available",
         "data": {
-            "version": "V99.9.9",
+            "version": crate::xota::UNLOCKER_X4PRO_VERSION,
             "change_log": cfg.change_log,
             "download_url": download_url,
             "size": xota.firmware_size,
@@ -1673,7 +1674,7 @@ mod tests {
 
         assert_eq!(v["code"], 0);
         let data = &v["data"];
-        assert_eq!(data["version"], "V99.9.9");
+        assert_eq!(data["version"], crate::xota::UNLOCKER_X4PRO_VERSION);
         assert_eq!(data["ota_format"], "encrypted_v1");
         // ota_type is echoed as a JSON number (matches the real server), not a string.
         assert_eq!(data["ota_type"], 0);
@@ -1686,7 +1687,7 @@ mod tests {
         assert_eq!(data["checksum"]["sha256"], "cd".repeat(32));
         assert!(data["checksum"]["crc32"].is_null());
         let url = data["download_url"].as_str().unwrap();
-        assert!(url.starts_with("http://192.168.137.1/firmware/V99.9.9-X4Pro-EN-OTA0-PROD-"));
+        assert!(url.starts_with("http://192.168.137.1/firmware/V8.2.0-X4Pro-EN-OTA0-PROD-"));
         assert!(url.ends_with(".xota"));
     }
 
