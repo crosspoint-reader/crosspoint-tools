@@ -5,7 +5,7 @@
 //! ports 53/80/443). We just sequence the RPCs and watch DHCP leases.
 
 use crate::helper::Helper;
-use crate::types::{ArmServerSpec, Locale, Model};
+use crate::types::{ArmServerSpec, Locale, Model, XotaOta};
 use anyhow::{anyhow, Result};
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
@@ -62,6 +62,7 @@ impl Runtime {
             dns_internal_port: DNS_INTERNAL_PORT,
             crosspet_http: cfg.crosspet_http,
             capture_only: cfg.capture_only,
+            xota: cfg.xota,
         };
         helper.arm_servers(spec).await
     }
@@ -97,6 +98,9 @@ pub struct ArmConfig {
     pub crosspet_http: bool,
     /// Capture-only: arm + log requests but never offer an update.
     pub capture_only: bool,
+    /// X4 Pro encrypted-OTA info. Set when `firmware_path` is an `encrypted_v1`
+    /// `.xota`; `None` for the plain-image path.
+    pub xota: Option<XotaOta>,
 }
 
 async fn wait_for_bridge_ip(helper: &Helper) -> Result<Ipv4Addr> {

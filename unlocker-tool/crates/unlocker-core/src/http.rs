@@ -9,7 +9,7 @@
 //! download, not a chunked application stream.
 
 use crate::cert::SelfSignedCert;
-use crate::types::{Locale, Model};
+use crate::types::{Locale, Model, XotaOta};
 use anyhow::Context as _;
 use axum::{
     body::Body,
@@ -284,6 +284,11 @@ pub struct ServerConfig {
     /// all update-check endpoints answer "no update available" so the device
     /// never downloads or flashes. See `ArmServerSpec::capture_only`.
     pub capture_only: bool,
+    /// X4 Pro encrypted-OTA info. When set, `firmware_path` points at an
+    /// `encrypted_v1` `.xota` and `check-update` emits the encrypted-OTA
+    /// manifest (`ota_format: "encrypted_v1"`, `plain_size`, `plain_sha256`,
+    /// `checksum{crc32,sha256}`). `None` for the plain X3/X4/CrossPoint path.
+    pub xota: Option<XotaOta>,
     /// Notified on every manifest request. Orchestrator awaits the first
     /// notification to advance from AwaitingDeviceRequest.
     pub on_manifest_request: Arc<tokio::sync::Notify>,
@@ -301,6 +306,11 @@ pub struct UpdateQuery {
     pub device_id: String,
     #[serde(default)]
     pub lng: String,
+    /// X4 Pro sends `ota_type` (`0` normal / `1` alternate). Same image, the
+    /// device just uses it to pick an OSS path upstream; we echo it back so the
+    /// response matches the request the stock client made.
+    #[serde(default)]
+    pub ota_type: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -446,6 +456,14 @@ async fn check_update(
         .into_response();
     }
 
+    // X4 Pro: the stock updater expects an `encrypted_v1` `.xota` and verifies
+    // the decrypted image against `plain_sha256`. `cfg.xota` is set only when we
+    // armed with an encrypted package (see the install pipeline), so branch on
+    // it rather than re-checking the model.
+    if let Some(xota) = &cfg.xota {
+        return x4pro_check_update(&cfg, xota, &q).into_response();
+    }
+
     let filename = format!(
         "V99.9.9-{model}-{locale}-PROD-{date}.bin",
         model = cfg.model.short(),
@@ -466,6 +484,58 @@ async fn check_update(
         message: "Update available".into(),
     })
     .into_response()
+}
+
+/// Build the X4 Pro `encrypted_v1` `check-update` response.
+///
+/// Shape mirrors the real `api-prod.xteink.cc/api/v1/check-update` payload:
+/// `data.checksum` is an object `{crc32, sha256}` (of the `.xota`), and the
+/// extra `ota_format`/`ota_type`/`plain_size`/`plain_sha256`/`force_update`
+/// fields drive the device's decrypt-then-verify path. The version is forced
+/// high so the device always considers our image newer than what it's running.
+fn x4pro_check_update(cfg: &ServerConfig, xota: &XotaOta, q: &UpdateQuery) -> Json<serde_json::Value> {
+    // Serve the `.xota` over plain HTTP from the bridge IP: the device fetches
+    // `download_url` directly (api-prod.xteink.cc is a plain-HTTP host for this
+    // device), and the OTA payload's integrity is covered by the checksum +
+    // plain_sha256 fields, not the transport.
+    let filename = format!(
+        "V99.9.9-X4Pro-{locale}-PROD-{date}.xota",
+        locale = cfg.locale.short(),
+        date = chrono::Utc::now().format("%m%d"),
+    );
+    let download_url = format!("http://{}/firmware/{}", cfg.bridge_ip, filename);
+    // Echo the requested ota_type (default "1", the alternate path the device
+    // used in every capture); the image is identical either way.
+    let ota_type = if q.ota_type.is_empty() { "1" } else { q.ota_type.as_str() };
+
+    tracing::info!(
+        %download_url,
+        xota_size = cfg.firmware_size,
+        plain_size = xota.plain_size,
+        %ota_type,
+        "serving X4 Pro encrypted_v1 manifest"
+    );
+
+    Json(serde_json::json!({
+        "code": 0,
+        "message": "Update available",
+        "data": {
+            "version": "V99.9.9",
+            "change_log": cfg.change_log,
+            "download_url": download_url,
+            "size": cfg.firmware_size,
+            "upload_time": chrono::Utc::now().to_rfc3339(),
+            "checksum": {
+                "crc32": xota.xota_crc32,
+                "sha256": cfg.firmware_sha256,
+            },
+            "force_update": true,
+            "ota_format": "encrypted_v1",
+            "ota_type": ota_type,
+            "plain_size": xota.plain_size,
+            "plain_sha256": xota.plain_sha256,
+        },
+    }))
 }
 
 async fn serve_firmware(
@@ -1063,6 +1133,7 @@ mod tests {
             change_log: "test".to_string(),
             crosspet_http,
             capture_only: false,
+            xota: None,
             on_manifest_request: Arc::new(tokio::sync::Notify::new()),
             on_firmware_streamed: Arc::new(tokio::sync::Notify::new()),
         })
@@ -1174,6 +1245,50 @@ mod tests {
             "http://unlocker.crosspointreader.com/firmware/firmware.bin"
         );
         assert_eq!(vcodex["size"], TEST_FIRMWARE_SIZE);
+    }
+
+    /// X4 Pro: when armed with `xota` info, `check-update` returns the
+    /// `encrypted_v1` manifest shape (checksum object, plain_size/plain_sha256,
+    /// ota_format), a `.xota` download URL, and echoes the requested ota_type.
+    #[tokio::test]
+    async fn x4pro_check_update_returns_encrypted_v1_manifest() {
+        let mut cfg = (*test_config(false)).clone();
+        cfg.model = Model::X4Pro;
+        cfg.firmware_sha256 = "ab".repeat(32);
+        cfg.xota = Some(XotaOta {
+            plain_size: 518_560,
+            plain_sha256: "cd".repeat(32),
+            xota_crc32: 0x1234_5678,
+        });
+        let app = router(Arc::new(cfg));
+
+        let resp = app
+            .oneshot(
+                AxRequest::builder()
+                    .uri("/api/v1/check-update?current_version=V7.0.8&device_type=ESP32S3_X4_TL_SSD1677&device_id=11226248&lng=en&ota_type=1")
+                    .header(header::HOST, "api-prod.xteink.cc")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        assert_eq!(v["code"], 0);
+        let data = &v["data"];
+        assert_eq!(data["version"], "V99.9.9");
+        assert_eq!(data["ota_format"], "encrypted_v1");
+        assert_eq!(data["ota_type"], "1");
+        assert_eq!(data["force_update"], true);
+        assert_eq!(data["size"], TEST_FIRMWARE_SIZE);
+        assert_eq!(data["plain_size"], 518_560);
+        assert_eq!(data["plain_sha256"], "cd".repeat(32));
+        assert_eq!(data["checksum"]["sha256"], "ab".repeat(32));
+        assert_eq!(data["checksum"]["crc32"], 0x1234_5678u32);
+        let url = data["download_url"].as_str().unwrap();
+        assert!(url.starts_with("http://192.168.137.1/firmware/V99.9.9-X4Pro-EN-PROD-"));
+        assert!(url.ends_with(".xota"));
     }
 
     #[test]

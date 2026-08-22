@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 pub enum Model {
     X3,
     X4,
+    /// Xteink X4 Pro — ESP32-S3 based, distinct from the C3-based X3/X4. Its OTA
+    /// flow is account-bound and serves an encrypted `encrypted_v1` `.xota`
+    /// package rather than a plain image (see `xota.rs`).
+    X4Pro,
 }
 
 impl Model {
@@ -12,13 +16,33 @@ impl Model {
         match self {
             Model::X3 => "X3",
             Model::X4 => "X4",
+            Model::X4Pro => "X4Pro",
         }
     }
 
+    /// Value the device sends in the `device_type` *header* and reports at the
+    /// firmware level. For the X4 Pro the OTA validator strcmps against this
+    /// bare string (no panel suffix).
     pub fn device_type(&self) -> &'static str {
         match self {
             Model::X3 => "ESP32C3_X3",
             Model::X4 => "ESP32C3_X4",
+            Model::X4Pro => "ESP32S3_X4_TL",
+        }
+    }
+
+    /// True for the ESP32-S3 X4 Pro, whose OTA uses the encrypted `.xota`
+    /// pipeline instead of the plain GitHub/stock manifest path.
+    pub fn is_x4pro(&self) -> bool {
+        matches!(self, Model::X4Pro)
+    }
+
+    /// Display panel controller. Only the X4 Pro's OTA manifest / `.xota`
+    /// metadata carries this; the C3 devices don't advertise one.
+    pub fn panel(&self) -> Option<&'static str> {
+        match self {
+            Model::X4Pro => Some("SSD1677"),
+            _ => None,
         }
     }
 }
@@ -127,6 +151,10 @@ where
             }
             let model = match piece.as_str() {
                 "x3" => Model::X3,
+                // `x4pro` must be matched before `x4` would-be substrings; here
+                // the split already isolates whole tokens, so an exact match is
+                // enough. Accept a couple of spellings publishers might emit.
+                "x4pro" | "x4_pro" | "x4-pro" => Model::X4Pro,
                 "x4" => Model::X4,
                 other => return Err(D::Error::custom(format!("unknown model {other}"))),
             };
@@ -188,4 +216,26 @@ pub struct ArmServerSpec {
     /// X4 Pro's account-bound update flow) without running an install.
     #[serde(default)]
     pub capture_only: bool,
+    /// X4 Pro encrypted-OTA metadata. Present only when serving the ESP32-S3 X4
+    /// Pro, whose stock updater downloads an `encrypted_v1` `.xota` and decrypts
+    /// it on-device. When set, `firmware_path`/`firmware_size`/`firmware_sha256`
+    /// describe the *encrypted* `.xota` we serve, and these carry the *plain*
+    /// image's size + sha256 that the device verifies after decrypting. `None`
+    /// for the plain-image X3/X4/CrossPoint path.
+    #[serde(default)]
+    pub xota: Option<XotaOta>,
+}
+
+/// Plain-image identity for an X4 Pro `encrypted_v1` OTA, surfaced in the
+/// `check-update` manifest so the device can verify the image after it decrypts
+/// the `.xota` we serve.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct XotaOta {
+    /// Byte length of the decrypted (plain) app image.
+    pub plain_size: u64,
+    /// Lowercase hex sha256 of the decrypted (plain) app image.
+    pub plain_sha256: String,
+    /// CRC-32 (IEEE) of the served `.xota` package — advertised in the
+    /// manifest's `checksum` object for the device's transport integrity check.
+    pub xota_crc32: u32,
 }

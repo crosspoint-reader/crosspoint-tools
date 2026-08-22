@@ -19,6 +19,8 @@ rcgen = { workspace = true }
 rustls = { workspace = true }
 reqwest = { workspace = true }
 sha2 = { workspace = true }
+aes = "0.8"
+ctr = "0.9"
 hex = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }

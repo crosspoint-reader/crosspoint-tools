@@ -880,6 +880,57 @@ async fn run_local_install(
     run_prepared_install(orch, log, runtime, helper, firmware, crosspet_http).await
 }
 
+/// Wrap a prepared plain image into an X4 Pro `encrypted_v1` `.xota` and cache
+/// it. Returns the `.xota`'s on-disk path, size, and sha256 (for the server's
+/// self-check) plus the `XotaOta` (plain size/sha + `.xota` crc32) the manifest
+/// advertises. The plain input can be any source — a catalog release, a
+/// sideloaded local `.bin`, or the X4 Pro escape-hatch bin — since they all
+/// arrive here as a `PreparedFirmware` path.
+async fn prepare_x4pro_xota(
+    log: &SessionLog,
+    firmware: &PreparedFirmware,
+) -> anyhow::Result<(std::path::PathBuf, u64, String, unlocker_core::types::XotaOta)> {
+    let plain = tokio::fs::read(&firmware.path).await.map_err(|e| {
+        anyhow::anyhow!("reading plain firmware {} to encrypt: {e}", firmware.path.display())
+    })?;
+
+    // Metadata version is forced high to stay consistent with the manifest's
+    // advertised V99.9.9 (the device treats it as newer than anything running).
+    let enc = unlocker_core::xota::encrypt(Model::X4Pro, &plain, "V99.9.9", None)?;
+
+    // Cache the `.xota` under its own sha so repeated runs reuse it and the
+    // helper (root) reads it from the app cache dir rather than a TCC-guarded
+    // location. Keying on the plain sha keeps the name stable across the random
+    // per-package IV (the bytes differ each run, but the input doesn't).
+    let dest = catalog::cache_dir()?.join(format!("{}.xota", firmware.sha));
+    tokio::fs::write(&dest, &enc.bytes)
+        .await
+        .map_err(|e| anyhow::anyhow!("writing {}: {e}", dest.display()))?;
+
+    log.push(
+        "info",
+        format!(
+            "encrypted X4 Pro .xota: plain {} bytes (sha {}), package {} bytes",
+            enc.plain_size,
+            &enc.plain_sha256[..16],
+            enc.bytes.len()
+        ),
+        None,
+    )
+    .await;
+
+    Ok((
+        dest,
+        enc.bytes.len() as u64,
+        enc.xota_sha256,
+        unlocker_core::types::XotaOta {
+            plain_size: enc.plain_size,
+            plain_sha256: enc.plain_sha256,
+            xota_crc32: enc.xota_crc32,
+        },
+    ))
+}
+
 async fn run_prepared_install(
     orch: Arc<Orchestrator>,
     log: Arc<SessionLog>,
@@ -950,17 +1001,31 @@ async fn run_prepared_install(
     //    device connects. The device may check for updates the moment it
     //    joins the network. ──
     let bridge_ip: std::net::Ipv4Addr = info.bridge_ip;
+    let model = orch.data().await.model.unwrap();
+
+    // X4 Pro: its stock updater only accepts an `encrypted_v1` `.xota`, so wrap
+    // the plain image we prepared into an encrypted package the device will
+    // decrypt-and-verify. The served artifact becomes the `.xota`; the manifest
+    // then advertises the plain image's size + sha256 for the on-device check.
+    let (firmware_path, firmware_size, firmware_sha256, xota) = if model.is_x4pro() {
+        let (path, size, sha, info) = prepare_x4pro_xota(&log, &firmware).await?;
+        (path, size, sha, Some(info))
+    } else {
+        (firmware.path, firmware.size, firmware.sha, None)
+    };
+
     let arm_cfg = ArmConfig {
         bridge_ip,
-        model: orch.data().await.model.unwrap(),
+        model,
         locale: orch.data().await.locale.unwrap(),
-        firmware_path: firmware.path,
-        firmware_size: firmware.size,
-        firmware_sha256: firmware.sha,
+        firmware_path,
+        firmware_size,
+        firmware_sha256,
         crosspoint_version: firmware.version,
         change_log: firmware.change_log,
         crosspet_http,
         capture_only: false,
+        xota,
     };
     runtime.arm(&helper, arm_cfg).await?;
     log.push("info", "DNS + HTTP + HTTPS servers armed", None)
@@ -1084,6 +1149,7 @@ async fn run_capture(
         change_log: String::new(),
         crosspet_http: false,
         capture_only: true,
+        xota: None,
     };
     runtime.arm(&helper, arm_cfg).await?;
     log.push(

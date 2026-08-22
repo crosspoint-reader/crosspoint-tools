@@ -199,6 +199,9 @@ async function handleApi(
       case '/api/recovery/escape-hatch/firmware':
         return handleEscapeHatchFirmware(env, corsHeaders);
 
+      case '/api/recovery/escape-hatch-x4pro/firmware':
+        return handleEscapeHatchX4ProFirmware(env, corsHeaders);
+
       case '/api/firmware/stock':
         return handleStockFirmware(url, env, corsHeaders);
 
@@ -883,11 +886,20 @@ async function handleReleaseFirmware(
 //     --file=/path/to/escape-hatch/.pio/build/default/firmware.bin
 const ESCAPE_HATCH_R2_KEY = 'recovery/escape-hatch/firmware.bin';
 
-async function handleEscapeHatchFirmware(
+// X4 Pro (ESP32-S3) escape-hatch bridge. Distinct build + R2 key from the
+// C3-based x3/x4 hatch above — the X4 Pro is a different chip, and the Unlocker
+// wraps this plain .bin into an encrypted `.xota` before serving it over the
+// spoofed X4 Pro OTA. Upload with:
+//   wrangler r2 object put crosspoint-firmware/recovery/escape-hatch-x4pro/firmware.bin \
+//     --file=/path/to/escape-hatch/.pio/build/x4pro/firmware.bin
+const ESCAPE_HATCH_X4PRO_R2_KEY = 'recovery/escape-hatch-x4pro/firmware.bin';
+
+async function serveEscapeHatch(
   env: Env,
-  headers: Record<string, string>
+  headers: Record<string, string>,
+  r2Key: string
 ): Promise<Response> {
-  const object = await env.FIRMWARE_BUCKET.get(ESCAPE_HATCH_R2_KEY);
+  const object = await env.FIRMWARE_BUCKET.get(r2Key);
   if (!object) {
     return json({ error: 'Escape Hatch firmware not available' }, 404, headers);
   }
@@ -899,6 +911,20 @@ async function handleEscapeHatchFirmware(
       'Content-Length': String(object.size),
     },
   });
+}
+
+function handleEscapeHatchFirmware(
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  return serveEscapeHatch(env, headers, ESCAPE_HATCH_R2_KEY);
+}
+
+function handleEscapeHatchX4ProFirmware(
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  return serveEscapeHatch(env, headers, ESCAPE_HATCH_X4PRO_R2_KEY);
 }
 
 // --- Stock Firmware (Official Xteink) ---
@@ -4012,7 +4038,7 @@ interface CatalogRelease {
   firmware_url: string;
   firmware_sha256: string;
   size: number;
-  supported_devices: ('x3' | 'x4')[];
+  supported_devices: ('x3' | 'x4' | 'x4pro')[];
 }
 
 const ORIGIN = 'https://crosspointreader.com';
@@ -4170,15 +4196,37 @@ async function fetchEscapeHatchForCatalog(env: Env): Promise<CatalogRelease | nu
   };
 }
 
+// X4 Pro escape-hatch bridge, catalog release. Same `recovery-` id convention as
+// above so the Unlocker keeps it out of the normal channel cards and surfaces it
+// from the X4 Pro recovery panel. `supported_devices: ['x4pro']` so it only
+// appears for the X4 Pro; the Unlocker encrypts this plain .bin into a `.xota`
+// before serving. Returns null until the .bin is uploaded to R2.
+async function fetchEscapeHatchX4ProForCatalog(env: Env): Promise<CatalogRelease | null> {
+  const result = await computeR2Sha(env, ESCAPE_HATCH_X4PRO_R2_KEY);
+  if (!result) return null;
+  return {
+    id: 'recovery-escape-hatch-x4pro',
+    channel: 'stable',
+    name: 'Escape Hatch (X4 Pro recovery)',
+    version: 'escape-hatch-x4pro',
+    released_at: '2026-08-21T00:00:00Z',
+    firmware_url: `${ORIGIN}/api/recovery/escape-hatch-x4pro/firmware`,
+    firmware_sha256: result.sha,
+    size: result.size,
+    supported_devices: ['x4pro'],
+  };
+}
+
 async function handleCatalog(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const [stable, insider, betas, escapeHatch] = await Promise.all([
+  const [stable, insider, betas, escapeHatch, escapeHatchX4Pro] = await Promise.all([
     fetchStableForCatalog(env),
     fetchInsiderForCatalog(env),
     fetchBetasForCatalog(env),
     fetchEscapeHatchForCatalog(env),
+    fetchEscapeHatchX4ProForCatalog(env),
   ]);
 
   const releases: CatalogRelease[] = [];
@@ -4186,6 +4234,7 @@ async function handleCatalog(
   if (insider) releases.push(insider);
   for (const b of betas) releases.push(b);
   if (escapeHatch) releases.push(escapeHatch);
+  if (escapeHatchX4Pro) releases.push(escapeHatchX4Pro);
 
   return json({
     schema_version: 1,
