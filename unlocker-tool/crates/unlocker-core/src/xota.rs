@@ -155,6 +155,38 @@ pub fn encrypt(model: Model, plain: &[u8], version: &str, iv: Option<[u8; 16]>) 
     })
 }
 
+/// Identity fields read out of an existing `encrypted_v1` `.xota` (e.g. a real
+/// Xteink stock package served verbatim) so the manifest can advertise them.
+#[derive(Debug, Clone)]
+pub struct XotaInfo {
+    pub plain_size: u64,
+    pub plain_sha256: String,
+    pub xota_sha256: String,
+    pub xota_crc32: u32,
+}
+
+/// Inspect an already-built `.xota` without re-encrypting it: decrypt just the
+/// 182-byte metadata to recover `plain_sha256`, and derive the other manifest
+/// fields. Used to serve a real stock `.xota` byte-for-byte for diagnostics.
+pub fn inspect(xota: &[u8]) -> anyhow::Result<XotaInfo> {
+    if xota.len() < 202 || &xota[0..4] != MAGIC {
+        anyhow::bail!("not a valid .xota (missing XOTA magic / too short)");
+    }
+    let iv: [u8; 16] = xota[4..20].try_into().unwrap();
+    let key = derive_key();
+    // Decrypt the first 182 bytes of the CTR stream (the metadata block).
+    let mut meta = xota[20..202].to_vec();
+    let mut cipher = Aes128Ctr::new((&key).into(), (&iv).into());
+    cipher.apply_keystream(&mut meta);
+    let plain_sha256 = hex::encode(&meta[4..36]); // raw 32-byte sha at [4:36]
+    Ok(XotaInfo {
+        plain_size: (xota.len() - 202) as u64,
+        plain_sha256,
+        xota_sha256: hex::encode(Sha256::digest(xota)),
+        xota_crc32: crc32_ieee(xota),
+    })
+}
+
 /// Random 16-byte IV. Uses the process clock + a getrandom fallback via
 /// `uuid` (already a dependency) to avoid pulling in a rng crate. CTR only
 /// needs the nonce to be unique per package under a fixed key; these bytes are

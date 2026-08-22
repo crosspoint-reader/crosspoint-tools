@@ -140,6 +140,108 @@ fn esp_chip_name(chip_id: u16) -> Option<&'static str> {
     }
 }
 
+/// Finds the first occurrence of `needle` in `haystack`.
+fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() || haystack.len() < needle.len() {
+        return None;
+    }
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
+}
+
+/// Wraps a plain TCP stream and logs the verbatim bytes of every HTTP response
+/// head we write (status line + headers, up to the blank line). This is the
+/// in-app equivalent of `tcpdump -A` on the bridge: it captures exactly what
+/// hyper puts on the wire — the real `Content-Length` value + case, whether the
+/// response is chunked, `Connection`, etc. — which a handler-level log can't see
+/// (hyper serializes headers after the handler returns). Used to diagnose the
+/// X4 Pro OTA driver reading our declared length as 0–202 (-104) despite our
+/// intent to send a large `Content-Length`. Body bytes are never logged (we key
+/// on writes that start with `HTTP/`).
+struct ResponseHeadLogStream<S> {
+    inner: S,
+    peer: Option<SocketAddr>,
+}
+
+impl<S: tokio::io::AsyncRead + Unpin> tokio::io::AsyncRead for ResponseHeadLogStream<S> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_read(cx, buf)
+    }
+}
+
+impl<S: tokio::io::AsyncWrite + Unpin> tokio::io::AsyncWrite for ResponseHeadLogStream<S> {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let this = &mut *self;
+        let n = match Pin::new(&mut this.inner).poll_write(cx, buf) {
+            Poll::Ready(Ok(n)) => n,
+            // Definitively attribute a mid-transfer drop: an error here means the
+            // *peer* (device) tore the connection down (ConnectionReset /
+            // BrokenPipe), so the drop is device-side, not ours.
+            Poll::Ready(Err(e)) => {
+                tracing::warn!(
+                    peer = ?this.peer,
+                    kind = ?e.kind(),
+                    error = %e,
+                    "outbound write failed — DEVICE closed the connection (peer-side drop)"
+                );
+                return Poll::Ready(Err(e));
+            }
+            pending => return pending,
+        };
+        // hyper writes the whole response head as one buffer beginning with the
+        // status line; body chunks are separate writes. So only writes starting
+        // with `HTTP/` are response heads.
+        if n >= 5 && &buf[..5] == b"HTTP/" {
+            let end = find_subsequence(&buf[..n], b"\r\n\r\n").unwrap_or(n.min(2048));
+            let head = String::from_utf8_lossy(&buf[..end]);
+            tracing::info!(peer = ?this.peer, "outbound HTTP response head (verbatim wire bytes):\n{head}");
+        }
+        Poll::Ready(Ok(n))
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        // If we ever see this during a firmware transfer, the drop is OURS: the
+        // server initiated the connection close (e.g. a teardown/timeout), not
+        // the device.
+        tracing::info!(peer = ?self.peer, "server initiating connection shutdown (our-side close)");
+        Pin::new(&mut self.inner).poll_shutdown(cx)
+    }
+}
+
+/// Acceptor that wraps each accepted plain-HTTP connection in
+/// `ResponseHeadLogStream`. Mirrors `LoggingTlsAcceptor` but for the cleartext
+/// listener (port 80), where the X4 Pro firmware download happens.
+#[derive(Clone)]
+struct HttpHeadLoggingAcceptor;
+
+impl<S> Accept<TcpStream, S> for HttpHeadLoggingAcceptor
+where
+    S: Send + 'static,
+{
+    type Stream = ResponseHeadLogStream<TcpStream>;
+    type Service = S;
+    type Future =
+        Pin<Box<dyn Future<Output = io::Result<(Self::Stream, Self::Service)>> + Send + 'static>>;
+
+    fn accept(&self, stream: TcpStream, service: S) -> Self::Future {
+        let peer = stream.peer_addr().ok();
+        Box::pin(async move { Ok((ResponseHeadLogStream { inner: stream, peer }, service)) })
+    }
+}
+
 /// Adds connection and handshake diagnostics around axum-server's Rustls
 /// acceptor. axum-server intentionally discards acceptor errors before the
 /// HTTP middleware runs, so failures must be logged here.
@@ -291,12 +393,16 @@ impl http_body::Body for LoggedSizedBody {
 
 impl Drop for LoggedSizedBody {
     fn drop(&mut self) {
-        if self.finished {
+        // Treat "all bytes handed to hyper" as complete even if the final
+        // `poll_frame` (which returns None) was never polled — hyper drops the
+        // body once Content-Length bytes are sent, so `offset == total` is a
+        // clean finish, not an early close.
+        if self.finished || self.offset >= self.total {
             tracing::info!(
                 path = %self.path,
                 written = self.offset,
                 total = self.total,
-                "xota stream complete (device pulled the whole package)"
+                "xota stream complete (full package handed to the socket)"
             );
         } else {
             tracing::warn!(
@@ -592,6 +698,10 @@ fn x4pro_check_update(cfg: &ServerConfig, xota: &XotaOta, q: &UpdateQuery) -> Js
         locale = cfg.locale.short(),
         date = chrono::Utc::now().format("%m%d"),
     );
+    // Serve over plain HTTP for now so the ResponseHeadLogStream tee on :80 can
+    // capture the exact drop event (write error vs our shutdown). HTTP vs HTTPS
+    // made no difference to the failure. Flip back to
+    // https://unlocker.crosspointreader.com once the drop direction is known.
     let download_url = format!("http://{}/firmware/{}", cfg.bridge_ip, filename);
     // Echo the requested ota_type as an integer (default 1 — the alternate path
     // the device used in every capture). The real server emits a JSON number,
@@ -692,6 +802,60 @@ async fn serve_firmware(
 
     log_image_metadata(&bytes);
 
+    let path_for_log = cfg.firmware_path.display().to_string();
+
+    // X4 Pro full download: emit the response headers in the exact order the
+    // real AliyunOSS server uses, with `Content-Length` immediately after the
+    // status line / `Content-Type`. The stock OTA driver rejects with -104
+    // ("content length invalid") when `esp_http_client_get_content_length()`
+    // reads 0–202 — even though we demonstrably put `Content-Length: <full
+    // size>` on the wire. The one remaining difference from the working real
+    // response was header *order*: ours placed `Content-Length` 4th (after
+    // Content-Disposition, ~byte 112), the real server places it 2nd (~byte 57).
+    // A bounded header buffer/scan on the device would miss a late one. Match
+    // the real order exactly: Content-Type, Content-Length, Connection,
+    // Accept-Ranges, Content-Disposition.
+    if cfg.xota.is_some() && range.is_none() {
+        // Match the real AliyunOSS download response the device successfully
+        // pulls 5.5 MB from: Content-Length + Connection: close + Accept-Ranges:
+        // bytes, plus the integrity headers OSS sends — `Content-MD5`
+        // (base64 of the body MD5) and `ETag` (uppercase-hex of the same MD5).
+        // If the firmware validates or requires these, a bare response reads as
+        // "no messages". (Earlier removing Accept-Ranges / using keep-alive was
+        // based on theories the real server's own headers disprove.)
+        use base64::Engine as _;
+        let md5 = md5::Md5::digest(&bytes);
+        let content_md5 = base64::engine::general_purpose::STANDARD.encode(md5);
+        let etag = format!("\"{}\"", hex::encode_upper(md5));
+        let resp = Response::builder()
+            .header(header::CONTENT_TYPE, "application/octet-stream")
+            .header(header::CONTENT_LENGTH, size)
+            .header(header::CONNECTION, "close")
+            .header(header::ACCEPT_RANGES, "bytes")
+            .header(header::ETAG, etag)
+            .header(
+                header::LAST_MODIFIED,
+                chrono::Utc::now()
+                    .format("%a, %d %b %Y %H:%M:%S GMT")
+                    .to_string(),
+            )
+            .header(
+                header::CONTENT_DISPOSITION,
+                HeaderValue::from_static("attachment"),
+            )
+            .header("Content-MD5", content_md5)
+            .body(Body::new(LoggedSizedBody::new(
+                Bytes::from(bytes),
+                path_for_log,
+            )))
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        tracing::info!(
+            size,
+            "serving X4 Pro .xota (real-order headers + Content-MD5/ETag)"
+        );
+        return Ok(resp);
+    }
+
     // The X4 Pro OTA driver validates the `Content-Length` header (rejects with
     // -104 "content length invalid" otherwise). Keep its response lean and
     // identical in spirit to the real OSS download — just content-type,
@@ -717,7 +881,6 @@ async fn serve_firmware(
             );
     }
 
-    let path_for_log = cfg.firmware_path.display().to_string();
     let body = match range {
         Some((start, end)) => {
             let content_len = end - start + 1;
@@ -1213,17 +1376,37 @@ pub async fn start(cfg: Arc<ServerConfig>, cert: &SelfSignedCert) -> anyhow::Res
     let https_handle = axum_server::Handle::new();
     let shutdown_requested = Arc::new(AtomicBool::new(false));
 
+    // Emit HTTP/1.1 response header names in Title-Case (`Content-Length`, not
+    // hyper's default lowercase `content-length`). The X4 Pro's OTA download
+    // driver parses `Content-Length` case-sensitively — with the lowercase name
+    // it reads the length as 0 and rejects the transfer with -104 ("content
+    // length invalid"). Real Xteink servers (AliyunOSS) send Title-Case, so this
+    // matches them. `preserve_header_case` keeps any names we set explicitly.
+
     // Plain HTTP listener.
     let app_http = app.clone();
     let h1 = http_handle.clone();
-    let http_server = axum_server::from_tcp(http_listener)?.handle(h1);
+    let mut http_server = axum_server::from_tcp(http_listener)?;
+    http_server
+        .http_builder()
+        .http1()
+        .title_case_headers(true)
+        .preserve_header_case(true);
+    // Log the verbatim response-head bytes we put on the wire (see
+    // ResponseHeadLogStream) so we can see exactly what Content-Length the X4
+    // Pro's OTA client actually receives.
+    let http_server = http_server.acceptor(HttpHeadLoggingAcceptor).handle(h1);
 
     let app_https = app.clone();
     let h2 = https_handle.clone();
     let https_acceptor = LoggingTlsAcceptor::new(tls);
-    let https_server = axum_server::from_tcp(https_listener)?
-        .acceptor(https_acceptor)
-        .handle(h2);
+    let mut https_server = axum_server::from_tcp(https_listener)?;
+    https_server
+        .http_builder()
+        .http1()
+        .title_case_headers(true)
+        .preserve_header_case(true);
+    let https_server = https_server.acceptor(https_acceptor).handle(h2);
 
     let http_shutdown = shutdown_requested.clone();
     let http = tokio::spawn(supervise_server(
@@ -1479,8 +1662,9 @@ mod tests {
         std::fs::remove_file(&path).ok();
 
         let text = String::from_utf8_lossy(&buf);
-        let head = text.split("\r\n\r\n").next().unwrap().to_lowercase();
-        eprintln!("--- response head ---\n{head}\n---------------------");
+        let raw_head = text.split("\r\n\r\n").next().unwrap().to_string();
+        eprintln!("--- RAW response head (verbatim case) ---\n{raw_head}\n---------------------");
+        let head = raw_head.to_lowercase();
 
         assert_eq!(
             head.matches("content-length:").count(),
@@ -1498,6 +1682,73 @@ mod tests {
         assert!(head.contains("connection: close"), "head:\n{head}");
         // The whole body must arrive (head + 4096 bytes).
         assert_eq!(buf.len(), text.find("\r\n\r\n").unwrap() + 4 + 4096);
+    }
+
+    /// Proves the `title_case_headers` server tuning added in `start()` actually
+    /// puts `Content-Length` (not hyper's default lowercase) on the wire — the
+    /// fix for the X4 Pro OTA driver's case-sensitive `-104` rejection. Serves
+    /// the real firmware route through the same `axum_server` + http1 builder
+    /// pipeline `start()` uses, then reads the raw response head off a socket.
+    #[tokio::test]
+    async fn firmware_headers_are_title_case_on_the_wire() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let path = std::env::temp_dir().join(format!("x4pro-case-test-{}.xota", std::process::id()));
+        let bytes = vec![0x22u8; 2048];
+        std::fs::write(&path, &bytes).unwrap();
+        let sha = hex::encode(Sha256::digest(&bytes));
+        let mut cfg = (*test_config(false)).clone();
+        cfg.model = Model::X4Pro;
+        cfg.firmware_path = path.clone();
+        cfg.firmware_size = bytes.len() as u64;
+        cfg.firmware_sha256 = sha;
+        cfg.xota = Some(XotaOta {
+            plain_size: 2000,
+            plain_sha256: "00".repeat(32),
+            xota_crc32: 0,
+        });
+        let app = router(Arc::new(cfg));
+
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = axum_server::Handle::new();
+        // Same tuning as start(): Title-Case header names.
+        let mut server = axum_server::from_tcp(listener).unwrap();
+        server
+            .http_builder()
+            .http1()
+            .title_case_headers(true)
+            .preserve_header_case(true);
+        // Route through the same head-logging acceptor start() uses, to confirm
+        // the stream wrapper serves headers + body intact.
+        let server = server.acceptor(HttpHeadLoggingAcceptor).handle(handle.clone());
+        let h = handle.clone();
+        tokio::spawn(async move { server.serve(app.into_make_service()).await.unwrap() });
+        handle.listening().await;
+        let _ = h;
+
+        let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        stream
+            .write_all(b"GET /firmware/test.xota HTTP/1.1\r\nHost: 192.168.2.1\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut buf = Vec::new();
+        stream.read_to_end(&mut buf).await.unwrap();
+        std::fs::remove_file(&path).ok();
+
+        let text = String::from_utf8_lossy(&buf);
+        let head = text.split("\r\n\r\n").next().unwrap().to_string();
+        eprintln!("--- wire head (title-case check) ---\n{head}\n------------------------------------");
+        // Exact, case-sensitive: the OTA driver looks for "Content-Length".
+        assert!(
+            head.contains("Content-Length: 2048"),
+            "expected Title-Case `Content-Length`; head:\n{head}"
+        );
+        assert!(
+            !head.contains("content-length:"),
+            "must not emit lowercase content-length; head:\n{head}"
+        );
     }
 
     #[test]

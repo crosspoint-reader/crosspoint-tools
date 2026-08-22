@@ -170,7 +170,7 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
     try {
       dest = await saveFileDialog({
         defaultPath: suggested,
-        filters: [{ name: "Firmware image", extensions: ["bin"] }],
+        filters: [{ name: "Firmware image", extensions: ["bin", "xota"] }],
       });
     } catch (e) {
       setSaveNotice(`Couldn't open save dialog: ${String(e)}`);
@@ -194,7 +194,7 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
     try {
       const picked = await openFileDialog({
         multiple: false,
-        filters: [{ name: "Firmware image", extensions: ["bin"] }],
+        filters: [{ name: "Firmware image", extensions: ["bin", "xota"] }],
       });
       if (typeof picked !== "string") {
         setPendingId(null);

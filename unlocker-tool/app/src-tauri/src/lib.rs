@@ -681,13 +681,13 @@ async fn select_local_firmware(
     if !path.is_file() {
         return Err(format!("firmware file not found: {}", path.display()));
     }
-    let is_bin = path
+    let ext_ok = path
         .extension()
         .and_then(|s| s.to_str())
-        .map(|ext| ext.eq_ignore_ascii_case("bin"))
+        .map(|ext| ext.eq_ignore_ascii_case("bin") || ext.eq_ignore_ascii_case("xota"))
         .unwrap_or(false);
-    if !is_bin {
-        return Err("local firmware must be a .bin file".into());
+    if !ext_ok {
+        return Err("local firmware must be a .bin or .xota file".into());
     }
 
     state
@@ -894,9 +894,48 @@ async fn prepare_x4pro_xota(
         anyhow::anyhow!("reading plain firmware {} to encrypt: {e}", firmware.path.display())
     })?;
 
-    // Metadata version is forced high to stay consistent with the manifest's
-    // advertised V99.9.9 (the device treats it as newer than anything running).
-    let enc = unlocker_core::xota::encrypt(Model::X4Pro, &plain, "V99.9.9", None)?;
+    // DIAGNOSTIC / real-firmware path: if the sideloaded file is already an
+    // `encrypted_v1` `.xota` (starts with "XOTA"), serve it byte-for-byte
+    // instead of re-encrypting. Lets us push a real Xteink stock `.xota` through
+    // our server to isolate whether the failure is our serving vs our packaging.
+    if plain.starts_with(b"XOTA") {
+        let info = unlocker_core::xota::inspect(&plain)?;
+        let dest = catalog::cache_dir()?.join(format!("{}.xota", firmware.sha));
+        tokio::fs::write(&dest, &plain)
+            .await
+            .map_err(|e| anyhow::anyhow!("writing {}: {e}", dest.display()))?;
+        log.push(
+            "info",
+            format!(
+                "serving pre-built .xota verbatim: {} bytes, plain {} bytes (sha {})",
+                plain.len(),
+                info.plain_size,
+                &info.plain_sha256[..16]
+            ),
+            None,
+        )
+        .await;
+        return Ok((
+            dest,
+            plain.len() as u64,
+            info.xota_sha256,
+            unlocker_core::types::XotaOta {
+                plain_size: info.plain_size,
+                plain_sha256: info.plain_sha256,
+                xota_crc32: info.xota_crc32,
+            },
+        ));
+    }
+
+    // The `.xota` metadata version must be a value the device accepts as an
+    // upgrade. The real 7.0.8 package (which flashes fine through our server)
+    // carries metadata version "V7.0.9"; our own "V99.9.9" is rejected during
+    // the metadata read (likely a version-range/parse guard) and surfaces as the
+    // generic "server did not return any messages". Use the known-good "V7.0.9"
+    // — still far newer than the device's V0.0.7, and identical to the working
+    // real package. (The manifest's advertised version stays V99.9.9; the device
+    // accepts the real package with exactly that manifest/metadata combination.)
+    let enc = unlocker_core::xota::encrypt(Model::X4Pro, &plain, "V7.0.9", None)?;
 
     // Cache the `.xota` under its own sha so repeated runs reuse it and the
     // helper (root) reads it from the app cache dir rather than a TCC-guarded
