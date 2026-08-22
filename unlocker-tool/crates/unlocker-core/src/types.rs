@@ -216,21 +216,22 @@ pub struct ArmServerSpec {
     /// X4 Pro's account-bound update flow) without running an install.
     #[serde(default)]
     pub capture_only: bool,
-    /// X4 Pro encrypted-OTA metadata. Present only when serving the ESP32-S3 X4
-    /// Pro, whose stock updater downloads an `encrypted_v1` `.xota` and decrypts
-    /// it on-device. When set, `firmware_path`/`firmware_size`/`firmware_sha256`
-    /// describe the *encrypted* `.xota` we serve, and these carry the *plain*
-    /// image's size + sha256 that the device verifies after decrypting. `None`
-    /// for the plain-image X3/X4/CrossPoint path.
+    /// X4 Pro encrypted-OTA artifacts, one per supported OTA channel. Empty for
+    /// the plain-image X3/X4/CrossPoint path.
     #[serde(default)]
-    pub xota: Option<XotaOta>,
+    pub xota_variants: Vec<XotaOta>,
 }
 
-/// Plain-image identity for an X4 Pro `encrypted_v1` OTA, surfaced in the
-/// `check-update` manifest so the device can verify the image after it decrypts
-/// the `.xota` we serve.
+/// One channel-specific X4 Pro `encrypted_v1` artifact plus the plaintext
+/// identity surfaced in the `check-update` manifest.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct XotaOta {
+    /// Channel selected by the device (`0` normal or `1` alternate).
+    pub ota_type: u8,
+    /// Cached encrypted package served for this channel.
+    pub firmware_path: String,
+    pub firmware_size: u64,
+    pub firmware_sha256: String,
     /// Byte length of the decrypted (plain) app image.
     pub plain_size: u64,
     /// Lowercase hex sha256 of the decrypted (plain) app image.

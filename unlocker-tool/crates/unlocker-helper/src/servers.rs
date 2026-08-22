@@ -98,7 +98,7 @@ impl ServerHolder {
             change_log: spec.change_log,
             crosspet_http: spec.crosspet_http,
             capture_only: spec.capture_only,
-            xota: spec.xota,
+            xota_variants: spec.xota_variants,
             on_manifest_request: on_manifest.clone(),
             on_firmware_streamed: on_firmware.clone(),
         });

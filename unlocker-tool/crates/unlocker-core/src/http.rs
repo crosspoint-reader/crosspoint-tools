@@ -486,11 +486,8 @@ pub struct ServerConfig {
     /// all update-check endpoints answer "no update available" so the device
     /// never downloads or flashes. See `ArmServerSpec::capture_only`.
     pub capture_only: bool,
-    /// X4 Pro encrypted-OTA info. When set, `firmware_path` points at an
-    /// `encrypted_v1` `.xota` and `check-update` emits the encrypted-OTA
-    /// manifest (`ota_format: "encrypted_v1"`, `plain_size`, `plain_sha256`,
-    /// `checksum{crc32,sha256}`). `None` for the plain X3/X4/CrossPoint path.
-    pub xota: Option<XotaOta>,
+    /// Channel-specific X4 Pro encrypted packages. Empty for plain firmware.
+    pub xota_variants: Vec<XotaOta>,
     /// Notified on every manifest request. Orchestrator awaits the first
     /// notification to advance from AwaitingDeviceRequest.
     pub on_manifest_request: Arc<tokio::sync::Notify>,
@@ -508,9 +505,8 @@ pub struct UpdateQuery {
     pub device_id: String,
     #[serde(default)]
     pub lng: String,
-    /// X4 Pro sends `ota_type` (`0` normal / `1` alternate). Same image, the
-    /// device just uses it to pick an OSS path upstream; we echo it back so the
-    /// response matches the request the stock client made.
+    /// X4 Pro sends `ota_type` (`0` normal / `1` alternate). The plaintext is
+    /// the same, but each channel uses a different XOTA key and metadata flag.
     #[serde(default)]
     pub ota_type: String,
 }
@@ -661,11 +657,11 @@ async fn check_update(
     }
 
     // X4 Pro: the stock updater expects an `encrypted_v1` `.xota` and verifies
-    // the decrypted image against `plain_sha256`. `cfg.xota` is set only when we
+    // the decrypted image against `plain_sha256`. Variants are present only when we
     // armed with an encrypted package (see the install pipeline), so branch on
     // it rather than re-checking the model.
-    if let Some(xota) = &cfg.xota {
-        return x4pro_check_update(&cfg, xota, &q).into_response();
+    if !cfg.xota_variants.is_empty() {
+        return x4pro_check_update(&cfg, &q).into_response();
     }
 
     let filename = format!(
@@ -697,17 +693,27 @@ async fn check_update(
 /// extra `ota_format`/`ota_type`/`plain_size`/`plain_sha256`/`force_update`
 /// fields drive the device's decrypt-then-verify path. The version is forced
 /// high so the device always considers our image newer than what it's running.
-fn x4pro_check_update(
-    cfg: &ServerConfig,
-    xota: &XotaOta,
-    q: &UpdateQuery,
-) -> Json<serde_json::Value> {
+fn x4pro_check_update(cfg: &ServerConfig, q: &UpdateQuery) -> Json<serde_json::Value> {
     // Serve the `.xota` over plain HTTP from the bridge IP: the device fetches
     // `download_url` directly (api-prod.xteink.cc is a plain-HTTP host for this
     // device), and the OTA payload's integrity is covered by the checksum +
     // plain_sha256 fields, not the transport.
+    let requested_ota_type = q.ota_type.trim().parse::<u8>().unwrap_or(1);
+    let xota = cfg
+        .xota_variants
+        .iter()
+        .find(|xota| xota.ota_type == requested_ota_type)
+        .unwrap_or(&cfg.xota_variants[0]);
+    let ota_type = xota.ota_type;
+    if ota_type != requested_ota_type {
+        tracing::warn!(
+            requested_ota_type,
+            ota_type,
+            "requested XOTA channel is unavailable; serving fallback"
+        );
+    }
     let filename = format!(
-        "V99.9.9-X4Pro-{locale}-PROD-{date}.xota",
+        "V99.9.9-X4Pro-{locale}-OTA{ota_type}-PROD-{date}.xota",
         locale = cfg.locale.short(),
         date = chrono::Utc::now().format("%m%d"),
     );
@@ -716,14 +722,10 @@ fn x4pro_check_update(
     // made no difference to the failure. Flip back to
     // https://unlocker.crosspointreader.com once the drop direction is known.
     let download_url = format!("http://{}/firmware/{}", cfg.bridge_ip, filename);
-    // Echo the requested ota_type as an integer (default 1 — the alternate path
-    // the device used in every capture). The real server emits a JSON number,
-    // not a string, so match that; the image is identical either way.
-    let ota_type: i64 = q.ota_type.trim().parse().unwrap_or(1);
 
     tracing::info!(
         %download_url,
-        xota_size = cfg.firmware_size,
+        xota_size = xota.firmware_size,
         plain_size = xota.plain_size,
         ota_type,
         "serving X4 Pro encrypted_v1 manifest"
@@ -741,7 +743,7 @@ fn x4pro_check_update(
             "version": "V99.9.9",
             "change_log": cfg.change_log,
             "download_url": download_url,
-            "size": cfg.firmware_size,
+            "size": xota.firmware_size,
             "upload_time": chrono::Utc::now().to_rfc3339(),
             "checksum": {
                 "crc32": serde_json::Value::Null,
@@ -761,15 +763,38 @@ async fn serve_firmware(
     headers: HeaderMap,
     AxPath(filename): AxPath<String>,
 ) -> Result<Response, StatusCode> {
+    let xota = if cfg.xota_variants.is_empty() {
+        None
+    } else {
+        cfg.xota_variants
+            .iter()
+            .find(|xota| filename.contains(&format!("-OTA{}-", xota.ota_type)))
+    };
+    if !cfg.xota_variants.is_empty() && xota.is_none() {
+        tracing::warn!(%filename, "firmware URL does not name an available XOTA channel");
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let (firmware_path, size, expected_sha256) = if let Some(xota) = xota {
+        (
+            std::path::Path::new(&xota.firmware_path),
+            xota.firmware_size,
+            xota.firmware_sha256.as_str(),
+        )
+    } else {
+        (
+            cfg.firmware_path.as_path(),
+            cfg.firmware_size,
+            cfg.firmware_sha256.as_str(),
+        )
+    };
     tracing::info!(
         %filename,
-        path = %cfg.firmware_path.display(),
-        size = cfg.firmware_size,
+        path = %firmware_path.display(),
+        size,
         range = ?headers.get(header::RANGE),
         ?headers,
         "firmware download requested"
     );
-    let size = cfg.firmware_size;
     let range = parse_range(headers.get(header::RANGE), size)?;
     tracing::info!(size, ?range, "serving firmware");
     // Advance the app UI as soon as the device begins the firmware GET.
@@ -777,7 +802,7 @@ async fn serve_firmware(
     // the device is already on its OTA progress view.
     cfg.on_firmware_streamed.notify_one();
 
-    let bytes = match tokio::fs::read(&cfg.firmware_path).await {
+    let bytes = match tokio::fs::read(firmware_path).await {
         Ok(b) => b,
         Err(e) => {
             // Previously this mapped silently to 404 and the device gave up
@@ -786,7 +811,7 @@ async fn serve_firmware(
             // reads from ~/Downloads/~/Desktop/etc. even for root. Surface
             // the underlying io error so we can tell EPERM from ENOENT.
             tracing::error!(
-                path = %cfg.firmware_path.display(),
+                path = %firmware_path.display(),
                 error = %e,
                 kind = ?e.kind(),
                 "failed to read firmware file from disk"
@@ -796,10 +821,10 @@ async fn serve_firmware(
     };
     let served_sha256 = hex::encode(Sha256::digest(&bytes));
     let head24 = hex::encode(&bytes[..bytes.len().min(24)]);
-    if !served_sha256.eq_ignore_ascii_case(&cfg.firmware_sha256) {
+    if !served_sha256.eq_ignore_ascii_case(expected_sha256) {
         tracing::error!(
-            path = %cfg.firmware_path.display(),
-            expected_sha256 = %cfg.firmware_sha256,
+            path = %firmware_path.display(),
+            expected_sha256,
             served_sha256 = %served_sha256,
             head24 = %head24,
             "refusing to serve firmware because bytes on disk do not match selected firmware hash"
@@ -807,7 +832,7 @@ async fn serve_firmware(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
     tracing::info!(
-        path = %cfg.firmware_path.display(),
+        path = %firmware_path.display(),
         served_sha256 = %served_sha256,
         head24 = %head24,
         "firmware bytes loaded for response"
@@ -815,7 +840,7 @@ async fn serve_firmware(
 
     log_image_metadata(&bytes);
 
-    let path_for_log = cfg.firmware_path.display().to_string();
+    let path_for_log = firmware_path.display().to_string();
 
     // X4 Pro full download: emit the response headers in the exact order the
     // real AliyunOSS server uses, with `Content-Length` immediately after the
@@ -828,7 +853,7 @@ async fn serve_firmware(
     // A bounded header buffer/scan on the device would miss a late one. Match
     // the real order exactly: Content-Type, Content-Length, Connection,
     // Accept-Ranges, Content-Disposition.
-    if cfg.xota.is_some() && range.is_none() {
+    if xota.is_some() && range.is_none() {
         // Match the real AliyunOSS download response the device successfully
         // pulls 5.5 MB from: Content-Length + Connection: close + Accept-Ranges:
         // bytes, plus the integrity headers OSS sends — `Content-MD5`
@@ -878,7 +903,7 @@ async fn serve_firmware(
     let mut builder = Response::builder()
         .header(header::CONTENT_TYPE, "application/octet-stream")
         .header(header::ACCEPT_RANGES, "bytes");
-    if cfg.xota.is_some() {
+    if xota.is_some() {
         builder = builder.header(
             header::CONTENT_DISPOSITION,
             HeaderValue::from_static("attachment"),
@@ -911,7 +936,7 @@ async fn serve_firmware(
         }
         None => {
             builder = builder.header(header::CONTENT_LENGTH, size);
-            if cfg.xota.is_some() {
+            if xota.is_some() {
                 // X4 Pro: serve the whole `.xota` as a single fixed-length body,
                 // exactly like the real OSS download (Content-Length + Connection:
                 // close, no chunked). `Body::from_stream` yields an unknown-length
@@ -1489,7 +1514,7 @@ mod tests {
             change_log: "test".to_string(),
             crosspet_http,
             capture_only: false,
-            xota: None,
+            xota_variants: Vec::new(),
             on_manifest_request: Arc::new(tokio::sync::Notify::new()),
             on_firmware_streamed: Arc::new(tokio::sync::Notify::new()),
         })
@@ -1611,17 +1636,32 @@ mod tests {
         let mut cfg = (*test_config(false)).clone();
         cfg.model = Model::X4Pro;
         cfg.firmware_sha256 = "ab".repeat(32);
-        cfg.xota = Some(XotaOta {
-            plain_size: 518_560,
-            plain_sha256: "cd".repeat(32),
-            xota_crc32: 0x1234_5678,
-        });
+        cfg.xota_variants = vec![
+            XotaOta {
+                ota_type: 1,
+                firmware_path: "wrong-channel.xota".to_string(),
+                firmware_size: 1,
+                firmware_sha256: "ef".repeat(32),
+                plain_size: 1,
+                plain_sha256: "ef".repeat(32),
+                xota_crc32: 0,
+            },
+            XotaOta {
+                ota_type: 0,
+                firmware_path: "firmware.bin".to_string(),
+                firmware_size: TEST_FIRMWARE_SIZE,
+                firmware_sha256: "ab".repeat(32),
+                plain_size: 518_560,
+                plain_sha256: "cd".repeat(32),
+                xota_crc32: 0x1234_5678,
+            },
+        ];
         let app = router(Arc::new(cfg));
 
         let resp = app
             .oneshot(
                 AxRequest::builder()
-                    .uri("/api/v1/check-update?current_version=V7.0.8&device_type=ESP32S3_X4_TL_SSD1677&device_id=11226248&lng=en&ota_type=1")
+                    .uri("/api/v1/check-update?current_version=V7.0.8&device_type=ESP32S3_X4_TL_SSD1677&device_id=11226248&lng=en&ota_type=0")
                     .header(header::HOST, "api-prod.xteink.cc")
                     .body(Body::empty())
                     .unwrap(),
@@ -1636,7 +1676,7 @@ mod tests {
         assert_eq!(data["version"], "V99.9.9");
         assert_eq!(data["ota_format"], "encrypted_v1");
         // ota_type is echoed as a JSON number (matches the real server), not a string.
-        assert_eq!(data["ota_type"], 1);
+        assert_eq!(data["ota_type"], 0);
         assert_eq!(data["force_update"], true);
         assert_eq!(data["size"], TEST_FIRMWARE_SIZE);
         assert_eq!(data["plain_size"], 518_560);
@@ -1646,7 +1686,7 @@ mod tests {
         assert_eq!(data["checksum"]["sha256"], "cd".repeat(32));
         assert!(data["checksum"]["crc32"].is_null());
         let url = data["download_url"].as_str().unwrap();
-        assert!(url.starts_with("http://192.168.137.1/firmware/V99.9.9-X4Pro-EN-PROD-"));
+        assert!(url.starts_with("http://192.168.137.1/firmware/V99.9.9-X4Pro-EN-OTA0-PROD-"));
         assert!(url.ends_with(".xota"));
     }
 
@@ -1673,11 +1713,15 @@ mod tests {
         cfg.firmware_path = path.clone();
         cfg.firmware_size = bytes.len() as u64;
         cfg.firmware_sha256 = sha;
-        cfg.xota = Some(XotaOta {
+        cfg.xota_variants = vec![XotaOta {
+            ota_type: 1,
+            firmware_path: path.to_string_lossy().into_owned(),
+            firmware_size: bytes.len() as u64,
+            firmware_sha256: cfg.firmware_sha256.clone(),
             plain_size: 4000,
             plain_sha256: "00".repeat(32),
             xota_crc32: 0,
-        });
+        }];
         let app = router(Arc::new(cfg));
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1690,7 +1734,7 @@ mod tests {
 
         let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
         stream
-            .write_all(b"GET /firmware/test.xota HTTP/1.1\r\nHost: 192.168.2.1\r\nConnection: close\r\n\r\n")
+            .write_all(b"GET /firmware/test-OTA1-file.xota HTTP/1.1\r\nHost: 192.168.2.1\r\nConnection: close\r\n\r\n")
             .await
             .unwrap();
         let mut buf = Vec::new();
@@ -1739,11 +1783,15 @@ mod tests {
         cfg.firmware_path = path.clone();
         cfg.firmware_size = bytes.len() as u64;
         cfg.firmware_sha256 = sha;
-        cfg.xota = Some(XotaOta {
+        cfg.xota_variants = vec![XotaOta {
+            ota_type: 1,
+            firmware_path: path.to_string_lossy().into_owned(),
+            firmware_size: bytes.len() as u64,
+            firmware_sha256: cfg.firmware_sha256.clone(),
             plain_size: 2000,
             plain_sha256: "00".repeat(32),
             xota_crc32: 0,
-        });
+        }];
         let app = router(Arc::new(cfg));
 
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -1769,7 +1817,7 @@ mod tests {
 
         let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
         stream
-            .write_all(b"GET /firmware/test.xota HTTP/1.1\r\nHost: 192.168.2.1\r\nConnection: close\r\n\r\n")
+            .write_all(b"GET /firmware/test-OTA1-file.xota HTTP/1.1\r\nHost: 192.168.2.1\r\nConnection: close\r\n\r\n")
             .await
             .unwrap();
         let mut buf = Vec::new();

@@ -30,7 +30,7 @@ GET http://api-prod.xteink.cc/api/v1/check-update
       &device_type=ESP32S3_X4_TL_SSD1677     # note the panel/controller suffix
       &device_id=11226248                    # short numeric id
       &lng=en
-      &ota_type=1                            # 0 and 1 both return the same image
+      &ota_type=1                            # 0 and 1 use different XOTA keys
 Headers:
   user-agent:     ESP32 HTTP Client/1.0
   device_id:      11226248_7C_E8_B1_AB_4C_88 # numericId_MAC
@@ -57,13 +57,13 @@ Key gotcha: the query-string `device_type` is **`ESP32S3_X4_TL_SSD1677`** (model
 }, "message": "Update available" }
 ```
 
-Firmware is delivered **encrypted** (`ota_format: encrypted_v1`, `.xota`). There is no plain variant — `ota_type` 0 and 1 return the same bytes under different OSS paths.
+Firmware is delivered **encrypted** (`ota_format: encrypted_v1`, `.xota`). There is no plain variant. Both OTA channels carry the same plaintext image, but `ota_type` 0 and 1 use different AES keys and metadata flags, so their `.xota` bytes differ.
 
 ### `.xota` encryption
 
 - Layout: `XOTA` magic (4 bytes), IV (16 bytes), encrypted metadata (182 bytes), then the encrypted firmware body. AES-128-CTR runs continuously across `metadata || body`.
 - Decrypted metadata bytes `[0:4]` are the firmware body length as a little-endian `u32`; `[4:36]` are its raw SHA-256. Treating the stock bytes `60 a5 67 00` as fixed magic is incorrect: they decode to `6,792,544`, the stock image's exact length.
-- The firmware-global AES key and complete metadata layout are implemented in `crates/unlocker-core/src/xota.rs`. The unlocker can wrap any valid X4 Pro app image into the stock `encrypted_v1` transport format locally.
+- Both channel-specific AES keys and the complete metadata layout are implemented in `crates/unlocker-core/src/xota.rs`. The unlocker wraps a selected X4 Pro app image for both channels and serves the variant matching the device's `ota_type` request.
 - **You don't need to decrypt to get a plain image.** Once installed, the decrypted firmware lives in the device's app partition, so an app-slot dump over USB yields the plain, flashable image. Verified: the first `plain_size` bytes of a dumped `app0` hash to the server's `plain_sha256`. This is how `crosspointreader.com` currently pins the plain X4 Pro stock build.
 
 ### Flash layout & OTA state
@@ -91,7 +91,7 @@ Beyond check-update, the Pro also talks to an account-bound layer: it GETs `/api
 
 ### Implications for the unlocker
 
-- The X3/X4 unlock works because their OTA accepts a **plain** firmware image via the check-update manifest. The X4 Pro expects an `encrypted_v1` `.xota` and verifies the decrypted image against `plain_sha256`, so returning a plain image the same way will not install — producing a valid `.xota` needs the (not-yet-extracted) firmware key. Until then, the Pro is flashed over **USB** (the `crosspointreader.com` WebSerial flasher writes the OTA partition directly), not via the WiFi manifest spoof.
+- The X3/X4 unlock works because their OTA accepts a **plain** firmware image via the check-update manifest. The X4 Pro expects an `encrypted_v1` `.xota`, verifies the decrypted image against `plain_sha256`, and uses a different AES key for each OTA channel. The unlocker now produces and selects the correct channel-specific package for Wi-Fi OTA.
 - Any X4 Pro capture/flow **must answer NTP first** (handled by the SNTP responder above).
 - To diagnose a Pro without flashing anything, use Settings → **Start traffic capture** (capture-only mode): it arms the hotspot + DNS/HTTP/HTTPS + NTP and logs every request (full method/URI/headers/body) while returning "no update" to everything, so you can read exactly what the device sends.
 

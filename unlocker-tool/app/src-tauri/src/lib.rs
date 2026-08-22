@@ -881,17 +881,19 @@ async fn run_local_install(
 }
 
 /// Wrap a prepared plain image into an X4 Pro `encrypted_v1` `.xota` and cache
-/// it. Returns the `.xota`'s on-disk path, size, and sha256 (for the server's
-/// self-check) plus the `XotaOta` (plain size/sha + `.xota` crc32) the manifest
-/// advertises. The plain input can be any source — a catalog release, a
-/// sideloaded local `.bin`, or the X4 Pro escape-hatch bin — since they all
-/// arrive here as a `PreparedFirmware` path.
+/// it. Xteink uses distinct keys for OTA channels 0 and 1, so a plain input is
+/// wrapped twice and the server selects the artifact matching the device's
+/// `ota_type` request. A pre-built `.xota` is served only for its detected
+/// channel.
 async fn prepare_x4pro_xota(
     log: &SessionLog,
     firmware: &PreparedFirmware,
-) -> anyhow::Result<(std::path::PathBuf, u64, String, unlocker_core::types::XotaOta)> {
+) -> anyhow::Result<Vec<unlocker_core::types::XotaOta>> {
     let plain = tokio::fs::read(&firmware.path).await.map_err(|e| {
-        anyhow::anyhow!("reading plain firmware {} to encrypt: {e}", firmware.path.display())
+        anyhow::anyhow!(
+            "reading plain firmware {} to encrypt: {e}",
+            firmware.path.display()
+        )
     })?;
 
     // DIAGNOSTIC / real-firmware path: if the sideloaded file is already an
@@ -915,37 +917,15 @@ async fn prepare_x4pro_xota(
             None,
         )
         .await;
-        return Ok((
-            dest,
-            plain.len() as u64,
-            info.xota_sha256,
-            unlocker_core::types::XotaOta {
-                plain_size: info.plain_size,
-                plain_sha256: info.plain_sha256,
-                xota_crc32: info.xota_crc32,
-            },
-        ));
-    }
-
-    // The stock updater also validates the embedded ESP app identity before it
-    // accepts the first decrypted application block. Normalize third-party
-    // builds (for example `crosspoint-reader` / `1.6.0rc`) to the identity used
-    // by the successfully tested direct-stock Escape Hatch image, and repair
-    // the ESP checksum + appended SHA-256 before XOTA encryption.
-    let normalized = unlocker_core::xota::normalize_x4pro_app_identity(&plain)?;
-    if normalized.changed {
-        log.push(
-            "info",
-            format!(
-                "normalized X4 Pro app identity: project {:?} -> {:?}, version {:?} -> {:?}",
-                normalized.original_project,
-                unlocker_core::xota::STOCK_APP_PROJECT,
-                normalized.original_version,
-                unlocker_core::xota::STOCK_APP_VERSION,
-            ),
-            None,
-        )
-        .await;
+        return Ok(vec![unlocker_core::types::XotaOta {
+            ota_type: info.ota_type,
+            firmware_path: dest.to_string_lossy().into_owned(),
+            firmware_size: plain.len() as u64,
+            firmware_sha256: info.xota_sha256,
+            plain_size: info.plain_size,
+            plain_sha256: info.plain_sha256,
+            xota_crc32: info.xota_crc32,
+        }]);
     }
 
     // The `.xota` metadata version must be a value the device accepts as an
@@ -956,39 +936,35 @@ async fn prepare_x4pro_xota(
     // — still far newer than the device's V0.0.7, and identical to the working
     // real package. (The manifest's advertised version stays V99.9.9; the device
     // accepts the real package with exactly that manifest/metadata combination.)
-    let enc = unlocker_core::xota::encrypt(Model::X4Pro, &normalized.bytes, "V7.0.9", None)?;
-
-    // Cache the `.xota` under its own sha so repeated runs reuse it and the
-    // helper (root) reads it from the app cache dir rather than a TCC-guarded
-    // location. Keying on the plain sha keeps the name stable across the random
-    // per-package IV (the bytes differ each run, but the input doesn't).
-    let dest = catalog::cache_dir()?.join(format!("{}.xota", firmware.sha));
-    tokio::fs::write(&dest, &enc.bytes)
-        .await
-        .map_err(|e| anyhow::anyhow!("writing {}: {e}", dest.display()))?;
-
-    log.push(
-        "info",
-        format!(
-            "encrypted X4 Pro .xota: plain {} bytes (sha {}), package {} bytes",
-            enc.plain_size,
-            &enc.plain_sha256[..16],
-            enc.bytes.len()
-        ),
-        None,
-    )
-    .await;
-
-    Ok((
-        dest,
-        enc.bytes.len() as u64,
-        enc.xota_sha256,
-        unlocker_core::types::XotaOta {
+    let mut variants = Vec::with_capacity(2);
+    for ota_type in 0..=1 {
+        let enc = unlocker_core::xota::encrypt(Model::X4Pro, &plain, "V7.0.9", ota_type, None)?;
+        let dest = catalog::cache_dir()?.join(format!("{}-ota{ota_type}.xota", firmware.sha));
+        tokio::fs::write(&dest, &enc.bytes)
+            .await
+            .map_err(|e| anyhow::anyhow!("writing {}: {e}", dest.display()))?;
+        log.push(
+            "info",
+            format!(
+                "encrypted X4 Pro ota_type {ota_type}: plain {} bytes (sha {}), package {} bytes",
+                enc.plain_size,
+                &enc.plain_sha256[..16],
+                enc.bytes.len()
+            ),
+            None,
+        )
+        .await;
+        variants.push(unlocker_core::types::XotaOta {
+            ota_type,
+            firmware_path: dest.to_string_lossy().into_owned(),
+            firmware_size: enc.bytes.len() as u64,
+            firmware_sha256: enc.xota_sha256,
             plain_size: enc.plain_size,
             plain_sha256: enc.plain_sha256,
             xota_crc32: enc.xota_crc32,
-        },
-    ))
+        });
+    }
+    Ok(variants)
 }
 
 async fn run_prepared_install(
@@ -1067,25 +1043,24 @@ async fn run_prepared_install(
     // the plain image we prepared into an encrypted package the device will
     // decrypt-and-verify. The served artifact becomes the `.xota`; the manifest
     // then advertises the plain image's size + sha256 for the on-device check.
-    let (firmware_path, firmware_size, firmware_sha256, xota) = if model.is_x4pro() {
-        let (path, size, sha, info) = prepare_x4pro_xota(&log, &firmware).await?;
-        (path, size, sha, Some(info))
+    let xota_variants = if model.is_x4pro() {
+        prepare_x4pro_xota(&log, &firmware).await?
     } else {
-        (firmware.path, firmware.size, firmware.sha, None)
+        Vec::new()
     };
 
     let arm_cfg = ArmConfig {
         bridge_ip,
         model,
         locale: orch.data().await.locale.unwrap(),
-        firmware_path,
-        firmware_size,
-        firmware_sha256,
+        firmware_path: firmware.path,
+        firmware_size: firmware.size,
+        firmware_sha256: firmware.sha,
         crosspoint_version: firmware.version,
         change_log: firmware.change_log,
         crosspet_http,
         capture_only: false,
-        xota,
+        xota_variants,
     };
     runtime.arm(&helper, arm_cfg).await?;
     log.push("info", "DNS + HTTP + HTTPS servers armed", None)
@@ -1209,7 +1184,7 @@ async fn run_capture(
         change_log: String::new(),
         crosspet_http: false,
         capture_only: true,
-        xota: None,
+        xota_variants: Vec::new(),
     };
     runtime.arm(&helper, arm_cfg).await?;
     log.push(
