@@ -312,15 +312,15 @@ async function handleApi(
         return handleDeviceBuildUpload(DEVICE_BUILDS.sticky, request, env, ctx, corsHeaders);
 
       case '/api/sticky':
-        if (request.method === 'PATCH') return handleDeviceBuildUpdate(DEVICE_BUILDS.sticky, request, env, ctx, corsHeaders);
-        if (request.method === 'DELETE') return handleDeviceBuildDelete(DEVICE_BUILDS.sticky, request, env, ctx, corsHeaders);
+        if (request.method === 'PATCH') return handleDeviceBuildUpdate(DEVICE_BUILDS.sticky, null, request, env, ctx, corsHeaders);
+        if (request.method === 'DELETE') return handleDeviceBuildDelete(DEVICE_BUILDS.sticky, null, request, env, ctx, corsHeaders);
         return json({ error: 'Method not allowed' }, 405, corsHeaders);
 
       case '/api/sticky/info':
         return handleDeviceBuildInfo(DEVICE_BUILDS.sticky, env, corsHeaders);
 
       case '/api/sticky/firmware':
-        return handleDeviceBuildFirmware(DEVICE_BUILDS.sticky, env, corsHeaders);
+        return handleDeviceBuildFirmware(DEVICE_BUILDS.sticky, null, env, corsHeaders);
 
       case '/api/stats':
         return handleCommunityStats(env, corsHeaders);
@@ -330,6 +330,9 @@ async function handleApi(
 
       default:
         // Device builds: /api/device-build/{device}[/upload|/info|/firmware]
+        // and per-build: /api/device-build/{device}/{id}[/firmware]. The
+        // id-less firmware/PATCH/DELETE forms target the latest build for
+        // pre-list clients.
         if (url.pathname.startsWith('/api/device-build/')) {
           const parts = url.pathname.replace('/api/device-build/', '').split('/');
           const cfg = DEVICE_BUILDS[parts[0]];
@@ -337,10 +340,16 @@ async function handleApi(
           const sub = parts[1] || '';
           if (sub === 'upload') return handleDeviceBuildUpload(cfg, request, env, ctx, corsHeaders);
           if (sub === 'info') return handleDeviceBuildInfo(cfg, env, corsHeaders);
-          if (sub === 'firmware') return handleDeviceBuildFirmware(cfg, env, corsHeaders);
+          if (sub === 'firmware') return handleDeviceBuildFirmware(cfg, null, env, corsHeaders);
           if (sub === '') {
-            if (request.method === 'PATCH') return handleDeviceBuildUpdate(cfg, request, env, ctx, corsHeaders);
-            if (request.method === 'DELETE') return handleDeviceBuildDelete(cfg, request, env, ctx, corsHeaders);
+            if (request.method === 'PATCH') return handleDeviceBuildUpdate(cfg, null, request, env, ctx, corsHeaders);
+            if (request.method === 'DELETE') return handleDeviceBuildDelete(cfg, null, request, env, ctx, corsHeaders);
+            return json({ error: 'Method not allowed' }, 405, corsHeaders);
+          }
+          if (parts[2] === 'firmware') return handleDeviceBuildFirmware(cfg, sub, env, corsHeaders);
+          if (parts.length === 2) {
+            if (request.method === 'PATCH') return handleDeviceBuildUpdate(cfg, sub, request, env, ctx, corsHeaders);
+            if (request.method === 'DELETE') return handleDeviceBuildDelete(cfg, sub, request, env, ctx, corsHeaders);
             return json({ error: 'Method not allowed' }, 405, corsHeaders);
           }
           return json({ error: 'Not found' }, 404, corsHeaders);
@@ -3642,12 +3651,16 @@ async function handleBetaFirmware(
   });
 }
 
-// --- Sticky Beta Build ---
+// --- Device Beta Builds ---
 //
-// A single admin-uploaded build per non-Xteink device (Sticky, M5Paper,
-// LilyGo T5), offered as device options in the homepage flasher (the old
-// standalone /sticky page is merged into it). Uploading replaces the
-// previous build in place; there is exactly one per device at a time.
+// Admin-uploaded builds per non-catalog device (Sticky, X4 Pro, M5Paper,
+// LilyGo T5, M5PaperMono), offered as device options in the homepage flasher
+// (the old standalone /sticky page is merged into it). Each device carries a
+// list of builds; uploads append a new entry rather than replacing the
+// previous one. Pre-list deployments stored a single build under
+// `{metaKey}` with its binary at the bare `{r2Key}`; that build is folded
+// into the list as id 'legacy' on first read and its binary stays at the
+// old key.
 
 interface DeviceBuildConfig {
   r2Key: string;
@@ -3702,6 +3715,7 @@ const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
 };
 
 type StoredDeviceBuild = {
+  id: string;
   name: string;
   notes?: string;
   firmwareSize?: number;
@@ -3716,6 +3730,46 @@ function deviceBuildStatus(build: StoredDeviceBuild) {
     fingerprint: build.firmwareSha256 || build.uploadedAt || build.name,
     notes: build.notes,
   };
+}
+
+function deviceBuildListKey(cfg: DeviceBuildConfig): string {
+  return `${cfg.metaKey}-list`;
+}
+
+function deviceBuildR2Key(cfg: DeviceBuildConfig, id: string): string {
+  if (id === 'legacy') return cfg.r2Key;
+  const slug = cfg.r2Key.split('/')[1];
+  return `builds/${slug}/${id}/firmware.bin`;
+}
+
+async function readDeviceBuildList(env: Env, cfg: DeviceBuildConfig): Promise<StoredDeviceBuild[]> {
+  const raw = await env.BUILD_META.get(deviceBuildListKey(cfg));
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed as StoredDeviceBuild[];
+    } catch {
+      // fall through to the legacy key
+    }
+  }
+  const legacy = await env.BUILD_META.get(cfg.metaKey);
+  if (!legacy) return [];
+  try {
+    return [{ id: 'legacy', ...(JSON.parse(legacy) as Omit<StoredDeviceBuild, 'id'>) }];
+  } catch {
+    return [];
+  }
+}
+
+async function writeDeviceBuildList(env: Env, cfg: DeviceBuildConfig, builds: StoredDeviceBuild[]): Promise<void> {
+  await env.BUILD_META.put(deviceBuildListKey(cfg), JSON.stringify(builds));
+  await env.BUILD_META.delete(cfg.metaKey);
+}
+
+// Uploads append, so the last entry is the newest — served by the id-less
+// legacy endpoints that predate multiple builds per device.
+function latestDeviceBuild(builds: StoredDeviceBuild[]): StoredDeviceBuild | null {
+  return builds.length ? builds[builds.length - 1] : null;
 }
 
 async function handleDeviceBuildUpload(
@@ -3744,26 +3798,28 @@ async function handleDeviceBuildUpload(
 
   const data = await (firmware as File).arrayBuffer();
   const sha256 = await sha256Hex(data);
-  await env.FIRMWARE_BUCKET.put(cfg.r2Key, data, {
-    customMetadata: { sha256 },
-  });
-
-  const build = {
+  const build: StoredDeviceBuild = {
+    id: crypto.randomUUID(),
     name,
     notes,
     firmwareSize: data.byteLength,
     firmwareSha256: sha256,
     uploadedAt: new Date().toISOString(),
   };
-  await env.BUILD_META.put(cfg.metaKey, JSON.stringify(build));
+  await env.FIRMWARE_BUCKET.put(deviceBuildR2Key(cfg, build.id), data, {
+    customMetadata: { sha256 },
+  });
+
+  const builds = [...await readDeviceBuildList(env, cfg), build];
+  await writeDeviceBuildList(env, cfg, builds);
 
   scheduleInstatusTask(
     ctx,
     reconcileDeviceBuildStatus(
       env,
       cfg.statusDevice,
-      deviceBuildStatus(build),
-      notifyRequested(formData.get('notify'))
+      builds.map(deviceBuildStatus),
+      notifyRequested(formData.get('notify')) ? deviceBuildStatus(build) : undefined
     ),
     `${cfg.label} build`
   );
@@ -3771,8 +3827,10 @@ async function handleDeviceBuildUpload(
   return json({ build }, 201, headers);
 }
 
+// buildId === null targets the latest build (the pre-list endpoints).
 async function handleDeviceBuildUpdate(
   cfg: DeviceBuildConfig,
+  buildId: string | null,
   request: Request,
   env: Env,
   ctx: ExecutionContext,
@@ -3782,11 +3840,13 @@ async function handleDeviceBuildUpdate(
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
-  const raw = await env.BUILD_META.get(cfg.metaKey);
-  if (!raw) {
+  const builds = await readDeviceBuildList(env, cfg);
+  const build = buildId === null
+    ? latestDeviceBuild(builds)
+    : builds.find(b => b.id === buildId) || null;
+  if (!build) {
     return json({ error: `No ${cfg.label} build uploaded` }, 404, headers);
   }
-  const build = JSON.parse(raw) as StoredDeviceBuild;
 
   const body = await request.json() as { name?: string; notes?: string };
   if (body.name !== undefined) {
@@ -3799,10 +3859,10 @@ async function handleDeviceBuildUpdate(
     build.notes = typeof body.notes === 'string' ? body.notes.trim() : '';
   }
 
-  await env.BUILD_META.put(cfg.metaKey, JSON.stringify(build));
+  await writeDeviceBuildList(env, cfg, builds);
   scheduleInstatusTask(
     ctx,
-    reconcileDeviceBuildStatus(env, cfg.statusDevice, deviceBuildStatus(build)),
+    reconcileDeviceBuildStatus(env, cfg.statusDevice, builds.map(deviceBuildStatus)),
     `${cfg.label} build metadata`
   );
   return json({ build }, 200, headers);
@@ -3810,6 +3870,7 @@ async function handleDeviceBuildUpdate(
 
 async function handleDeviceBuildDelete(
   cfg: DeviceBuildConfig,
+  buildId: string | null,
   request: Request,
   env: Env,
   ctx: ExecutionContext,
@@ -3819,16 +3880,20 @@ async function handleDeviceBuildDelete(
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
-  const raw = await env.BUILD_META.get(cfg.metaKey);
-  if (!raw) {
+  const builds = await readDeviceBuildList(env, cfg);
+  const build = buildId === null
+    ? latestDeviceBuild(builds)
+    : builds.find(b => b.id === buildId) || null;
+  if (!build) {
     return json({ error: `No ${cfg.label} build uploaded` }, 404, headers);
   }
 
-  await env.FIRMWARE_BUCKET.delete(cfg.r2Key);
-  await env.BUILD_META.delete(cfg.metaKey);
+  const remaining = builds.filter(b => b.id !== build.id);
+  await env.FIRMWARE_BUCKET.delete(deviceBuildR2Key(cfg, build.id));
+  await writeDeviceBuildList(env, cfg, remaining);
   scheduleInstatusTask(
     ctx,
-    reconcileDeviceBuildStatus(env, cfg.statusDevice, null),
+    reconcileDeviceBuildStatus(env, cfg.statusDevice, remaining.map(deviceBuildStatus)),
     `${cfg.label} build removal`
   );
   return json({ ok: true }, 200, headers);
@@ -3839,19 +3904,26 @@ async function handleDeviceBuildInfo(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const raw = await env.BUILD_META.get(cfg.metaKey);
-  if (!raw) {
-    return json({ build: null }, 200, headers);
-  }
-  return json({ build: JSON.parse(raw) }, 200, headers);
+  const builds = await readDeviceBuildList(env, cfg);
+  // `build` (the newest) is kept for cached frontends that predate the list.
+  return json({ build: latestDeviceBuild(builds), builds }, 200, headers);
 }
 
 async function handleDeviceBuildFirmware(
   cfg: DeviceBuildConfig,
+  buildId: string | null,
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const object = await env.FIRMWARE_BUCKET.get(cfg.r2Key);
+  const builds = await readDeviceBuildList(env, cfg);
+  const build = buildId === null
+    ? latestDeviceBuild(builds)
+    : builds.find(b => b.id === buildId) || null;
+  if (!build) {
+    return json({ error: `No ${cfg.label} build uploaded` }, 404, headers);
+  }
+
+  const object = await env.FIRMWARE_BUCKET.get(deviceBuildR2Key(cfg, build.id));
   if (!object) {
     return json({ error: `No ${cfg.label} build uploaded` }, 404, headers);
   }
@@ -4303,11 +4375,6 @@ type StatusReconcileOptions = {
   notifyStable?: boolean;
 };
 
-async function readStoredDeviceBuild(env: Env, cfg: DeviceBuildConfig): Promise<StoredDeviceBuild | null> {
-  const raw = await env.BUILD_META.get(cfg.metaKey);
-  return raw ? JSON.parse(raw) as StoredDeviceBuild : null;
-}
-
 async function reconcileAllReleaseStatus(
   env: Env,
   options: StatusReconcileOptions = {}
@@ -4317,14 +4384,13 @@ async function reconcileAllReleaseStatus(
     fetchStableForCatalog(env),
     fetchInsiderForCatalog(env),
     getBetaList(env),
-    ...deviceConfigs.map(cfg => readStoredDeviceBuild(env, cfg)),
+    ...deviceConfigs.map(cfg => readDeviceBuildList(env, cfg)),
   ]);
   const primaryStable = stable.find(release => release.supported_devices.includes('x4')) || stable[0] || null;
 
-  const statusDeviceBuilds: Partial<Record<DeviceBuildConfig['statusDevice'], ReturnType<typeof deviceBuildStatus> | null>> = {};
+  const statusDeviceBuilds: Partial<Record<DeviceBuildConfig['statusDevice'], ReturnType<typeof deviceBuildStatus>[]>> = {};
   deviceConfigs.forEach((cfg, index) => {
-    const build = deviceBuilds[index];
-    statusDeviceBuilds[cfg.statusDevice] = build ? deviceBuildStatus(build) : null;
+    statusDeviceBuilds[cfg.statusDevice] = deviceBuilds[index].map(deviceBuildStatus);
   });
 
   await reconcileReleaseStatusSnapshot(env, {
@@ -4345,7 +4411,7 @@ async function reconcileAllReleaseStatus(
     stable: primaryStable?.version || null,
     insider: insider?.version || null,
     betas: betas.length,
-    deviceBuilds: deviceBuilds.filter(Boolean).length,
+    deviceBuilds: deviceBuilds.reduce((count, builds) => count + builds.length, 0),
   };
 }
 

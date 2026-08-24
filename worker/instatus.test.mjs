@@ -190,10 +190,10 @@ test('full reconciliation lists components once instead of fetching each compone
     insider,
     betas: [],
     deviceBuilds: {
-      x4pro: { name: 'X4 Pro Beta 12', version: '12', fingerprint: 'x4pro-sha' },
-      sticky: { name: 'Sticky RC 5', version: 'RC 5', fingerprint: 'sticky-sha' },
-      m5paper: { name: 'M5Paper RC1', version: 'RC1', fingerprint: 'm5paper-sha' },
-      lilygo: { name: 'LilyGo Beta 2', version: '2', fingerprint: 'lilygo-sha' },
+      x4pro: [{ name: 'X4 Pro Beta 12', version: '12', fingerprint: 'x4pro-sha' }],
+      sticky: [{ name: 'Sticky RC 5', version: 'RC 5', fingerprint: 'sticky-sha' }],
+      m5paper: [{ name: 'M5Paper RC1', version: 'RC1', fingerprint: 'm5paper-sha' }],
+      lilygo: [{ name: 'LilyGo Beta 2', version: '2', fingerprint: 'lilygo-sha' }],
     },
   })
 
@@ -206,10 +206,10 @@ test('full reconciliation lists components once instead of fetching each compone
     insider,
     betas: [],
     deviceBuilds: {
-      x4pro: { name: 'X4 Pro Beta 12', version: '12', fingerprint: 'x4pro-sha' },
-      sticky: { name: 'Sticky RC 5', version: 'RC 5', fingerprint: 'sticky-sha' },
-      m5paper: { name: 'M5Paper RC1', version: 'RC1', fingerprint: 'm5paper-sha' },
-      lilygo: { name: 'LilyGo Beta 2', version: '2', fingerprint: 'lilygo-sha' },
+      x4pro: [{ name: 'X4 Pro Beta 12', version: '12', fingerprint: 'x4pro-sha' }],
+      sticky: [{ name: 'Sticky RC 5', version: 'RC 5', fingerprint: 'sticky-sha' }],
+      m5paper: [{ name: 'M5Paper RC1', version: 'RC1', fingerprint: 'm5paper-sha' }],
+      lilygo: [{ name: 'LilyGo Beta 2', version: '2', fingerprint: 'lilygo-sha' }],
     },
   })
   assert.equal(listRequests, 2)
@@ -343,7 +343,7 @@ test('keeps a failed device build notice queued and retries it without duplicate
     notes: 'SD plugin preview.',
   }
 
-  await assert.rejects(reconcileDeviceBuildStatus(env, 'x4pro', build, true), /429/)
+  await assert.rejects(reconcileDeviceBuildStatus(env, 'x4pro', [build], build), /429/)
   assert.ok(kv.has('instatus:pending:device:x4pro'))
 
   await flushPendingDeviceNotifications(env)

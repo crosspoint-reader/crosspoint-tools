@@ -24,7 +24,7 @@ export type ReleaseStatusSnapshot = {
   stable: PublishedBuildStatus | null;
   insider: PublishedBuildStatus | null;
   betas: BetaBuild[];
-  deviceBuilds: Partial<Record<DeviceBuildStatusDevice, PublishedBuildStatus | null>>;
+  deviceBuilds: Partial<Record<DeviceBuildStatusDevice, PublishedBuildStatus[]>>;
 };
 
 type InstatusConfig = {
@@ -556,15 +556,12 @@ export async function reconcileReleaseStatusSnapshot(
   const targets = deviceBuildTargets(env);
   await Promise.all((Object.keys(DEVICE_BUILD_LABELS) as DeviceBuildStatusDevice[])
     .filter(device => targets[device].groupId)
-    .map(device => {
-      const build = snapshot.deviceBuilds[device] || null;
-      return updateComponent(
-        config,
-        deviceBuildTarget(env, device),
-        build ? build.name : 'No build is currently available.',
-        components
-      );
-    }));
+    .map(device => updateComponent(
+      config,
+      deviceBuildTarget(env, device),
+      deviceBuildComponentDescription(snapshot.deviceBuilds[device] || []),
+      components
+    )));
 }
 
 export async function reconcileBetaStatus(
@@ -641,6 +638,16 @@ function pendingDeviceNotificationKey(device: DeviceBuildStatusDevice): string {
   return `${PENDING_DEVICE_NOTIFICATION_PREFIX}${device}`;
 }
 
+function deviceBuildComponentDescription(builds: PublishedBuildStatus[]): string {
+  if (builds.length === 0) return 'No build is currently available.';
+  return builds.map(build => build.name).join('; ');
+}
+
+// The queued copy carries the full component description alongside the build
+// so a cron retry doesn't collapse the component text to just this build's
+// name when the device has several.
+type PendingDeviceNotification = PublishedBuildStatus & { componentDescription?: string };
+
 // Release bursts (CI uploading several device builds plus insider/stock in the
 // same window) can trip Instatus's per-endpoint rate limit, so a notification
 // that fails here must survive to be retried by the cron flush below.
@@ -648,10 +655,14 @@ async function deliverDeviceBuildNotification(
   env: Env,
   config: InstatusConfig,
   device: DeviceBuildStatusDevice,
-  build: PublishedBuildStatus
+  build: PendingDeviceNotification
 ): Promise<void> {
   const label = DEVICE_BUILD_LABELS[device];
-  const id = await updateComponent(config, deviceBuildTarget(env, device), build.name);
+  const id = await updateComponent(
+    config,
+    deviceBuildTarget(env, device),
+    build.componentDescription || build.name
+  );
   const notes = limitedNotes(build.notes);
   await publishNotificationOnce(
     env,
@@ -672,27 +683,38 @@ async function deliverDeviceBuildNotification(
 export async function reconcileDeviceBuildStatus(
   env: Env,
   device: DeviceBuildStatusDevice,
-  build: PublishedBuildStatus | null,
-  notify = false
+  builds: PublishedBuildStatus[],
+  notify?: PublishedBuildStatus
 ): Promise<void> {
   const config = getInstatusConfig(env);
   if (!config) return;
-  if (notify && build) {
-    await env.BUILD_META.put(pendingDeviceNotificationKey(device), JSON.stringify(build));
-    await deliverDeviceBuildNotification(env, config, device, build);
+  const description = deviceBuildComponentDescription(builds);
+  if (notify) {
+    const pending: PendingDeviceNotification = { ...notify, componentDescription: description };
+    await env.BUILD_META.put(pendingDeviceNotificationKey(device), JSON.stringify(pending));
+    await deliverDeviceBuildNotification(env, config, device, pending);
     return;
   }
   // Metadata edits (e.g. a name typo fix) must also reach any queued notice
   // still waiting on delivery, or it fires with the stale copy; a deleted
-  // build's queued notice must never fire at all.
-  if (build) {
-    if (await env.BUILD_META.get(pendingDeviceNotificationKey(device))) {
-      await env.BUILD_META.put(pendingDeviceNotificationKey(device), JSON.stringify(build));
+  // build's queued notice must never fire at all. The queued build is matched
+  // back to the list by fingerprint, which survives name/notes edits.
+  const key = pendingDeviceNotificationKey(device);
+  const queuedRaw = await env.BUILD_META.get(key);
+  if (queuedRaw) {
+    let queued: PendingDeviceNotification | null = null;
+    try {
+      queued = JSON.parse(queuedRaw) as PendingDeviceNotification;
+    } catch {
+      // unreadable — drop it below
     }
-  } else {
-    await env.BUILD_META.delete(pendingDeviceNotificationKey(device));
+    const current = queued && builds.find(build => build.fingerprint === queued!.fingerprint);
+    if (current) {
+      await env.BUILD_META.put(key, JSON.stringify({ ...current, componentDescription: description }));
+    } else {
+      await env.BUILD_META.delete(key);
+    }
   }
-  const description = build ? build.name : 'No build is currently available.';
   await updateComponent(config, deviceBuildTarget(env, device), description);
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
-import { fetchReleaseVisibility, fetchBetaBuilds, fetchDeviceBuildInfo, fetchStockFirmwareInfo } from '../lib/flasher.js'
+import { fetchReleaseVisibility, fetchBetaBuilds, fetchDeviceBuildList, fetchStockFirmwareInfo } from '../lib/flasher.js'
 
 // Maps catalog channels to the release-visibility keys the admin panel uses.
 // Only the "real" stable release maps to `crosspoint`; recovery entries
@@ -113,24 +113,27 @@ export default function DownloadModal({ open, onClose }) {
     if (!open || model !== 'x4pro' || x4proReleases) return
     let cancelled = false
     Promise.all([
-      fetchDeviceBuildInfo('x4pro').catch(() => null),
+      fetchDeviceBuildList('x4pro').catch(() => []),
       fetchStockFirmwareInfo('x4pro', 'en').catch(() => null),
-    ]).then(([build, stockInfo]) => {
+    ]).then(([builds, stockInfo]) => {
       if (cancelled) return
       const list = []
-      if (build) {
+      // The worker list is append-ordered (oldest first); show newest first.
+      builds.slice().reverse().forEach((build) => {
         list.push({
-          id: 'x4pro-beta',
+          id: `x4pro-beta-${build.id || 'legacy'}`,
           name: build.name || 'X4 Pro Beta',
           channel: 'beta',
           version: '',
           released_at: build.uploadedAt || '',
           size: build.firmwareSize || 0,
-          firmware_url: '/api/device-build/x4pro/firmware',
+          firmware_url: build.id
+            ? `/api/device-build/x4pro/${build.id}/firmware`
+            : '/api/device-build/x4pro/firmware',
           filename: 'x4pro-firmware.bin',
           supported_devices: ['x4pro'],
         })
-      }
+      })
       // Pinned stock build; English only — the X4 Pro has no Chinese variant.
       list.push({
         id: 'x4pro-stock-en',

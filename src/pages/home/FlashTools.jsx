@@ -14,7 +14,7 @@ import {
   fetchReleaseVisibility,
   fetchRcInfo,
   fetchRcFirmware,
-  fetchDeviceBuildInfo,
+  fetchDeviceBuildList,
   fetchDeviceBuildFirmware,
   fetchFlashAsset,
 } from '../../lib/flasher.js'
@@ -284,8 +284,9 @@ export default function FlashTools() {
   // { enabled, release: { tag, version, publishedAt, notesUrl, assets } }
   const [rc, setRc] = useState({ enabled: false, release: null })
 
-  // Admin-uploaded build for DEVICE_BUILD_MODELS (sticky, m5paper, lilygo, x4pro)
-  const [deviceBuild, setDeviceBuild] = useState(null)
+  // Admin-uploaded builds for DEVICE_BUILD_MODELS (sticky, m5paper, lilygo,
+  // x4pro) — each device can carry several beta builds at once.
+  const [deviceBuilds, setDeviceBuilds] = useState([])
 
   // Stable release publish date, shown on the Xteink cards (both flash the
   // same release build).
@@ -311,9 +312,10 @@ export default function FlashTools() {
   useEffect(() => {
     let cancelled = false
     DEVICE_BUILD_MODELS.forEach((id) => {
-      fetchDeviceBuildInfo(id)
-        .then((b) => {
-          if (!cancelled && b) setDeviceAvailability((a) => ({ ...a, [id]: b }))
+      fetchDeviceBuildList(id)
+        .then((builds) => {
+          const latest = builds[builds.length - 1]
+          if (!cancelled && latest) setDeviceAvailability((a) => ({ ...a, [id]: latest }))
         })
         .catch(() => {})
     })
@@ -360,10 +362,10 @@ export default function FlashTools() {
     if (!model) return
     let cancelled = false
     if (DEVICE_BUILD_MODELS.includes(model)) {
-      setDeviceBuild(null)
-      fetchDeviceBuildInfo(model)
-        .then((b) => {
-          if (!cancelled) setDeviceBuild(b)
+      setDeviceBuilds([])
+      fetchDeviceBuildList(model)
+        .then((builds) => {
+          if (!cancelled) setDeviceBuilds(builds)
         })
         .catch(() => {})
       // The X4 Pro also offers a pinned stock build (static asset) alongside
@@ -489,8 +491,9 @@ export default function FlashTools() {
       const lang = action === 'stock-en' ? 'en' : 'ch'
       return { device: model, channel: action, version: stock[lang].text }
     }
-    if (action === 'device') {
-      return { device: model, channel: 'beta', version: deviceBuild?.name }
+    if (action.startsWith('device-')) {
+      const build = deviceBuilds.find((b) => `device-${b.id}` === action)
+      return { device: model, channel: 'beta', version: build?.name }
     }
     if (action.startsWith('beta-')) {
       const beta = betaBuilds.find((build) => `beta-${build.id}` === action)
@@ -504,6 +507,9 @@ export default function FlashTools() {
     if (running) return
 
     const install = DEVICE_INSTALLS[model]
+    const activeDeviceBuild = action.startsWith('device-')
+      ? deviceBuilds.find((b) => `device-${b.id}` === action)
+      : null
 
     // Request the serial port FIRST, while we still have the user gesture.
     // Any await before this (file reads, fetches) consumes the gesture and
@@ -517,7 +523,7 @@ export default function FlashTools() {
     }
 
     if (install) {
-      await runDeviceInstall(install, action, serialPort)
+      await runDeviceInstall(install, action, serialPort, activeDeviceBuild)
       return
     }
 
@@ -526,7 +532,7 @@ export default function FlashTools() {
     // behavior.
     const skipReset =
       action === 'crosspoint' || action === 'nightly' || action === 'rc' ||
-      action === 'custom' || action === 'device' || action.startsWith('beta-')
+      action === 'custom' || action.startsWith('device-') || action.startsWith('beta-')
 
     const titles = {
       crosspoint: 'Flashing CrossPoint Firmware...',
@@ -535,12 +541,15 @@ export default function FlashTools() {
       'stock-en': 'Flashing English Firmware...',
       'stock-ch': 'Flashing Chinese Firmware...',
       custom: 'Flashing Custom Firmware...',
-      device: `Flashing ${MODELS.find((m) => m.id === model)?.name || 'Device'} Beta...`,
     }
     const activeBeta = action.startsWith('beta-')
       ? betaBuilds.find((build) => `beta-${build.id}` === action)
       : null
-    const title = activeBeta ? `Flashing ${betaLabel(activeBeta)}...` : titles[action]
+    const title = activeBeta
+      ? `Flashing ${betaLabel(activeBeta)}...`
+      : activeDeviceBuild
+        ? `Flashing ${activeDeviceBuild.name}...`
+        : titles[action]
 
     const downloadMsgs = {
       crosspoint: 'Downloading firmware...',
@@ -548,9 +557,10 @@ export default function FlashTools() {
       rc: 'Downloading release candidate...',
       'stock-en': 'Downloading firmware...',
       'stock-ch': 'Downloading firmware...',
-      device: 'Downloading beta firmware...',
     }
-    const downloadMsg = action.startsWith('beta-') ? 'Downloading beta firmware...' : downloadMsgs[action]
+    const downloadMsg = action.startsWith('beta-') || action.startsWith('device-')
+      ? 'Downloading beta firmware...'
+      : downloadMsgs[action]
 
     const steps = [
       'Connect to device',
@@ -591,8 +601,8 @@ export default function FlashTools() {
       } else if (action === 'custom') {
         if (!customFile) throw new Error('No file selected')
         firmware = new Uint8Array(await customFile.arrayBuffer())
-      } else if (action === 'device') {
-        firmware = await fetchDeviceBuildFirmware(model)
+      } else if (action.startsWith('device-')) {
+        firmware = await fetchDeviceBuildFirmware(model, action.replace('device-', ''))
       } else if (action.startsWith('beta-')) {
         firmware = await fetchBetaFirmware(action.replace('beta-', ''))
       }
@@ -651,13 +661,13 @@ export default function FlashTools() {
   // Full boot-region install for the non-Xteink devices (see DEVICE_INSTALLS).
   // Same flow the standalone Sticky page used: bootloader + partition table +
   // boot_app0 otadata + firmware in one write, then a serial hard reset.
-  async function runDeviceInstall(install, action, serialPort) {
+  async function runDeviceInstall(install, action, serialPort, activeDeviceBuild) {
     const buildName =
       action === 'custom'
         ? 'Custom Firmware'
         : action === 'rc'
           ? `CrossPoint ${rc.release?.tag || ''} RC`
-          : deviceBuild?.name || `${install.name} Beta`
+          : activeDeviceBuild?.name || `${install.name} Beta`
     const steps = [
       'Connect to device',
       'Write bootloader + partition table + firmware',
@@ -686,7 +696,7 @@ export default function FlashTools() {
       } else if (action === 'rc') {
         firmware = await fetchRcFirmware(model)
       } else {
-        firmware = await fetchDeviceBuildFirmware(model)
+        firmware = await fetchDeviceBuildFirmware(model, activeDeviceBuild?.id)
       }
       const bootloaderData = await fetchFlashAsset(install.bootloader, `${install.name} bootloader`)
       const partitionTableData = install.partitions
@@ -747,6 +757,9 @@ export default function FlashTools() {
       : null
 
   const selectedBeta = fw?.startsWith('beta-') ? betaBuilds.find((b) => `beta-${b.id}` === fw) : null
+  const selectedDeviceBuild = fw?.startsWith('device-')
+    ? deviceBuilds.find((b) => `device-${b.id}` === fw)
+    : null
 
   return (
     <section id="flash-tools" className="relative scroll-mt-20 border-t border-stone-200 py-16 sm:py-20">
@@ -835,12 +848,17 @@ export default function FlashTools() {
                       <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
                     </button>
                   )}
-                  {deviceBuild && (
-                    <button type="button" onClick={() => selectFw('device')} className={cardClass(fw === 'device')}>
-                      <div className="text-sm font-semibold text-stone-900">{deviceBuild.name}</div>
+                  {deviceBuilds.slice().reverse().map((b) => (
+                    <button
+                      key={b.id}
+                      type="button"
+                      onClick={() => selectFw(`device-${b.id}`)}
+                      className={cardClass(fw === `device-${b.id}`)}
+                    >
+                      <div className="text-sm font-semibold text-stone-900">{b.name}</div>
                       <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
                     </button>
-                  )}
+                  ))}
                   {model === 'x4pro' && (
                     <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
                       <div className="text-sm font-semibold text-stone-900">Stock English</div>
@@ -1137,27 +1155,27 @@ export default function FlashTools() {
                   )}
 
                   {/* Device build panel (Sticky / M5Paper / LilyGo / X4 Pro) */}
-                  {fw === 'device' && deviceBuild && (
+                  {selectedDeviceBuild && (
                     <div>
-                      <div className="text-sm font-semibold text-stone-900">{deviceBuild.name}</div>
+                      <div className="text-sm font-semibold text-stone-900">{selectedDeviceBuild.name}</div>
                       <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">
-                        {(deviceBuild.firmwareSize / 1024 / 1024).toFixed(1)} MB &middot;{' '}
-                        {fmtDate(deviceBuild.uploadedAt)}
+                        {(selectedDeviceBuild.firmwareSize / 1024 / 1024).toFixed(1)} MB &middot;{' '}
+                        {fmtDate(selectedDeviceBuild.uploadedAt)}
                       </div>
-                      {deviceBuild.notes && (
+                      {selectedDeviceBuild.notes && (
                         <div
                           className={NOTES_PROSE}
-                          dangerouslySetInnerHTML={{ __html: renderMarkdown(deviceBuild.notes) }}
+                          dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedDeviceBuild.notes) }}
                         />
                       )}
                       <button
                         type="button"
-                        onClick={() => runFlash('device')}
+                        onClick={() => runFlash(`device-${selectedDeviceBuild.id}`)}
                         disabled={running}
                         className="mt-4 inline-flex items-center justify-center rounded-md bg-amber-600 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <BoltIcon />
-                        Flash {deviceBuild.name}
+                        Flash {selectedDeviceBuild.name}
                       </button>
                       <p className="mt-2 text-xs text-stone-400">
                         Beta build for the {MODELS.find((m) => m.id === model)?.name}.{' '}

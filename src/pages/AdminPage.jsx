@@ -1563,15 +1563,15 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
   const [file, setFile] = useState(null)
   const [notify, setNotify] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [build, setBuild] = useState(null)
-  const [edit, setEdit] = useState(null) // { name, notes } when panel open
+  const [builds, setBuilds] = useState([])
+  const [edit, setEdit] = useState(null) // { id, name, notes } when panel open
   const fileInputRef = useRef(null)
 
   const loadBuildInfo = useCallback(async () => {
     try {
       const res = await fetch(infoUrl)
       const data = await res.json()
-      setBuild(data.build || null)
+      setBuilds(Array.isArray(data.builds) ? data.builds : data.build ? [data.build] : [])
     } catch {
       // ignore, matches original behavior
     }
@@ -1618,9 +1618,10 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
     setBusy(false)
   }
 
-  function toggleEditBuild() {
-    if (!build) return
-    setEdit((prev) => (prev ? null : { name: build.name, notes: build.notes || '' }))
+  function toggleEditBuild(build) {
+    setEdit((prev) =>
+      prev?.id === build.id ? null : { id: build.id, name: build.name, notes: build.notes || '' }
+    )
   }
 
   async function saveBuildEdit() {
@@ -1630,7 +1631,7 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
     if (!editName) return
 
     try {
-      const res = await fetch(baseUrl, {
+      const res = await fetch(`${baseUrl}/${edit.id}`, {
         method: 'PATCH',
         headers: {
           Authorization: 'Bearer ' + secret,
@@ -1651,18 +1652,18 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
     }
   }
 
-  async function deleteBuild() {
-    if (!build) return
+  async function deleteBuild(build) {
     if (!window.confirm('Delete ' + label + ' build "' + build.name + '"?')) return
 
     try {
-      const res = await fetch(baseUrl, {
+      const res = await fetch(`${baseUrl}/${build.id}`, {
         method: 'DELETE',
         headers: { Authorization: 'Bearer ' + secret },
       })
       const r = await readJsonResponse(res)
       if (r.ok) {
         log('Deleted ' + label + ' build: ' + build.name)
+        if (edit?.id === build.id) setEdit(null)
         loadBuildInfo()
       } else {
         log(label + ' delete failed: ' + describeFailure(r))
@@ -1718,79 +1719,83 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
         <NotifyToggle checked={notify} onChange={setNotify} />
       </div>
 
-      {build ? (
-        <div className="mt-4 border-t border-stone-100 pt-2.5">
-          <div className="flex items-center justify-between">
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-stone-700">{build.name}</div>
-              <div className="text-xs text-stone-400">
-                {formatMB(build.firmwareSize)} MB &middot;{' '}
-                {new Date(build.uploadedAt).toLocaleDateString()}
-                {build.notes && (
-                  <>
-                    {' '}
-                    &middot;{' '}
-                    <span className="text-stone-500" title={build.notes}>
-                      has notes
-                    </span>
-                  </>
-                )}
+      {builds.length ? (
+        <div className="mt-4 divide-y divide-stone-100 border-t border-stone-100">
+          {builds.slice().reverse().map((build) => (
+            <div key={build.id} className="py-2.5">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium text-stone-700">{build.name}</div>
+                  <div className="text-xs text-stone-400">
+                    {formatMB(build.firmwareSize)} MB &middot;{' '}
+                    {new Date(build.uploadedAt).toLocaleDateString()}
+                    {build.notes && (
+                      <>
+                        {' '}
+                        &middot;{' '}
+                        <span className="text-stone-500" title={build.notes}>
+                          has notes
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="ml-2 flex shrink-0 gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleEditBuild(build)}
+                    className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+                    title="Edit"
+                  >
+                    <PencilIcon />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteBuild(build)}
+                    className="rounded-md p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                    title="Delete"
+                  >
+                    <XIcon />
+                  </button>
+                </div>
               </div>
+              {edit?.id === build.id && (
+                <div className="mt-2 space-y-2">
+                  <input
+                    type="text"
+                    value={edit.name}
+                    onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+                    className={inputCls}
+                  />
+                  <textarea
+                    value={edit.notes}
+                    onChange={(e) => setEdit({ ...edit, notes: e.target.value })}
+                    rows={2}
+                    className={`${inputCls} resize-none`}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={saveBuildEdit}
+                      className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEdit(null)}
+                      className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="ml-2 flex shrink-0 gap-0.5">
-              <button
-                type="button"
-                onClick={toggleEditBuild}
-                className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
-                title="Edit"
-              >
-                <PencilIcon />
-              </button>
-              <button
-                type="button"
-                onClick={deleteBuild}
-                className="rounded-md p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
-                title="Delete"
-              >
-                <XIcon />
-              </button>
-            </div>
-          </div>
-          {edit && (
-            <div className="mt-2 space-y-2">
-              <input
-                type="text"
-                value={edit.name}
-                onChange={(e) => setEdit({ ...edit, name: e.target.value })}
-                className={inputCls}
-              />
-              <textarea
-                value={edit.notes}
-                onChange={(e) => setEdit({ ...edit, notes: e.target.value })}
-                rows={2}
-                className={`${inputCls} resize-none`}
-              />
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={saveBuildEdit}
-                  className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600"
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEdit(null)}
-                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-500 hover:text-stone-700"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
+          ))}
         </div>
       ) : (
-        <p className="mt-3 text-xs text-stone-400">No {label} build uploaded</p>
+        <p className="mt-3 text-xs text-stone-400">No {label} builds uploaded</p>
       )}
     </Card>
   )
@@ -1928,16 +1933,16 @@ export default function AdminPage() {
               log={log}
               label="Sticky"
               namePlaceholder="Build name (e.g. Sticky Beta v1)"
-              infoUrl="/api/sticky/info"
-              uploadUrl="/api/sticky/upload"
-              baseUrl="/api/sticky"
+              infoUrl="/api/device-build/sticky/info"
+              uploadUrl="/api/device-build/sticky/upload"
+              baseUrl="/api/device-build/sticky"
               description={
                 <>
                   Upload the ESP32-S3 build served on the{' '}
                   <Link to="/sticky" className="font-medium text-brand-500 underline underline-offset-2">
                     /sticky
                   </Link>{' '}
-                  page. Uploading replaces the current build.
+                  page. Each upload is added alongside the existing builds.
                 </>
               }
             />
@@ -1949,7 +1954,7 @@ export default function AdminPage() {
               infoUrl="/api/device-build/x4pro/info"
               uploadUrl="/api/device-build/x4pro/upload"
               baseUrl="/api/device-build/x4pro"
-              description="Upload the Xteink X4 Pro build offered in the homepage web flasher. Flashes to the OTA partition like the other Xteink devices. Uploading replaces the current build."
+              description="Upload the Xteink X4 Pro build offered in the homepage web flasher. Flashes to the OTA partition like the other Xteink devices. Each upload is added alongside the existing builds."
             />
             <DeviceBuildCard
               secret={secret}
@@ -1959,7 +1964,7 @@ export default function AdminPage() {
               infoUrl="/api/device-build/m5paper/info"
               uploadUrl="/api/device-build/m5paper/upload"
               baseUrl="/api/device-build/m5paper"
-              description="Upload the M5Paper build offered in the homepage web flasher. Uploading replaces the current build."
+              description="Upload the M5Paper build offered in the homepage web flasher. Each upload is added alongside the existing builds."
             />
             <DeviceBuildCard
               secret={secret}
@@ -1969,7 +1974,7 @@ export default function AdminPage() {
               infoUrl="/api/device-build/papermono/info"
               uploadUrl="/api/device-build/papermono/upload"
               baseUrl="/api/device-build/papermono"
-              description="Upload the M5PaperMono build offered in the homepage web flasher. Uploading replaces the current build."
+              description="Upload the M5PaperMono build offered in the homepage web flasher. Each upload is added alongside the existing builds."
             />
             <DeviceBuildCard
               secret={secret}
@@ -1979,7 +1984,7 @@ export default function AdminPage() {
               infoUrl="/api/device-build/lilygo/info"
               uploadUrl="/api/device-build/lilygo/upload"
               baseUrl="/api/device-build/lilygo"
-              description="Upload the LilyGo T5 build offered in the homepage web flasher. Uploading replaces the current build."
+              description="Upload the LilyGo T5 build offered in the homepage web flasher. Each upload is added alongside the existing builds."
             />
             <LogCard entries={entries} />
           </div>

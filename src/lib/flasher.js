@@ -1148,16 +1148,22 @@ export async function fetchReleaseMeta() {
   return res.json();
 }
 
-// Admin-uploaded single builds for non-Xteink devices (m5paper, lilygo).
-export async function fetchDeviceBuildInfo(device) {
+// Admin-uploaded builds for the non-catalog devices (sticky, x4pro, m5paper,
+// lilygo, papermono). Each device carries a list; workers that predate the
+// list only return `build` (the newest), so fall back to wrapping it.
+export async function fetchDeviceBuildList(device) {
   const res = await fetch(`/api/device-build/${device}/info`);
-  if (!res.ok) return null;
+  if (!res.ok) return [];
   const data = await res.json();
-  return data.build || null;
+  if (Array.isArray(data.builds)) return data.builds;
+  return data.build ? [data.build] : [];
 }
 
-export async function fetchDeviceBuildFirmware(device) {
-  const res = await fetch(`/api/device-build/${device}/firmware`);
+export async function fetchDeviceBuildFirmware(device, buildId) {
+  const path = buildId
+    ? `/api/device-build/${device}/${buildId}/firmware`
+    : `/api/device-build/${device}/firmware`;
+  const res = await fetch(path);
   if (!res.ok) throw new Error(`Failed to download firmware: ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
 }
