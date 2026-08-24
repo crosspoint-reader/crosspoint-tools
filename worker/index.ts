@@ -3827,6 +3827,37 @@ async function handleDeviceBuildUpload(
   return json({ build }, 201, headers);
 }
 
+type DeviceBuildUpdateInput = {
+  name?: unknown;
+  notes?: unknown;
+  notify?: unknown;
+  firmware?: File;
+};
+
+// PATCH accepts JSON (name/notes) or multipart form data, which can also
+// carry a replacement firmware binary — same shape as the beta channel.
+async function parseDeviceBuildUpdateInput(request: Request): Promise<DeviceBuildUpdateInput | null> {
+  const contentType = request.headers.get('Content-Type') || '';
+  if (contentType.includes('multipart/form-data')) {
+    const formData = await request.formData();
+    const firmware = formData.get('firmware');
+    return {
+      ...(formData.has('name') ? { name: formData.get('name') } : {}),
+      ...(formData.has('notes') ? { notes: formData.get('notes') } : {}),
+      ...(formData.has('notify') ? { notify: formData.get('notify') } : {}),
+      ...(firmware instanceof File ? { firmware } : {}),
+    };
+  }
+
+  const parsed: unknown = await request.json().catch(() => null);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+  const body = parsed as Record<string, unknown>;
+  return {
+    ...(Object.hasOwn(body, 'name') ? { name: body.name } : {}),
+    ...(Object.hasOwn(body, 'notes') ? { notes: body.notes } : {}),
+  };
+}
+
 // buildId === null targets the latest build (the pre-list endpoints).
 async function handleDeviceBuildUpdate(
   cfg: DeviceBuildConfig,
@@ -3848,7 +3879,10 @@ async function handleDeviceBuildUpdate(
     return json({ error: `No ${cfg.label} build uploaded` }, 404, headers);
   }
 
-  const body = await request.json() as { name?: string; notes?: string };
+  const body = await parseDeviceBuildUpdateInput(request);
+  if (!body) {
+    return json({ error: 'Invalid update payload' }, 400, headers);
+  }
   if (body.name !== undefined) {
     if (typeof body.name !== 'string' || !body.name.trim()) {
       return json({ error: 'Name cannot be empty' }, 400, headers);
@@ -3859,10 +3893,31 @@ async function handleDeviceBuildUpdate(
     build.notes = typeof body.notes === 'string' ? body.notes.trim() : '';
   }
 
+  let binaryReplaced = false;
+  if (body.firmware) {
+    if (body.firmware.size === 0) {
+      return json({ error: 'Firmware file is empty' }, 400, headers);
+    }
+    const data = await body.firmware.arrayBuffer();
+    const sha256 = await sha256Hex(data);
+    await env.FIRMWARE_BUCKET.put(deviceBuildR2Key(cfg, build.id), data, {
+      customMetadata: { sha256 },
+    });
+    build.firmwareSize = data.byteLength;
+    build.firmwareSha256 = sha256;
+    build.uploadedAt = new Date().toISOString();
+    binaryReplaced = true;
+  }
+
   await writeDeviceBuildList(env, cfg, builds);
   scheduleInstatusTask(
     ctx,
-    reconcileDeviceBuildStatus(env, cfg.statusDevice, builds.map(deviceBuildStatus)),
+    reconcileDeviceBuildStatus(
+      env,
+      cfg.statusDevice,
+      builds.map(deviceBuildStatus),
+      binaryReplaced && notifyRequested(body.notify) ? deviceBuildStatus(build) : undefined
+    ),
     `${cfg.label} build metadata`
   );
   return json({ build }, 200, headers);

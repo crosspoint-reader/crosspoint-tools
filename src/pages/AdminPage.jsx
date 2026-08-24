@@ -1620,7 +1620,9 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
 
   function toggleEditBuild(build) {
     setEdit((prev) =>
-      prev?.id === build.id ? null : { id: build.id, name: build.name, notes: build.notes || '' }
+      prev?.id === build.id
+        ? null
+        : { id: build.id, name: build.name, notes: build.notes || '', file: null, notify: false }
     )
   }
 
@@ -1631,17 +1633,34 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
     if (!editName) return
 
     try {
-      const res = await fetch(`${baseUrl}/${edit.id}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: 'Bearer ' + secret,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: editName, notes: editNotes }),
-      })
+      // A replacement binary rides along as multipart; plain metadata edits
+      // stay JSON.
+      let init
+      if (edit.file) {
+        const formData = new FormData()
+        formData.append('name', editName)
+        formData.append('notes', editNotes)
+        formData.append('notify', String(edit.notify))
+        formData.append('firmware', edit.file)
+        init = {
+          method: 'PATCH',
+          headers: { Authorization: 'Bearer ' + secret },
+          body: formData,
+        }
+      } else {
+        init = {
+          method: 'PATCH',
+          headers: {
+            Authorization: 'Bearer ' + secret,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: editName, notes: editNotes }),
+        }
+      }
+      const res = await fetch(`${baseUrl}/${edit.id}`, init)
       const r = await readJsonResponse(res)
       if (r.ok) {
-        log(label + ' build updated: ' + r.data.build.name)
+        log(label + ' build updated: ' + r.data.build.name + (edit.file ? ' (binary replaced)' : ''))
         setEdit(null)
         loadBuildInfo()
       } else {
@@ -1773,6 +1792,18 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
                     rows={2}
                     className={`${inputCls} resize-none`}
                   />
+                  <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
+                    <span className="truncate">
+                      {edit.file ? edit.file.name : 'Replace .bin (optional)...'}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".bin"
+                      className="hidden"
+                      onChange={(e) => setEdit({ ...edit, file: e.target.files[0] || null })}
+                    />
+                  </label>
+                  {edit.file && <NotifyToggle checked={edit.notify} onChange={(v) => setEdit({ ...edit, notify: v })} />}
                   <div className="flex gap-2">
                     <button
                       type="button"
