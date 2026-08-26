@@ -3,7 +3,7 @@ title: Custom Firmware for Dummies
 summary: A CrossPoint Guide for custom firmwares
 author: Uri Tauber
 github: Uri-Tauber
-date: 2026-08-26T01:36:53+03:00
+date: 2026-08-26T08:36:53+03:00
 ---
 
 So you bought an Xteink e-reader, and someone online told you to flash CrossPoint on it. You have no idea what that means. Let's fix that.
@@ -36,7 +36,7 @@ So which one do you pick? Honestly, you'd need to be extremely bored to try them
 
 CrossPoint’s main advantage is its large testing and contributor base. Stable releases are used across many devices and hardware variants, and changes are reviewed before they are included. If reliability matters more to you than getting every new feature immediately, use the latest stable release. If you are comfortable encountering bugs and reporting them, you can instead try a nightly build — a version generated automatically from the newest, less-tested code.
 
-Forks vary considerably. Some are maintained by experienced developers and used by hundreds of peoples. Others are personal experiments maintained by one person with extensive AI help and not much testing.
+Forks vary considerably. Some are maintained by experienced developers and used by hundreds of people. Others are personal experiments maintained by one person with extensive AI help and not much testing.
 
 (AI-assisted development is not a bad thing by itself; CrossPoint contributors use AI tools too. What matters is whether the maintainer understands and reviews the resulting code, tests it on the hardware they claim to support, responds to failures, and provides a reliable recovery path.)
 
@@ -46,19 +46,19 @@ Before installing a fork, check whether it explicitly supports your exact device
 
 **Forks die.** One maintainer gets busy, or bored, or just moves on, and the updates stop. Sometimes it still works fine. Sometimes it quietly stops booting on your specific hardware and nobody's around to fix it.
 
-**Xteink doesn't owe the firmware community anything.** Some of their business decisions have made life a bit harder for developers. In April 2026, they started selling devices in mainland China that are locked against alternative firmware — the idea being to sell devices cheaper domestically without cutting into what overseas buyers paid full price for. You can get around the lock with an SD card install or our [unlocker tool](https://crosspointreader.com/unlock), but not every firmware supports that. Plenty of people swapped CrossPoint for something else, regretted it, and found out they couldn't switch back. Stuck on firmware that doesn't work, effectively for good.
+**Xteink doesn't owe the firmware community anything.** Some of their business decisions have made life a bit harder for developers. In April 2026, they started selling devices in mainland China that are locked against alternative firmware — the idea being to sell devices cheaper domestically without cutting into what overseas buyers paid full price for. You can get around the lock with an SD card install or our [unlocker tool](https://crosspointreader.com/unlock), but not every firmware supports that. A lot of people swapped CrossPoint for some fork or another, regretted it, and found out there was no going back. Stuck on firmware that doesn't work — for good.
 
 Then in July 2026, Xteink started shipping different hardware variants for the exact same model. There are now two versions of the X3, three of the X4 Pro. Even if two e-readers look identical on the outside, a revised internal display chip requires entirely different instructions to render text — which is how people end up flashing firmware and getting a device that just... stops responding.
 
 The latest version of CrossPoint supports every variant currently on the market. We don't recommend flashing an older CrossPoint build, or any firmware you haven't first confirmed actually matches your specific device.
 
-As of writing, **Crossink** and **witch(hunt)-reader** support all device variants, but support can change. Always check the project’s current compatibility information before flashing.
+As of writing, **Crossink** and **witch(hunt)-reader** support all X3 variants, but only **Crossink** covers the X4 Pro — and that can change, so double-check the project's current compatibility info before you flash.
 
 ## FAQ
 
 **Q: What are the actual risks of flashing CrossPoint?** 
 
-A: If you're flashing the latest stable CrossPoint onto a supported device with our official tool, the risl is very low. Use a decent USB cable, make sure the e-reader and your PC have power, and don't unplug mid-flash. It'll void your warranty though, so make sure the reader works properly first.
+A: If you're flashing the latest stable CrossPoint onto a supported device with our official tool, the risk is very low. Use a decent USB cable, make sure the e-reader and your PC have power, and don't unplug mid-flash. It'll void your warranty though, so make sure the reader works properly first.
 
 **Q: Wouldn't it be great if CrossPoint had feature X from some other firmware?** 
 
@@ -66,10 +66,8 @@ A: CrossPoint's scope is intentionally narrow, but if a feature fits within that
 
 **Q: Help! I flashed firmware X and now my device is dead and unresponsive. What do I do?** 
 
-A: If this teaches you to read the instructions first next time, it was worth it. That said, your device isn't really "dead." It's almost certainly still running fine — it just has no idea how to drive your specific variant's screen. If you bought it from the official store, plug it into a computer and [flash](https://crosspointreader.com/#flash-tools) the current CrossPoint build. If you ordered a locked device off AliExpress , this gets harder — if your firmware supports SD card installs, put the CrossPoint `.bin` file on a SD card and feel your way to the update menu blind. Ask on Reddit for the exact button sequence.
+A: If this teaches you to read the instructions first next time, it was worth it. That said, your device isn't really "dead." It's almost certainly still running fine — it just has no idea how to drive your specific variant's screen. If you bought it from the official store, plug it into a computer and [flash](https://crosspointreader.com/#flash-tools) the current CrossPoint build. If you ordered a locked device off AliExpress, this gets harder — if your firmware supports SD card installs, put the CrossPoint `.bin` file on an SD card and feel your way to the update menu blind. Ask on Reddit for the exact button sequence.
 
 **Q: I don't like CrossPoint. It's missing features X and Y.** 
 
 A: Fair enough — you can always flash back to stock firmware anytime using our [flashing tool](https://crosspointreader.com/#flash-tools). You're also welcome to open a feature request [on GitHub](https://github.com/crosspoint-reader/crosspoint-reader/issues) explaining what you miss from the stock firmware. It might make it into a future release.
-
-
