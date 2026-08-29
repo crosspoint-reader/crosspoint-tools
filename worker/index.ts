@@ -958,6 +958,13 @@ const STOCK_CHECK_URLS: Record<string, Record<string, string>> = {
   x4pro: {
     en: 'https://api-prod.xteink.cc/api/v1/check-update?current_version=V0.0.1&device_type=ESP32S3_X4_TL_SSD1677&device_id=12345&lng=en&ota_type=1',
   },
+  // X4 Classic (X4C): same encrypted-`.xota` scheme as the X4 Pro, decrypted by
+  // the same firmware-embedded AES key (see decryptXota). Also needs the
+  // panel-suffixed device_type (`_SSD1677`) or the endpoint reports "No update
+  // available"; current_version=V0.0.1 forces the latest build to be offered.
+  x4c: {
+    en: 'https://api-prod.xteink.cc/api/v1/check-update?current_version=V0.0.1&device_type=ESP32S3_X4_CLA_SSD1677&device_id=12345&lng=en&ota_type=1',
+  },
 };
 
 // Firmware-embedded AES-128 key for the X4 Pro `.xota` (recovered by RE; see
@@ -3668,7 +3675,7 @@ interface DeviceBuildConfig {
   defaultName: string;
   filename: string;
   label: string;
-  statusDevice: 'x4pro' | 'sticky' | 'm5paper' | 'lilygo' | 'papermono';
+  statusDevice: 'x4pro' | 'x4c' | 'sticky' | 'm5paper' | 'lilygo' | 'papermono';
 }
 
 const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
@@ -3703,6 +3710,14 @@ const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
     filename: 'x4pro-firmware.bin',
     label: 'X4 Pro',
     statusDevice: 'x4pro',
+  },
+  x4c: {
+    r2Key: 'builds/x4c/firmware.bin',
+    metaKey: 'x4c-build',
+    defaultName: 'X4 Classic Beta',
+    filename: 'x4c-firmware.bin',
+    label: 'X4 Classic',
+    statusDevice: 'x4c',
   },
   papermono: {
     r2Key: 'builds/papermono/firmware.bin',

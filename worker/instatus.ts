@@ -11,7 +11,7 @@ export type BetaNotification = {
   build: BetaBuild;
 };
 
-export type DeviceBuildStatusDevice = 'x4pro' | 'sticky' | 'm5paper' | 'lilygo' | 'papermono';
+export type DeviceBuildStatusDevice = 'x4pro' | 'x4c' | 'sticky' | 'm5paper' | 'lilygo' | 'papermono';
 
 export type PublishedBuildStatus = {
   name: string;
@@ -165,6 +165,12 @@ function deviceBuildTargets(env: Env): Record<DeviceBuildStatusDevice, Component
       name: 'Beta',
       groupId: env.INSTATUS_X4_PRO_GROUP_ID,
       componentId: env.INSTATUS_X4_PRO_BETA_COMPONENT_ID,
+      order: 0,
+    },
+    x4c: {
+      name: 'Beta',
+      groupId: env.INSTATUS_X4C_GROUP_ID,
+      componentId: env.INSTATUS_X4C_BETA_COMPONENT_ID,
       order: 0,
     },
     sticky: {
@@ -628,6 +634,7 @@ export async function reconcileInsiderStatus(
 
 const DEVICE_BUILD_LABELS: Record<DeviceBuildStatusDevice, string> = {
   x4pro: 'X4 Pro',
+  x4c: 'X4 Classic',
   sticky: 'Sticky',
   m5paper: 'M5Paper',
   lilygo: 'LilyGo T5',

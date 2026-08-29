@@ -158,6 +158,7 @@ function StepsList({ steps, states, percent }) {
 const MODELS = [
   { id: 'x4', name: 'Xteink X4', res: '480 × 800' },
   { id: 'x4pro', name: 'Xteink X4 Pro', res: '480 × 800' },
+  { id: 'x4c', name: 'Xteink X4 Classic', res: '480 × 800' },
   { id: 'x3', name: 'Xteink X3', res: '528 × 792' },
   { id: 'sticky', name: 'Seeed Sticky', res: '480 × 800' },
   { id: 'm5paper', name: 'M5Paper v1.1', res: '540 × 960' },
@@ -173,6 +174,7 @@ const MODELS = [
 const MODEL_CHIPS = {
   x4: 'ESP32-C3',
   x4pro: 'ESP32-S3',
+  x4c: 'ESP32-S3',
   x3: 'ESP32-C3',
   sticky: 'ESP32-S3',
   m5paper: 'ESP32',
@@ -238,11 +240,17 @@ const DEVICE_INSTALLS = {
   },
 }
 
+// Xteink-class ESP32-S3 devices (X4 Pro, X4 Classic). Both flash through the
+// normal OTA-slot flow, offer official stock firmware alongside the admin
+// build, and — unlike the C3 Xteinks — can't be rebooted over serial, so they
+// need the unplug/power-button restart flow after flashing.
+const XTEINK_PRO_MODELS = new Set(['x4pro', 'x4c'])
+
 // Models flashed from a single admin-uploaded build (/api/device-build/{id})
 // instead of the release/nightly/stock catalog. The DEVICE_INSTALLS subset
-// needs the full boot-region install; the X4 Pro is Xteink-class hardware and
-// flashes through the normal OTA-slot flow.
-const DEVICE_BUILD_MODELS = ['x4pro', ...Object.keys(DEVICE_INSTALLS)]
+// needs the full boot-region install; the XTEINK_PRO_MODELS are Xteink-class
+// hardware and flash through the normal OTA-slot flow.
+const DEVICE_BUILD_MODELS = [...XTEINK_PRO_MODELS, ...Object.keys(DEVICE_INSTALLS)]
 
 // Vendor-level port filters for the non-Xteink devices: Espressif (0x303A,
 // any PID — USB-Serial-JTAG, ROM download mode, TinyUSB CDC), Seeed (0x2886)
@@ -368,9 +376,9 @@ export default function FlashTools() {
           if (!cancelled) setDeviceBuilds(builds)
         })
         .catch(() => {})
-      // The X4 Pro also offers a pinned stock build (static asset) alongside
+      // The X4 Pro / X4 Classic also offer official stock firmware alongside
       // the admin-uploaded build; there is no Chinese variant.
-      if (model === 'x4pro') {
+      if (XTEINK_PRO_MODELS.has(model)) {
         setStock({ en: { text: 'Loading...', enabled: false }, ch: { text: 'Unavailable', enabled: false } })
         fetchStockFirmwareInfo(model, 'en').then((info) => {
           if (cancelled) return
@@ -573,11 +581,12 @@ export default function FlashTools() {
     const states = steps.map(() => 'pending')
 
     setRunning(true)
-    // The X4 Pro can't be rebooted over serial — after flashing it needs a
-    // full power cycle: unplug/replug USB, then press and hold the power button
-    // to boot. Shown instead of the plain unplug/reset the other devices use.
+    // The X4 Pro / X4 Classic can't be rebooted over serial — after flashing
+    // they need a full power cycle: unplug/replug USB, then press and hold the
+    // power button to boot. Shown instead of the plain unplug/reset the other
+    // devices use.
     setRestart(
-      model === 'x4pro'
+      XTEINK_PRO_MODELS.has(model)
         ? { text: 'Unplug and reconnect the USB cable, then press and hold the power button to boot.' }
         : { unplug: skipReset && model !== 'x4' }
     )
@@ -631,7 +640,7 @@ export default function FlashTools() {
         status: {
           kind: 'ok',
           text:
-            model === 'x4pro'
+            XTEINK_PRO_MODELS.has(model)
               ? 'Flash complete! Unplug and reconnect the USB cable, then press and hold the power button to boot.'
               : skipReset
                 ? 'Flash complete! Unplug and replug the USB cable to restart your device.'
@@ -859,13 +868,13 @@ export default function FlashTools() {
                       <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
                     </button>
                   ))}
-                  {model === 'x4pro' && (
+                  {XTEINK_PRO_MODELS.has(model) && (
                     <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
                       <div className="text-sm font-semibold text-stone-900">Stock English</div>
                       <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
                     </button>
                   )}
-                  {(model === 'sticky' || model === 'x4pro') && (
+                  {(model === 'sticky' || XTEINK_PRO_MODELS.has(model)) && (
                     <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
                       <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
                       <div className="mt-0.5 font-mono text-xs text-stone-400">Upload file</div>
