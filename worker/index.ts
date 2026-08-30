@@ -1,5 +1,6 @@
 import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, Accessory, FirmwareDevice, ReleaseVisibility } from './types';
 import { betaDevices, normalizeBetaBuildList } from './betas';
+import { getPrebuiltFontAssetUrl, getPrebuiltFontManifest } from './prebuilt-fonts';
 import {
   discardPendingBetaNotification,
   flushPendingBetaNotifications,
@@ -226,6 +227,9 @@ async function handleApi(
       case '/api/fonts':
         return handleFontList(env, corsHeaders);
 
+      case '/api/prebuilt-fonts':
+        return handlePrebuiltFontList(env, corsHeaders);
+
       case '/api/custom-build/upload':
         return handleCustomBuildUpload(request, env, corsHeaders);
 
@@ -390,6 +394,9 @@ async function handleApi(
         // /api/font-build/result/{filename}            — user downloads outputs
         if (url.pathname.startsWith('/api/font-build/result/')) {
           return handleFontBuildResultDownload(request, url, env, corsHeaders);
+        }
+        if (url.pathname.startsWith('/api/prebuilt-fonts/')) {
+          return handlePrebuiltFontDownload(url, env, corsHeaders);
         }
         // /api/theme-build/files/{buildId}/{key}.{ext}  — workflow downloads custom icon inputs
         if (url.pathname.startsWith('/api/theme-build/files/')) {
@@ -1755,6 +1762,35 @@ async function handleFontList(
 ): Promise<Response> {
   const tree = await fetchFontTree(env);
   return json(tree, 200, headers);
+}
+
+async function handlePrebuiltFontList(
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const manifest = await getPrebuiltFontManifest(env);
+  return json(manifest, 200, { ...headers, 'Cache-Control': 'public, max-age=3600' });
+}
+
+async function handlePrebuiltFontDownload(
+  url: URL,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  const filename = decodeURIComponent(url.pathname.slice('/api/prebuilt-fonts/'.length));
+  const manifest = await getPrebuiltFontManifest(env);
+  const assetUrl = getPrebuiltFontAssetUrl(manifest, filename);
+  if (!assetUrl) return json({ error: 'Font not found' }, 404, headers);
+
+  const response = await fetch(assetUrl, { headers: { 'User-Agent': 'CrossPoint-Tools' } });
+  if (!response.ok) return json({ error: 'Failed to download font' }, 502, headers);
+
+  const responseHeaders = new Headers(headers);
+  responseHeaders.set('Content-Type', 'application/octet-stream');
+  responseHeaders.set('Content-Disposition', `attachment; filename="${filename}"`);
+  const contentLength = response.headers.get('Content-Length');
+  if (contentLength) responseHeaders.set('Content-Length', contentLength);
+  return new Response(response.body, { headers: responseHeaders });
 }
 
 // --- Custom Font Build ---

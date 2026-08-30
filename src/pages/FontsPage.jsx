@@ -9,6 +9,7 @@ import {
   CJK_PRESET_VALUES,
   DEFAULT_UI_SIZES,
   customIntervalsContainCjk,
+  formatSize,
   loadJSZip,
 } from './fonts/fontBuilder.js'
 
@@ -32,6 +33,10 @@ function Code({ children, className = '' }) {
 }
 
 export default function FontsPage() {
+  const [prebuiltFonts, setPrebuiltFonts] = useState(null)
+  const [prebuiltError, setPrebuiltError] = useState('')
+  const [prebuiltDownloading, setPrebuiltDownloading] = useState(null)
+
   // -- form state -----------------------------------------------------------
   const [familyName, setFamilyName] = useState('')
   const [fallbackFamilyName, setFallbackFamilyName] = useState('')
@@ -94,6 +99,54 @@ export default function FontsPage() {
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/prebuilt-fonts')
+      .then((response) => {
+        if (!response.ok) throw new Error('Could not load the font library.')
+        return response.json().catch(() => {
+          throw new Error('Could not load the font library.')
+        })
+      })
+      .then((manifest) => {
+        if (!cancelled) setPrebuiltFonts(manifest.families)
+      })
+      .catch((error) => {
+        if (!cancelled) setPrebuiltError(error.message)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function downloadPrebuiltFont(family) {
+    setPrebuiltDownloading(family.name)
+    setPrebuiltError('')
+    try {
+      const JSZip = await loadJSZip()
+      if (!JSZip) throw new Error('Could not load the ZIP tool. Please try again.')
+
+      const zip = new JSZip()
+      const folder = zip.folder(family.name)
+      await Promise.all(
+        family.files.map(async (file) => {
+          const response = await fetch('/api/prebuilt-fonts/' + encodeURIComponent(file.name))
+          if (!response.ok) throw new Error('Could not download ' + file.name + '.')
+          folder.file(file.name, await response.blob())
+        })
+      )
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(await zip.generateAsync({ type: 'blob' }))
+      link.download = family.name + '_cpfonts.zip'
+      link.click()
+      URL.revokeObjectURL(link.href)
+    } catch (error) {
+      setPrebuiltError(error.message)
+    } finally {
+      setPrebuiltDownloading(null)
+    }
+  }
 
   // -- folder auto-detect ---------------------------------------------------
   function handleFolder(e, config) {
@@ -391,21 +444,28 @@ export default function FontsPage() {
           className="pointer-events-none absolute inset-0 dot-field text-stone-300/60 [mask-image:radial-gradient(110%_100%_at_50%_0%,black,transparent_70%)]"
         />
         <div className="relative mx-auto max-w-3xl px-6 pt-16 pb-8 sm:pt-20 sm:pb-10">
-          <Eyebrow>Custom Fonts</Eyebrow>
+          <Eyebrow>CrossPoint Fonts</Eyebrow>
           <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-balance text-stone-900 sm:text-5xl">
-            Font Builder
+            Font Downloader &amp; Builder
           </h1>
           <p className="mt-4 max-w-[52ch] text-base/7 text-pretty text-stone-600">
-            Convert TrueType or OpenType fonts to CrossPoint's{' '}
-            <Code className="text-sm">.cpfont</Code> format directly in your browser. Includes
-            kerning and ligature support. No tools to install.
+            Download a ready-made font family or convert your own TrueType or OpenType fonts to
+            CrossPoint&rsquo;s <Code className="text-sm">.cpfont</Code> format.
           </p>
         </div>
       </section>
 
       {/* Builder */}
       <section className="pb-20 sm:pb-24">
-        <div className="mx-auto max-w-3xl px-6">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="mb-6">
+            <h2 className="font-display text-2xl font-semibold tracking-tight text-stone-900">
+              Build your own
+            </h2>
+            <p className="mt-2 text-sm/6 text-stone-600">
+              Includes kerning and ligature support. No tools to install.
+            </p>
+          </div>
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-950/5 sm:p-8">
             {/* Family name */}
             <div className="mb-6">
@@ -985,6 +1045,74 @@ export default function FontsPage() {
               <li>The font will appear in your reader's font settings.</li>
             </ol>
           </div>
+        </div>
+      </section>
+
+      {/* Pre-built library */}
+      <section className="pb-20 sm:pb-24">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="font-display text-2xl font-semibold tracking-tight text-stone-900">
+                Pre-built fonts
+              </h2>
+              <p className="mt-2 text-sm/6 text-stone-600">
+                Choose a family to download every available size in one ZIP. Unzip it, then copy
+                the family folder to <Code>/fonts/</Code> on the SD card.
+              </p>
+            </div>
+            <a
+              href="https://github.com/crosspoint-reader/crosspoint-fonts/releases/latest"
+              className="text-sm font-medium text-brand-600 hover:text-brand-700"
+            >
+              View latest release &rarr;
+            </a>
+          </div>
+
+          {prebuiltFonts === null && !prebuiltError && (
+            <p className="mt-6 text-sm text-stone-500">Loading font library&hellip;</p>
+          )}
+          {prebuiltError && (
+            <p role="alert" className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+              {prebuiltError}
+            </p>
+          )}
+          {prebuiltFonts && (
+            <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+              {prebuiltFonts.map((family) => {
+                const sizes = family.files
+                  .map((file) => file.name.match(/_(\d+)\.cpfont$/)?.[1])
+                  .filter(Boolean)
+                  .map(Number)
+                  .sort((a, b) => a - b)
+                  .join(', ')
+                const totalSize = family.files.reduce((total, file) => total + file.size, 0)
+                const downloading = prebuiltDownloading === family.name
+                return (
+                  <li
+                    key={family.name}
+                    className="flex items-center justify-between gap-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-stone-950/5"
+                  >
+                    <div className="min-w-0">
+                      <h3 className="font-display font-semibold text-stone-900">{family.name}</h3>
+                      <p className="mt-1 text-sm/5 text-stone-500">{family.description}</p>
+                      <p className="mt-2 font-mono text-xs text-stone-400">
+                        {sizes} pt &middot; {formatSize(totalSize)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => downloadPrebuiltFont(family)}
+                      disabled={prebuiltDownloading !== null}
+                      className="shrink-0 rounded-md bg-brand-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {downloading ? 'Zipping…' : 'Download ZIP'}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </div>
       </section>
     </Layout>

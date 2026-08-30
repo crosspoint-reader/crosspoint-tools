@@ -13,6 +13,7 @@
     "tail": "wrangler tail",
     "test:betas": "node --experimental-strip-types --test worker/betas.test.mjs",
     "test:instatus": "node --experimental-strip-types --test worker/instatus.test.mjs",
+    "test:prebuilt-fonts": "node --experimental-strip-types --test worker/prebuilt-fonts.test.mjs",
     "test:flasher": "node --test src/lib/flasher.test.mjs",
     "test:theme-builder": "node scripts/test-theme-builder.cjs"
   },
