@@ -2010,6 +2010,16 @@ export default function AdminPage() {
             <DeviceBuildCard
               secret={secret}
               log={log}
+              label="M5Paper S3"
+              namePlaceholder="Build name (e.g. M5Paper S3 Beta v1)"
+              infoUrl="/api/device-build/m5papers3/info"
+              uploadUrl="/api/device-build/m5papers3/upload"
+              baseUrl="/api/device-build/m5papers3"
+              description="Upload the M5Paper S3 build offered in the homepage web flasher. Each upload is added alongside the existing builds."
+            />
+            <DeviceBuildCard
+              secret={secret}
+              log={log}
               label="M5PaperMono"
               namePlaceholder="Build name (e.g. M5PaperMono Beta v1)"
               infoUrl="/api/device-build/papermono/info"

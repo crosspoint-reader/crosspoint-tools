@@ -3711,7 +3711,7 @@ interface DeviceBuildConfig {
   defaultName: string;
   filename: string;
   label: string;
-  statusDevice: 'x4pro' | 'x4c' | 'sticky' | 'm5paper' | 'lilygo' | 'papermono';
+  statusDevice: 'x4pro' | 'x4c' | 'sticky' | 'm5paper' | 'm5papers3' | 'lilygo' | 'papermono';
 }
 
 const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
@@ -3730,6 +3730,14 @@ const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
     filename: 'm5paper-firmware.bin',
     label: 'M5Paper',
     statusDevice: 'm5paper',
+  },
+  m5papers3: {
+    r2Key: 'builds/m5papers3/firmware.bin',
+    metaKey: 'm5papers3-build',
+    defaultName: 'M5Paper S3 Beta',
+    filename: 'm5papers3-firmware.bin',
+    label: 'M5Paper S3',
+    statusDevice: 'm5papers3',
   },
   lilygo: {
     r2Key: 'builds/lilygo/firmware.bin',

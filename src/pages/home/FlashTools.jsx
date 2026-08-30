@@ -162,6 +162,7 @@ const MODELS = [
   { id: 'x3', name: 'Xteink X3', res: '528 × 792' },
   { id: 'sticky', name: 'Seeed Sticky', res: '480 × 800' },
   { id: 'm5paper', name: 'M5Paper v1.1', res: '540 × 960' },
+  { id: 'm5papers3', name: 'M5Paper S3', res: '540 × 960' },
   { id: 'papermono', name: 'M5PaperMono', res: '480 × 800' },
   { id: 'lilygo', name: 'LilyGo T5', res: '540 × 960' },
 ]
@@ -178,6 +179,7 @@ const MODEL_CHIPS = {
   x3: 'ESP32-C3',
   sticky: 'ESP32-S3',
   m5paper: 'ESP32',
+  m5papers3: 'ESP32-S3',
   papermono: 'ESP32-S3',
   lilygo: 'ESP32-S3',
 }
@@ -221,6 +223,16 @@ const DEVICE_INSTALLS = {
     bootloaderOffset: 0x1000,
     baudrate: 460800,
     after: 'Press and hold the rotary dial to boot.',
+  },
+  m5papers3: {
+    name: 'M5Paper S3',
+    // No packaged partition table: like the papermono, the m5papers3 build
+    // uses the standard CrossPoint 16MB layout, so the client-generated
+    // table matches. Native USB (S3), so the baudrate is nominal.
+    bootloader: '/firmware/m5papers3-bootloader.bin',
+    bootloaderOffset: 0x0,
+    baudrate: 921600,
+    after: 'Press and hold the power button to boot the device.',
   },
   papermono: {
     name: 'M5PaperMono',
