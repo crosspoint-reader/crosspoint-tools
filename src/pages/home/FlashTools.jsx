@@ -167,6 +167,20 @@ const MODELS = [
   { id: 'lilygo', name: 'LilyGo T5', res: '540 × 960' },
 ]
 
+// Vendor favicon shown next to each device name in the picker, grouped by
+// brand family (assets under public/brands/).
+const MODEL_BRANDS = {
+  x4: '/brands/xteink.png',
+  x4pro: '/brands/xteink.png',
+  x4c: '/brands/xteink.png',
+  x3: '/brands/xteink.png',
+  sticky: '/brands/seeed.png',
+  m5paper: '/brands/m5stack.png',
+  m5papers3: '/brands/m5stack.png',
+  papermono: '/brands/m5stack.png',
+  lilygo: '/brands/lilygo.png',
+}
+
 // esptool chip identity each device must report before we write anything.
 // Stops firmware for one board from landing on another (e.g. the Sticky's
 // ESP32-S3 build onto an ESP32-C3 Xteink). Sticky, PaperMono and LilyGo
@@ -832,7 +846,10 @@ export default function FlashTools() {
                   className={cardClass(model === m.id)}
                   style={running ? { pointerEvents: 'none' } : undefined}
                 >
-                  <div className="text-sm font-semibold text-stone-900">{m.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <img src={MODEL_BRANDS[m.id]} alt="" aria-hidden="true" className="h-4 w-4 shrink-0 rounded-sm object-contain" />
+                    <div className="text-sm font-semibold text-stone-900">{m.name}</div>
+                  </div>
                   <div className="mt-0.5 font-mono text-xs text-stone-400">
                     {(() => {
                       // Cards date themselves by the newest build offered: an
