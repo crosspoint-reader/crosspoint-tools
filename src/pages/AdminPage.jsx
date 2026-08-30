@@ -1990,12 +1990,12 @@ export default function AdminPage() {
             <DeviceBuildCard
               secret={secret}
               log={log}
-              label="X4 Classic"
-              namePlaceholder="Build name (e.g. X4 Classic Beta v1)"
+              label="X4C"
+              namePlaceholder="Build name (e.g. X4C Beta v1)"
               infoUrl="/api/device-build/x4c/info"
               uploadUrl="/api/device-build/x4c/upload"
               baseUrl="/api/device-build/x4c"
-              description="Upload the Xteink X4 Classic build offered in the homepage web flasher. Flashes to the OTA partition like the other Xteink devices. Each upload is added alongside the existing builds."
+              description="Upload the Xteink X4C build offered in the homepage web flasher. Flashes to the OTA partition like the other Xteink devices. Each upload is added alongside the existing builds."
             />
             <DeviceBuildCard
               secret={secret}

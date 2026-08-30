@@ -158,7 +158,7 @@ function StepsList({ steps, states, percent }) {
 const MODELS = [
   { id: 'x4', name: 'Xteink X4', res: '480 × 800' },
   { id: 'x4pro', name: 'Xteink X4 Pro', res: '480 × 800' },
-  { id: 'x4c', name: 'Xteink X4 Classic', res: '480 × 800' },
+  { id: 'x4c', name: 'Xteink X4C', res: '480 × 800' },
   { id: 'x3', name: 'Xteink X3', res: '528 × 792' },
   { id: 'sticky', name: 'Seeed Sticky', res: '480 × 800' },
   { id: 'm5paper', name: 'M5Paper v1.1', res: '540 × 960' },
@@ -240,7 +240,7 @@ const DEVICE_INSTALLS = {
   },
 }
 
-// Xteink-class ESP32-S3 devices (X4 Pro, X4 Classic). Both flash through the
+// Xteink-class ESP32-S3 devices (X4 Pro, X4C). Both flash through the
 // normal OTA-slot flow, offer official stock firmware alongside the admin
 // build, and — unlike the C3 Xteinks — can't be rebooted over serial, so they
 // need the unplug/power-button restart flow after flashing.
@@ -376,7 +376,7 @@ export default function FlashTools() {
           if (!cancelled) setDeviceBuilds(builds)
         })
         .catch(() => {})
-      // The X4 Pro / X4 Classic also offer official stock firmware alongside
+      // The X4 Pro / X4C also offer official stock firmware alongside
       // the admin-uploaded build; there is no Chinese variant.
       if (XTEINK_PRO_MODELS.has(model)) {
         setStock({ en: { text: 'Loading...', enabled: false }, ch: { text: 'Unavailable', enabled: false } })
@@ -581,7 +581,7 @@ export default function FlashTools() {
     const states = steps.map(() => 'pending')
 
     setRunning(true)
-    // The X4 Pro / X4 Classic can't be rebooted over serial — after flashing
+    // The X4 Pro / X4C can't be rebooted over serial — after flashing
     // they need a full power cycle: unplug/replug USB, then press and hold the
     // power button to boot. Shown instead of the plain unplug/reset the other
     // devices use.

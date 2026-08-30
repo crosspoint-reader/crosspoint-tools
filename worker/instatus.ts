@@ -634,7 +634,7 @@ export async function reconcileInsiderStatus(
 
 const DEVICE_BUILD_LABELS: Record<DeviceBuildStatusDevice, string> = {
   x4pro: 'X4 Pro',
-  x4c: 'X4 Classic',
+  x4c: 'X4C',
   sticky: 'Sticky',
   m5paper: 'M5Paper',
   lilygo: 'LilyGo T5',
