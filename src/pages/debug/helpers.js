@@ -69,8 +69,8 @@ export function identifyFirmwareData(data) {
     const start = Math.max(0, versionOffset - 50)
     const end = Math.min(searchArea.length, versionOffset + version.length + 50)
     return findString(searchArea.slice(start, end), 'XTOS') !== -1
-      ? { type: 'official-chinese', version, displayName: 'Official Chinese' }
-      : { type: 'official-english', version, displayName: 'Official English' }
+      ? { type: 'official-chinese', version, displayName: 'XTeink Factory (Chinese)' }
+      : { type: 'official-english', version, displayName: 'XTeink Factory (English)' }
   }
   if (findString(data, 'CrossPoint-ESP32-') !== -1 || findString(data, 'Starting CrossPoint version') !== -1) {
     return { type: 'crosspoint', version, displayName: 'CrossPoint Community Reader' }

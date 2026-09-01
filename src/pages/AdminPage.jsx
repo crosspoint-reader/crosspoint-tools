@@ -85,8 +85,8 @@ const FIRMWARE_DEVICES = [
 const OFFICIAL_RELEASES = [
   { key: 'crosspoint', label: 'CrossPoint', sub: 'Community · stable release' },
   { key: 'nightly', label: 'CrossPoint Nightly', sub: 'Insider' },
-  { key: 'stock-en', label: 'Stock English', sub: 'Official' },
-  { key: 'stock-ch', label: 'Stock Chinese', sub: 'Official' },
+  { key: 'stock-en', label: 'Stock English', sub: 'XTeink Factory' },
+  { key: 'stock-ch', label: 'Stock Chinese', sub: 'XTeink Factory' },
 ]
 
 // Checkbox pair ("Show on X3 / X4") driven by a hiddenDevices list. Both

@@ -21,15 +21,15 @@ function channelLabel(channel) {
   if (channel === 'stable') return 'Stable'
   if (channel === 'insider') return 'Insider (nightly)'
   if (channel === 'beta') return 'Beta'
-  if (channel === 'stock-en') return 'Stock · English'
-  if (channel === 'stock-ch') return 'Stock · Chinese'
+  if (channel === 'stock-en') return 'XTeink Factory · English'
+  if (channel === 'stock-ch') return 'XTeink Factory · Chinese'
   return channel
 }
 
 function stockReleases(model) {
   return ['en', 'ch'].map((lang) => ({
     id: `stock-${lang}-${model}`,
-    name: lang === 'en' ? 'Stock English Firmware' : 'Stock Chinese Firmware',
+    name: lang === 'en' ? 'XTeink Factory Firmware (English)' : 'XTeink Factory Firmware (Chinese)',
     channel: `stock-${lang}`,
     version: '',
     released_at: '',
@@ -137,7 +137,7 @@ export default function DownloadModal({ open, onClose }) {
       // Pinned stock build; English only — the X4 Pro has no Chinese variant.
       list.push({
         id: 'x4pro-stock-en',
-        name: 'Stock English Firmware',
+        name: 'XTeink Factory Firmware (English)',
         channel: 'stock-en',
         version: stockInfo?.version || '',
         released_at: '',

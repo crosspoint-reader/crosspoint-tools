@@ -899,8 +899,8 @@ export default function FlashTools() {
                   ))}
                   {XTEINK_PRO_MODELS.has(model) && (
                     <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
-                      <div className="text-sm font-semibold text-stone-900">Stock English</div>
-                      <div className="mt-0.5 font-mono text-xs text-stone-400">Official</div>
+                      <div className="text-sm font-semibold text-stone-900">XTeink Factory Firmware</div>
+                      <div className="mt-0.5 font-mono text-xs text-stone-400">Stock English</div>
                     </button>
                   )}
                   {(model === 'sticky' || XTEINK_PRO_MODELS.has(model)) && (
@@ -946,8 +946,8 @@ export default function FlashTools() {
                 {(!isReleaseHidden('stock-en') || !isReleaseHidden('stock-ch')) && (
                   <DropdownCard
                     active={fw === 'stock-en' || fw === 'stock-ch'}
-                    title="Stock Firmware"
-                    sub="Official"
+                    title="XTeink Factory Firmware"
+                    sub="Stock"
                     subClass="text-stone-400"
                     value={fw === 'stock-en' || fw === 'stock-ch' ? fw : ''}
                     onSelect={selectFw}
@@ -1136,11 +1136,16 @@ export default function FlashTools() {
                   {(fw === 'stock-en' || fw === 'stock-ch') && (
                     <div>
                       <div className="text-sm font-semibold text-stone-900">
-                        {fw === 'stock-en' ? 'Official English Firmware' : 'Official Chinese Firmware'}
+                        {fw === 'stock-en' ? 'XTeink Factory Firmware (English)' : 'XTeink Factory Firmware (Chinese)'}
                       </div>
                       <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">
                         {stock[fw === 'stock-en' ? 'en' : 'ch'].text}
                       </div>
+                      <p className="mt-2 text-xs text-stone-400">
+                        This is the manufacturer's factory firmware from XTeink — it is not a
+                        CrossPoint release. To install CrossPoint, go back and pick a CrossPoint
+                        build instead.
+                      </p>
                       <button
                         type="button"
                         onClick={() => runFlash(fw)}
