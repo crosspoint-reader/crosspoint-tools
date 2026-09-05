@@ -37,8 +37,7 @@ const RELEASES = [
   },
   {
     version: '1.6',
-    date: 'In the works',
-    upcoming: true,
+    date: 'September 2026',
     blurb: 'X4 Pro and PaperMono support, Reading Night Mode, transparent sleep screens, and styled dictionary definitions.',
   },
 ]
