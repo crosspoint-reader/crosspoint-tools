@@ -10,18 +10,6 @@ function CheckIcon({ className }) {
   )
 }
 
-function AlertIcon({ className }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth="2.25" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"
-      />
-    </svg>
-  )
-}
-
 // ---- Small shared pieces -------------------------------------------------
 
 function PhaseBadges({ status, phase, live = false }) {
@@ -110,21 +98,19 @@ export default function RoadmapPage() {
                 </div>
               </div>
               <div className="mx-1 h-1 flex-1 rounded-full bg-brand-400" />
-              {/* Phase 1 (in progress) */}
+              {/* Phase 1 (complete with the 1.6 release) */}
               <div className="flex flex-col items-center">
-                <div className="flex size-9 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white ring-4 ring-brand-100">
-                  1
+                <div className="flex size-9 items-center justify-center rounded-full bg-brand-500 text-white">
+                  <CheckIcon className="size-4" />
                 </div>
                 <div className="mt-2 font-mono text-[11px] font-medium tracking-wide text-stone-500 uppercase">
                   Multi-device
                 </div>
               </div>
-              <div className="mx-1 h-1 flex-1 rounded-full bg-stone-200">
-                <div className="h-full w-1/4 rounded-full bg-brand-400" />
-              </div>
-              {/* Phase 2 */}
+              <div className="mx-1 h-1 flex-1 rounded-full bg-brand-400" />
+              {/* Phase 2 (in progress) */}
               <div className="flex flex-col items-center">
-                <div className="flex size-9 items-center justify-center rounded-full bg-white font-mono text-xs font-semibold text-stone-600 ring-2 ring-stone-300">
+                <div className="flex size-9 items-center justify-center rounded-full bg-brand-500 font-mono text-xs font-semibold text-white ring-4 ring-brand-100">
                   2
                 </div>
                 <div className="mt-2 font-mono text-[11px] font-medium tracking-wide text-stone-500 uppercase">
@@ -211,9 +197,10 @@ export default function RoadmapPage() {
                       </span>
                     </li>
                     <li className="flex gap-2.5 rounded-md px-1 py-1 transition-colors hover:bg-stone-100/60">
-                      <AlertIcon className="mt-0.5 size-4 shrink-0 text-stone-300" />
-                      <span className="text-stone-400 line-through decoration-stone-400">
-                        <strong className="font-semibold text-stone-500">Transparent sleep screens</strong>: shelved.
+                      <CheckIcon className="mt-0.5 size-4 shrink-0 text-brand-500" />
+                      <span className="text-stone-700">
+                        <strong className="font-semibold text-stone-900">Transparent sleep screens</strong>:
+                        un-shelved and shipped in 1.6.
                       </span>
                     </li>
                   </ul>
@@ -254,11 +241,11 @@ export default function RoadmapPage() {
 
           {/* Phase 1 */}
           <li className="relative pl-16 sm:pl-20">
-            <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-brand-500 font-mono text-sm font-bold text-white ring-4 ring-brand-100 sm:size-12 sm:text-base">
-              1
+            <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-brand-500 text-white sm:size-12">
+              <CheckIcon className="size-5 sm:size-6" />
             </div>
             <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.18)] sm:p-8">
-              <PhaseBadges status="In progress" phase="Phase 1" live />
+              <PhaseBadges status="Complete" phase="Phase 1" />
               <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
                 Consolidation, Footprint &amp; Multi-Device Support
               </h3>
@@ -290,23 +277,30 @@ export default function RoadmapPage() {
                   New network connectors
                 </span>
               </div>
+
+              <p className="mt-4 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-900 ring-1 ring-brand-200">
+                Phase 1 closed with the 1.6 release (September 5, 2026). CrossPoint now ships stable builds for
+                the Xteink X4 Pro and M5Stack PaperMono alongside the X3/X4 and Sticky, added X4 Classic board
+                support, and landed the SDK generalization work that made them possible — plus a 323&nbsp;KB
+                built-in font flash reduction.
+              </p>
             </div>
           </li>
 
           {/* Phase 2 */}
           <li className="relative pl-16 sm:pl-20">
-            <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-white font-mono text-sm font-bold text-stone-700 ring-2 ring-stone-300 sm:size-12 sm:text-base">
+            <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-brand-500 font-mono text-sm font-bold text-white ring-4 ring-brand-100 sm:size-12 sm:text-base">
               2
             </div>
             <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.18)] sm:p-8">
-              <PhaseBadges status="Up next" phase="Phase 2" />
+              <PhaseBadges status="In progress" phase="Phase 2" live />
               <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
                 Languages, Fonts &amp; Themes
               </h3>
               <p className="mt-2 text-stone-600">
                 <span className="font-semibold text-stone-900">Goal:</span> With the codebase smaller and portable,
                 make reading great in every language: multi-language support, better font support with custom fonts,
-                UI translations, and themes loaded from the SD card instead of consuming flash.
+                UI translations, and themes and plugins loaded from the SD card instead of consuming flash.
               </p>
 
               <FocusGrid
@@ -315,8 +309,15 @@ export default function RoadmapPage() {
                   'Better font support & custom fonts',
                   'UI languages & localization',
                   'Themes → SD-loaded assets',
+                  'SD-loaded plugins',
                 ]}
               />
+
+              <p className="mt-4 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-600 ring-1 ring-stone-200">
+                Already landed in 1.6: language-specific fonts with script grouping in the fonts manager,
+                on-device font downloads for Hebrew, Arabic, and Korean, Bulgarian and Persian UI languages,
+                additional keyboard layouts, and major CJK improvements.
+              </p>
             </div>
           </li>
         </ol>
@@ -620,14 +621,14 @@ export default function RoadmapPage() {
               <div className="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
                 <div className="flex items-start justify-between gap-3">
                   <h4 className="font-display font-semibold text-stone-900">
-                    Theme System: Move Themes Off-Firmware
+                    Themes &amp; Plugins: Move Them Off-Firmware
                   </h4>
                   <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-stone-700 uppercase ring-1 ring-stone-300">
                     Help wanted
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-stone-600">
-                  Abstract themes out of firmware so they load from SD card instead of consuming flash.
+                  Abstract themes and plugins out of firmware so they load from SD card instead of consuming flash.
                 </p>
                 <p className="mt-3 text-xs text-stone-500">
                   <strong className="font-semibold text-stone-700">Status:</strong>{' '}
@@ -649,23 +650,16 @@ export default function RoadmapPage() {
                     SDK Abstraction for All ESP32 E-Readers
                   </h4>
                   <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-brand-700 uppercase">
-                    In progress
+                    Shipped in 1.6
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-stone-600">
                   Generalize SDK layers (display, input, storage, battery) away from Xteink-specific assumptions.
                 </p>
                 <p className="mt-3 text-xs text-stone-500">
-                  <strong className="font-semibold text-stone-700">Status:</strong>{' '}
-                  <a
-                    href="https://github.com/itsthisjustin"
-                    target="_blank"
-                    rel="noopener"
-                    className="text-brand-600 underline underline-offset-2"
-                  >
-                    @itsthisjustin
-                  </a>{' '}
-                  is actively working. Coordinate before touching{' '}
+                  <strong className="font-semibold text-stone-700">Status:</strong> The generalized SDK landed in
+                  1.6, bringing the X4 Pro and PaperMono into stable. New device bring-ups are welcome on top of
+                  it — coordinate before touching{' '}
                   <code className="rounded bg-stone-100 px-1 font-mono text-[0.85em]">freeink-sdk/</code> or{' '}
                   <code className="rounded bg-stone-100 px-1 font-mono text-[0.85em]">lib/hal/</code>.
                 </p>
