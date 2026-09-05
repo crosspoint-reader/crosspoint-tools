@@ -836,7 +836,15 @@ async function handleLatestRelease(
     assets: Array<{ name: string; browser_download_url: string; size: number }>;
   };
 
-  const firmwareAsset = release.assets.find(a => a.name.endsWith('firmware.bin'));
+  const firmwareAsset =
+    release.assets.find(a => a.name === 'firmware.bin') ||
+    release.assets.find(a => parseReleaseAsset(a.name).devices.includes('x4'));
+
+  // Per-device asset map so the flasher can tell which devices this release
+  // covers (1.6.0+ ships one .bin per device family).
+  const assets = release.assets
+    .map(a => ({ name: a.name, size: a.size, devices: parseReleaseAsset(a.name).devices }))
+    .filter(a => a.devices.length > 0);
 
   return json({
     tag: release.tag_name,
@@ -846,6 +854,7 @@ async function handleLatestRelease(
     body: release.body,
     firmwareUrl: firmwareAsset?.browser_download_url || null,
     firmwareSize: firmwareAsset?.size || null,
+    assets,
   }, 200, {
     ...headers,
     'Cache-Control': 'public, max-age=300',
@@ -871,9 +880,15 @@ async function handleReleaseFirmware(
     assets: Array<{ name: string; browser_download_url: string }>;
   };
   const requestedAsset = url.searchParams.get('asset');
+  const requestedDevice = url.searchParams.get('device');
   const firmwareAsset = requestedAsset
-    ? release.assets.find(a => a.name === requestedAsset && stableAssetDevices(a.name).length > 0)
-    : release.assets.find(a => a.name === 'firmware.bin');
+    ? release.assets.find(a => a.name === requestedAsset && parseReleaseAsset(a.name).devices.length > 0)
+    : requestedDevice
+      // Prefer a device-named asset over the legacy shared firmware.bin so
+      // e.g. ?device=x4 keeps working on releases that ship both.
+      ? release.assets.find(a => a.name !== 'firmware.bin' && parseReleaseAsset(a.name).devices.includes(requestedDevice)) ||
+        release.assets.find(a => parseReleaseAsset(a.name).devices.includes(requestedDevice))
+      : release.assets.find(a => a.name === 'firmware.bin');
   if (!firmwareAsset) {
     return json({ error: 'Requested firmware is not in the latest release' }, 404, headers);
   }
@@ -890,7 +905,7 @@ async function handleReleaseFirmware(
     headers: {
       ...headers,
       'Content-Type': 'application/octet-stream',
-      'Content-Disposition': 'attachment; filename="firmware.bin"',
+      'Content-Disposition': `attachment; filename="${firmwareAsset.name}"`,
       'X-Firmware-Version': release.tag_name,
     },
   });
@@ -4073,14 +4088,48 @@ const RC_ASSET_DEVICES: Record<string, string[]> = {
   papermono: ['papermono'],
 };
 
-// Stable releases historically used a bare `firmware.bin` for the shared
-// X3/X4 image. New multi-device releases use the same filename prefixes as the
-// RC channel, so each catalog entry must point at the matching GitHub asset.
+// 1.6.0+ releases name every asset `crosspoint-<version>-<device>.bin`; the
+// device key is the filename suffix instead of the old prefix scheme above.
+const ASSET_SUFFIX_DEVICES: Record<string, string[]> = {
+  'x3-x4': ['x3', 'x4'],
+  'x4-x3': ['x3', 'x4'],
+  x4pro: ['x4pro'],
+  sticky: ['sticky'],
+  papermono: ['papermono'],
+};
+
+// Maps a release/prerelease asset filename to the flasher device ids it
+// supports, across all three naming schemes: legacy shared `firmware.bin`
+// (X3/X4), old prefix names (`x4pro-1.6.0_beta_RC01.bin`), and the 1.6.0+
+// suffix names (`crosspoint-1.6.0-x4pro.bin`). Also extracts the embedded
+// build version when the filename carries one. Unknown names map to no
+// devices so a new device in a future release can't be offered to the wrong
+// hardware.
+function parseReleaseAsset(name: string): { devices: string[]; version: string | null } {
+  if (name === 'firmware.bin') return { devices: ['x3', 'x4'], version: null };
+  if (!name.endsWith('.bin')) return { devices: [], version: null };
+  const stem = name.slice(0, -'.bin'.length);
+  if (stem.startsWith('crosspoint-')) {
+    for (const [suffix, devices] of Object.entries(ASSET_SUFFIX_DEVICES)) {
+      if (stem.endsWith(`-${suffix}`)) {
+        return {
+          devices,
+          version: stem.slice('crosspoint-'.length, stem.length - suffix.length - 1) || null,
+        };
+      }
+    }
+    return { devices: [], version: null };
+  }
+  const devices = RC_ASSET_DEVICES[stem.split('-')[0]] || [];
+  return { devices, version: devices.length ? stem.replace(/^[^-]+-/, '') || null : null };
+}
+
+// Catalog view of a stable asset's devices. The catalog schema (and the
+// deployed Unlocker, which hard-errors on unknown model ids) only knows
+// x3/x4/x4pro, so sticky/papermono assets are surfaced through the flasher's
+// /api/release endpoints instead of the catalog.
 function stableAssetDevices(name: string): ('x3' | 'x4' | 'x4pro')[] {
-  if (name === 'firmware.bin') return ['x3', 'x4'];
-  if (!name.endsWith('.bin')) return [];
-  const devices = RC_ASSET_DEVICES[name.split('-')[0]] || [];
-  return devices.filter(
+  return parseReleaseAsset(name).devices.filter(
     (device): device is 'x3' | 'x4' | 'x4pro' =>
       device === 'x3' || device === 'x4' || device === 'x4pro'
   );
@@ -4135,20 +4184,22 @@ async function fetchRcRelease(env: Env): Promise<RcRelease | null> {
   if (!release) return null;
 
   const assets: RcAsset[] = [];
+  let assetVersion: string | null = null;
   for (const a of release.assets) {
     if (!a.name.endsWith('.bin')) continue;
-    const devices = RC_ASSET_DEVICES[a.name.split('-')[0]];
-    if (!devices) {
-      console.warn(`RC asset with unknown device prefix skipped: ${a.name}`);
+    const parsed = parseReleaseAsset(a.name);
+    if (!parsed.devices.length) {
+      console.warn(`RC asset with unknown device name skipped: ${a.name}`);
       continue;
     }
-    assets.push({ name: a.name, size: a.size, devices, downloadUrl: a.browser_download_url });
+    if (!assetVersion && parsed.version) assetVersion = parsed.version;
+    assets.push({ name: a.name, size: a.size, devices: parsed.devices, downloadUrl: a.browser_download_url });
   }
   if (!assets.length) return null;
 
   // User-facing version: the build id embedded in the asset filename
   // (e.g. `1.6.0_beta_RC01`), falling back to the tag.
-  const version = assets[0].name.replace(/^[^-]+-/, '').replace(/\.bin$/, '') || release.tag_name;
+  const version = assetVersion || release.tag_name;
   // A new RC pushed to the same prerelease replaces its assets without moving
   // published_at, so date the release by its newest asset upload instead.
   const publishedAt = release.assets
@@ -4295,8 +4346,15 @@ async function fetchStableForCatalog(env: Env): Promise<CatalogRelease[]> {
       body: string;
       assets: Array<{ name: string; browser_download_url: string; size: number }>;
     };
+    // 1.6.0+ ships both the legacy shared `firmware.bin` and a device-named
+    // `crosspoint-<ver>-x3-x4.bin` for the same image; keep only the named one
+    // so the catalog doesn't carry two identical x3/x4 entries.
+    const hasNamedSharedAsset = release.assets.some(
+      a => a.name !== 'firmware.bin' && stableAssetDevices(a.name).includes('x4')
+    );
     const out: CatalogRelease[] = [];
     for (const asset of release.assets) {
+      if (asset.name === 'firmware.bin' && hasNamedSharedAsset) continue;
       const devices = stableAssetDevices(asset.name);
       if (!devices.length) continue;
 

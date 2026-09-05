@@ -140,7 +140,6 @@ fn deserialize_supported_devices<'de, D>(de: D) -> Result<Vec<Model>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    use serde::de::Error;
     let raw: Vec<String> = Vec::deserialize(de)?;
     let mut out = Vec::with_capacity(raw.len());
     for entry in raw {
@@ -156,7 +155,11 @@ where
                 // enough. Accept a couple of spellings publishers might emit.
                 "x4pro" | "x4_pro" | "x4-pro" => Model::X4Pro,
                 "x4" => Model::X4,
-                other => return Err(D::Error::custom(format!("unknown model {other}"))),
+                // Devices this Unlocker build doesn't know (e.g. a new device
+                // added to the catalog later). Skip the token instead of
+                // failing the whole catalog parse — a release supporting only
+                // unknown devices ends up with no models and is filtered out.
+                _ => continue,
             };
             if !out.contains(&model) {
                 out.push(model);

@@ -1028,7 +1028,9 @@ export async function fetchEarlyAccessFirmware() {
 }
 
 export async function fetchReleaseFirmware(model = 'x4') {
-  const res = await fetch('/api/release/firmware');
+  // 1.6.0+ releases ship one .bin per device family; the worker picks the
+  // asset covering this device (x3/x4 share one image).
+  const res = await fetch(`/api/release/firmware?device=${encodeURIComponent(model)}`);
   if (!res.ok) throw new Error(`Failed to download release firmware: ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
 }

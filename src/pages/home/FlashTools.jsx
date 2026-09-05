@@ -326,17 +326,27 @@ export default function FlashTools() {
   // same release build).
   const [releaseDate, setReleaseDate] = useState(null)
 
+  // Full stable release metadata. 1.6.0+ releases ship one asset per device
+  // family, so `assets: [{ name, size, devices }]` tells us which devices the
+  // stable channel covers (now including x4pro/sticky/papermono).
+  const [releaseMeta, setReleaseMeta] = useState(null)
+
   useEffect(() => {
     let cancelled = false
     fetchReleaseMeta()
       .then((meta) => {
-        if (!cancelled && meta?.publishedAt) setReleaseDate(meta.publishedAt)
+        if (cancelled || !meta) return
+        setReleaseMeta(meta)
+        if (meta.publishedAt) setReleaseDate(meta.publishedAt)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
   }, [])
+
+  const stableCoversDevice = (id) =>
+    (releaseMeta?.assets || []).some((a) => (a.devices || []).includes(id))
 
   // Uploaded build per non-Xteink device; their cards stay hidden from the
   // device grid until one exists (or an RC asset covers the device), and show
@@ -400,6 +410,25 @@ export default function FlashTools() {
       fetchDeviceBuildList(model)
         .then((builds) => {
           if (!cancelled) setDeviceBuilds(builds)
+        })
+        .catch(() => {})
+      // Stable release info for the devices the 1.6.0+ releases cover
+      // (x4pro/sticky/papermono ship their own release asset).
+      setCrosspoint({ text: 'Loading...', enabled: false, tag: null, notesUrl: null })
+      fetchReleaseMeta()
+        .then((meta) => {
+          if (cancelled) return
+          const covered = (meta?.assets || []).some((a) => (a.devices || []).includes(model))
+          setCrosspoint(
+            covered
+              ? {
+                  text: `${meta.tag} - ${fmtDate(meta.publishedAt)}`,
+                  enabled: true,
+                  tag: meta.tag,
+                  notesUrl: meta.htmlUrl || null,
+                }
+              : { text: 'Unavailable', enabled: false, tag: null, notesUrl: null }
+          )
         })
         .catch(() => {})
       // The X4 Pro / X4C also offer official stock firmware alongside
@@ -700,9 +729,11 @@ export default function FlashTools() {
     const buildName =
       action === 'custom'
         ? 'Custom Firmware'
-        : action === 'rc'
-          ? `CrossPoint ${rc.release?.tag || ''} RC`
-          : activeDeviceBuild?.name || `${install.name} Beta`
+        : action === 'crosspoint'
+          ? `CrossPoint ${crosspoint.tag || ''}`.trim()
+          : action === 'rc'
+            ? `CrossPoint ${rc.release?.tag || ''} RC`
+            : activeDeviceBuild?.name || `${install.name} Beta`
     const steps = [
       'Connect to device',
       'Write bootloader + partition table + firmware',
@@ -728,6 +759,8 @@ export default function FlashTools() {
       if (action === 'custom') {
         if (!customFile) throw new Error('No file selected')
         firmware = new Uint8Array(await customFile.arrayBuffer())
+      } else if (action === 'crosspoint') {
+        firmware = await fetchReleaseFirmware(model)
       } else if (action === 'rc') {
         firmware = await fetchRcFirmware(model)
       } else {
@@ -837,7 +870,11 @@ export default function FlashTools() {
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {MODELS.filter(
-                (m) => !DEVICE_BUILD_MODELS.includes(m.id) || deviceAvailability[m.id] || rcCoversDevice(m.id)
+                (m) =>
+                  !DEVICE_BUILD_MODELS.includes(m.id) ||
+                  deviceAvailability[m.id] ||
+                  rcCoversDevice(m.id) ||
+                  stableCoversDevice(m.id)
               ).map((m) => (
                 <button
                   key={m.id}
@@ -854,13 +891,16 @@ export default function FlashTools() {
                     {(() => {
                       // Cards date themselves by the newest build offered: an
                       // RC covering the device vs the beta upload date (device
-                      // builds) or the stable release date (Xteink). Resolution
-                      // is the fallback while these are still loading.
+                      // builds) or the stable release date (any device with a
+                      // release asset). Resolution is the fallback while these
+                      // are still loading.
                       const rcDate = rcCoversDevice(m.id) ? rc.release.publishedAt : null
+                      const stableDate =
+                        !DEVICE_BUILD_MODELS.includes(m.id) || stableCoversDevice(m.id) ? releaseDate : null
                       const ownDate = DEVICE_BUILD_MODELS.includes(m.id)
                         ? deviceAvailability[m.id]?.uploadedAt
-                        : releaseDate
-                      const date = [rcDate, ownDate]
+                        : null
+                      const date = [rcDate, stableDate, ownDate]
                         .filter(Boolean)
                         .sort((a, b) => new Date(b) - new Date(a))[0]
                       return date ? `Updated ${fmtDate(date)}` : m.res
@@ -880,6 +920,14 @@ export default function FlashTools() {
               </div>
               {DEVICE_BUILD_MODELS.includes(model) ? (
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {stableCoversDevice(model) && (
+                    <button type="button" onClick={() => selectFw('crosspoint')} className={cardClass(fw === 'crosspoint')}>
+                      <div className="text-sm font-semibold text-stone-900">
+                        {crosspoint.tag ? `CrossPoint ${crosspoint.tag}` : 'CrossPoint'}
+                      </div>
+                      <div className="mt-0.5 font-mono text-xs text-brand-600">Stable</div>
+                    </button>
+                  )}
                   {rcAsset && (
                     <button type="button" onClick={() => selectFw('rc')} className={cardClass(fw === 'rc')}>
                       <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>

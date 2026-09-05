@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
-import { fetchReleaseVisibility, fetchBetaBuilds, fetchDeviceBuildList, fetchStockFirmwareInfo } from '../lib/flasher.js'
+import { fetchReleaseVisibility, fetchBetaBuilds, fetchDeviceBuildList, fetchStockFirmwareInfo, fetchReleaseMeta } from '../lib/flasher.js'
 
 // Maps catalog channels to the release-visibility keys the admin panel uses.
 // Only the "real" stable release maps to `crosspoint`; recovery entries
@@ -115,9 +115,25 @@ export default function DownloadModal({ open, onClose }) {
     Promise.all([
       fetchDeviceBuildList('x4pro').catch(() => []),
       fetchStockFirmwareInfo('x4pro', 'en').catch(() => null),
-    ]).then(([builds, stockInfo]) => {
+      fetchReleaseMeta().catch(() => null),
+    ]).then(([builds, stockInfo, releaseMeta]) => {
       if (cancelled) return
       const list = []
+      // Stable release, when it ships an X4 Pro asset (1.6.0+).
+      const stableAsset = (releaseMeta?.assets || []).find((a) => (a.devices || []).includes('x4pro'))
+      if (stableAsset) {
+        list.push({
+          id: `x4pro-stable-${releaseMeta.tag}`,
+          name: `CrossPoint ${releaseMeta.tag}`,
+          channel: 'stable',
+          version: releaseMeta.tag,
+          released_at: releaseMeta.publishedAt || '',
+          size: stableAsset.size || 0,
+          firmware_url: '/api/release/firmware?device=x4pro',
+          filename: stableAsset.name,
+          supported_devices: ['x4pro'],
+        })
+      }
       // The worker list is append-ordered (oldest first); show newest first.
       builds.slice().reverse().forEach((build) => {
         list.push({
