@@ -45,16 +45,16 @@ const RELEASES = [
 // Live numbers come from /api/stats. These are the last known good values and
 // stand in until the fetch resolves — and stay put if it never does.
 const FALLBACK_STATS = {
-  contributors: 192,
-  forks: 1219,
-  changes: 0,
-  downloads: 70547,
+  contributors: 225,
+  forks: 1642,
+  changes: 126,
+  downloads: 110327,
 }
 
 const STAT_LABELS = [
   ['contributors', 'contributors around the world'],
   ['forks', 'community forks built on CrossPoint'],
-  ['changes', 'changes since the latest major release'],
+  ['changes', 'changes in the last major release'],
   ['downloads', 'devices running CrossPoint'],
 ]
 

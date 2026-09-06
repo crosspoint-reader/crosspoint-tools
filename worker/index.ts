@@ -1544,8 +1544,8 @@ async function getSubscriberEmail(request: Request): Promise<string | null> {
 // Community stats (front page)
 // ---------------------------------------------------------------------------
 
-const STATS_CACHE_KEY = 'community-stats:v2';
-const STATS_LAST_GOOD_KEY = 'community-stats:last:v2';
+const STATS_CACHE_KEY = 'community-stats:v3';
+const STATS_LAST_GOOD_KEY = 'community-stats:last:v3';
 const STATS_TTL = 6 * 60 * 60; // 6 hours
 
 // Lifetime count of web-flasher flashes that GitHub's release download_count
@@ -1619,19 +1619,20 @@ async function fetchContributorCount(headers: Record<string, string>): Promise<n
 }
 
 /**
- * Commits since the latest major release. Patch releases aren't a "major
- * release", so use the newest x.y.0 tag and compare it with the default branch.
+ * Commits in the last major release. Patch releases aren't a "major release",
+ * so the boundaries are the newest two x.y.0 tags (currently v1.5.0...1.6.0 —
+ * the optional "v" prefix is inconsistent across upstream tags).
  * `total_commits` is exact even though the `commits` array caps at 250.
  */
-async function fetchChangesSinceRelease(
+async function fetchReleaseChangeCount(
   releases: GhRelease[],
-  defaultBranch: string,
   headers: Record<string, string>
 ): Promise<number> {
-  const latest = releases.find(r => /^v?\d+\.\d+\.0$/.test(r.tag_name));
-  if (!latest) throw new Error('no major release to compare');
+  const minors = releases.filter(r => /^v?\d+\.\d+\.0$/.test(r.tag_name));
+  if (minors.length < 2) throw new Error('not enough minor releases to compare');
+  const [newer, older] = minors;
   const res = await fetch(
-    `https://api.github.com/repos/${UPSTREAM_REPO}/compare/${latest.tag_name}...${defaultBranch}?per_page=1`,
+    `https://api.github.com/repos/${UPSTREAM_REPO}/compare/${older.tag_name}...${newer.tag_name}?per_page=1`,
     { headers }
   );
   if (!res.ok) throw new Error(`compare: ${res.status}`);
@@ -1658,7 +1659,7 @@ async function computeCommunityStats(env: Env): Promise<CommunityStats> {
   if (!repoRes.ok) throw new Error(`repo: ${repoRes.status}`);
   if (!releasesRes.ok) throw new Error(`releases: ${releasesRes.status}`);
 
-  const repo = await repoRes.json() as { forks_count: number; default_branch: string };
+  const repo = await repoRes.json() as { forks_count: number };
   const allReleases = await releasesRes.json() as GhRelease[];
   const releases = allReleases.filter(r => !r.draft && !r.prerelease);
   if (releases.length === 0) throw new Error('no published releases');
@@ -1674,7 +1675,7 @@ async function computeCommunityStats(env: Env): Promise<CommunityStats> {
   return {
     contributors,
     forks: repo.forks_count,
-    changes: await fetchChangesSinceRelease(releases, repo.default_branch, ghHeaders),
+    changes: await fetchReleaseChangeCount(releases, ghHeaders),
     downloads,
     fetchedAt: new Date().toISOString(),
   };
