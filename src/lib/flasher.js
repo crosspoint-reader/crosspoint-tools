@@ -1021,8 +1021,11 @@ export async function fetchFlashAsset(path, label) {
   return new Uint8Array(await res.arrayBuffer());
 }
 
-export async function fetchEarlyAccessFirmware() {
-  const res = await fetch('/api/build/firmware');
+// Nightly build. x3/x4 share one image (no device param); x4pro/sticky/
+// papermono build from their own PlatformIO envs and download by device id.
+export async function fetchEarlyAccessFirmware(model) {
+  const device = ['x4pro', 'sticky', 'papermono'].includes(model) ? `?device=${model}` : '';
+  const res = await fetch(`/api/build/firmware${device}`);
   if (!res.ok) throw new Error(`Failed to download firmware: ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
 }

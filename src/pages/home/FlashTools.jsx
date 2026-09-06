@@ -412,6 +412,25 @@ export default function FlashTools() {
           if (!cancelled) setDeviceBuilds(builds)
         })
         .catch(() => {})
+      // Nightly info for devices covered by the multi-device nightly build
+      // (buildMeta.devices; absent on pre-multi-device builds = x3/x4 only).
+      setNightly({ text: 'Loading...', enabled: false, version: null })
+      fetchBuildMeta()
+        .then((buildMeta) => {
+          if (cancelled) return
+          const covered =
+            buildMeta?.status === 'success' && (buildMeta.devices || []).includes(model)
+          setNightly(
+            covered
+              ? {
+                  text: `${buildMeta.version} - ${fmtDate(buildMeta.buildDate)}`,
+                  enabled: true,
+                  version: buildMeta.version,
+                }
+              : { text: 'No build available', enabled: false, version: null }
+          )
+        })
+        .catch(() => {})
       // Stable release info for the devices the 1.6.0+ releases cover
       // (x4pro/sticky/papermono ship their own release asset).
       setCrosspoint({ text: 'Loading...', enabled: false, tag: null, notesUrl: null })
@@ -655,7 +674,7 @@ export default function FlashTools() {
       if (action === 'crosspoint') {
         firmware = await fetchReleaseFirmware(model)
       } else if (action === 'nightly') {
-        firmware = await fetchEarlyAccessFirmware()
+        firmware = await fetchEarlyAccessFirmware(model)
       } else if (action === 'rc') {
         firmware = await fetchRcFirmware(model)
       } else if (action === 'stock-en') {
@@ -731,9 +750,11 @@ export default function FlashTools() {
         ? 'Custom Firmware'
         : action === 'crosspoint'
           ? `CrossPoint ${crosspoint.tag || ''}`.trim()
-          : action === 'rc'
-            ? `CrossPoint ${rc.release?.tag || ''} RC`
-            : activeDeviceBuild?.name || `${install.name} Beta`
+          : action === 'nightly'
+            ? 'CrossPoint Nightly'
+            : action === 'rc'
+              ? `CrossPoint ${rc.release?.tag || ''} RC`
+              : activeDeviceBuild?.name || `${install.name} Beta`
     const steps = [
       'Connect to device',
       'Write bootloader + partition table + firmware',
@@ -761,6 +782,8 @@ export default function FlashTools() {
         firmware = new Uint8Array(await customFile.arrayBuffer())
       } else if (action === 'crosspoint') {
         firmware = await fetchReleaseFirmware(model)
+      } else if (action === 'nightly') {
+        firmware = await fetchEarlyAccessFirmware(model)
       } else if (action === 'rc') {
         firmware = await fetchRcFirmware(model)
       } else {
@@ -932,6 +955,12 @@ export default function FlashTools() {
                     <button type="button" onClick={() => selectFw('rc')} className={cardClass(fw === 'rc')}>
                       <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>
                       <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
+                    </button>
+                  )}
+                  {nightly.enabled && (
+                    <button type="button" onClick={() => selectFw('nightly')} className={cardClass(fw === 'nightly')}>
+                      <div className="text-sm font-semibold text-stone-900">CrossPoint Nightly</div>
+                      <div className="mt-0.5 font-mono text-xs text-amber-600">Insider</div>
                     </button>
                   )}
                   {deviceBuilds.slice().reverse().map((b) => (

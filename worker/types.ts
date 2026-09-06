@@ -73,6 +73,9 @@ export interface BuildMetadata {
   error?: string;
   changelog: ChangelogEntry[];
   summary?: string;
+  // Flasher device ids this nightly run produced binaries for. Absent on
+  // builds from before the multi-device nightly (implies x3/x4 only).
+  devices?: string[];
 }
 
 export interface ChangelogEntry {

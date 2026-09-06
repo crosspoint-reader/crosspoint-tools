@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from './Modal.jsx'
-import { fetchReleaseVisibility, fetchBetaBuilds, fetchDeviceBuildList, fetchStockFirmwareInfo, fetchReleaseMeta } from '../lib/flasher.js'
+import { fetchReleaseVisibility, fetchBetaBuilds, fetchDeviceBuildList, fetchStockFirmwareInfo, fetchReleaseMeta, fetchBuildMeta } from '../lib/flasher.js'
 
 // Maps catalog channels to the release-visibility keys the admin panel uses.
 // Only the "real" stable release maps to `crosspoint`; recovery entries
@@ -116,7 +116,8 @@ export default function DownloadModal({ open, onClose }) {
       fetchDeviceBuildList('x4pro').catch(() => []),
       fetchStockFirmwareInfo('x4pro', 'en').catch(() => null),
       fetchReleaseMeta().catch(() => null),
-    ]).then(([builds, stockInfo, releaseMeta]) => {
+      fetchBuildMeta().catch(() => null),
+    ]).then(([builds, stockInfo, releaseMeta, buildMeta]) => {
       if (cancelled) return
       const list = []
       // Stable release, when it ships an X4 Pro asset (1.6.0+).
@@ -131,6 +132,20 @@ export default function DownloadModal({ open, onClose }) {
           size: stableAsset.size || 0,
           firmware_url: '/api/release/firmware?device=x4pro',
           filename: stableAsset.name,
+          supported_devices: ['x4pro'],
+        })
+      }
+      // Nightly, when the multi-device nightly covered the X4 Pro.
+      if (buildMeta?.status === 'success' && (buildMeta.devices || []).includes('x4pro')) {
+        list.push({
+          id: `x4pro-insider-${buildMeta.commitShort}`,
+          name: `master-${buildMeta.commitShort}`,
+          channel: 'insider',
+          version: buildMeta.version || '',
+          released_at: buildMeta.buildDate || '',
+          size: 0,
+          firmware_url: '/api/build/firmware?device=x4pro',
+          filename: 'x4pro-nightly.bin',
           supported_devices: ['x4pro'],
         })
       }

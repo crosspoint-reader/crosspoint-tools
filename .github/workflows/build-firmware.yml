@@ -109,6 +109,16 @@ jobs:
         if: steps.check.outputs.skip == 'false'
         run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
 
+      # Four envs build in this job now (shared + sticky + x4pro + papermono);
+      # cache the toolchains/frameworks like the upstream release workflow does.
+      - name: Cache PlatformIO packages
+        if: steps.check.outputs.skip == 'false'
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+
       - name: Set build version
         if: steps.check.outputs.skip == 'false'
         run: |
@@ -117,9 +127,12 @@ jobs:
           sed -i "s|version = ${VERSION}|version = ${BUILD_VERSION}|" platformio.ini
           echo "Firmware version: $BUILD_VERSION"
 
+      # Every device family with its own release env gets a nightly. The
+      # shared gh_release image covers X3/X4; the device-suffixed envs match
+      # the upstream release workflow (sticky/x4pro/papermono).
       - name: Build CrossPoint
         if: steps.check.outputs.skip == 'false'
-        run: pio run -e gh_release
+        run: pio run -e gh_release -e sticky-gh_release -e x4pro-gh_release -e papermono-gh_release -j1
 
       - name: Get version and changelog
         if: steps.check.outputs.skip == 'false'
@@ -139,12 +152,23 @@ jobs:
       - name: Upload firmware to R2
         if: steps.check.outputs.skip == 'false'
         run: |
-          curl -s -X PUT "${WEBHOOK_BASE_URL}/api/build/upload" \
+          # Shared X3/X4 image first (no device param — also drives the
+          # Instatus insider reconcile), then one upload per device env.
+          curl -sf -X PUT "${WEBHOOK_BASE_URL}/api/build/upload" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/octet-stream" \
             -H "X-Build-Commit: ${{ steps.check.outputs.commit }}" \
             -H "X-Build-Version: ${{ steps.info.outputs.version }}" \
             --data-binary @".pio/build/gh_release/firmware.bin"
+
+          for device in sticky x4pro papermono; do
+            curl -sf -X PUT "${WEBHOOK_BASE_URL}/api/build/upload?device=${device}" \
+              -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
+              -H "Content-Type: application/octet-stream" \
+              -H "X-Build-Commit: ${{ steps.check.outputs.commit }}" \
+              -H "X-Build-Version: ${{ steps.info.outputs.version }}" \
+              --data-binary @".pio/build/${device}-gh_release/firmware.bin"
+          done
 
       - name: Update build metadata (success)
         if: steps.check.outputs.skip == 'false'
@@ -166,7 +190,8 @@ jobs:
             --arg version "$VERSION" \
             --argjson firmwareSize "$SIZE" \
             --argjson changelog "$CHANGELOG" \
-            '{status:$status, commit:$commit, commitShort:$commitShort, commitMessage:$commitMessage, version:$version, firmwareSize:$firmwareSize, changelog:$changelog, error:null, buildLog:null}' \
+            --argjson devices '["x3","x4","sticky","x4pro","papermono"]' \
+            '{status:$status, commit:$commit, commitShort:$commitShort, commitMessage:$commitMessage, version:$version, firmwareSize:$firmwareSize, changelog:$changelog, devices:$devices, error:null, buildLog:null}' \
           | curl -s -X POST "${WEBHOOK_BASE_URL}/api/build/status" \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
               -H "Content-Type: application/json" \

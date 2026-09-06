@@ -174,7 +174,7 @@ async function handleApi(
         return handleBuildSummary(url, env, corsHeaders);
 
       case '/api/build/firmware':
-        return handleFirmwareDownload(env, corsHeaders);
+        return handleFirmwareDownload(url, env, corsHeaders);
 
       case '/api/build/trigger':
         return handleManualTrigger(request, env, corsHeaders);
@@ -183,7 +183,7 @@ async function handleApi(
         return handleBuildStatus(request, env, corsHeaders);
 
       case '/api/build/upload':
-        return handleBuildUpload(request, env, ctx, corsHeaders);
+        return handleBuildUpload(request, url, env, ctx, corsHeaders);
 
       case '/api/status/reconcile':
         return await handleStatusReconcile(request, url, env, corsHeaders);
@@ -621,11 +621,24 @@ async function handleBuildSummary(
 
 // --- Firmware Download (from R2) ---
 
+// Devices with their own nightly PlatformIO env (`<device>-gh_release`
+// upstream). The shared `gh_release` image covers x3/x4 and stays at the
+// legacy `builds/latest/firmware.bin` key; these get a per-device suffix.
+const NIGHTLY_DEVICE_BUILDS = new Set(['x4pro', 'sticky', 'papermono']);
+
+function nightlyR2Key(device: string | null, prefix = 'builds/latest'): string {
+  return device && NIGHTLY_DEVICE_BUILDS.has(device)
+    ? `${prefix}/firmware-${device}.bin`
+    : `${prefix}/firmware.bin`;
+}
+
 async function handleFirmwareDownload(
+  url: URL,
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const object = await env.FIRMWARE_BUCKET.get('builds/latest/firmware.bin');
+  const device = url.searchParams.get('device');
+  const object = await env.FIRMWARE_BUCKET.get(nightlyR2Key(device));
   if (!object) {
     return json({ error: 'No firmware available' }, 404, headers);
   }
@@ -758,6 +771,7 @@ async function handleBuildStatus(
 
 async function handleBuildUpload(
   request: Request,
+  url: URL,
   env: Env,
   ctx: ExecutionContext,
   headers: Record<string, string>
@@ -770,6 +784,14 @@ async function handleBuildUpload(
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
+  // Per-device nightly uploads (?device=x4pro|sticky|papermono) land next to
+  // the shared image under a device-suffixed key. No device param = the
+  // legacy shared x3/x4 image.
+  const device = url.searchParams.get('device');
+  if (device && !NIGHTLY_DEVICE_BUILDS.has(device)) {
+    return json({ error: `Unknown nightly device: ${device}` }, 400, headers);
+  }
+
   const commit = request.headers.get('X-Build-Commit') || 'unknown';
   const version = request.headers.get('X-Build-Version') || '';
   const buildDate = new Date().toISOString();
@@ -779,24 +801,28 @@ async function handleBuildUpload(
 
   // Upload to R2
   const metadata = { commit, version, buildDate, sha256 };
-  await env.FIRMWARE_BUCKET.put(`builds/${commit.substring(0, 7)}/firmware.bin`, firmwareData, {
+  await env.FIRMWARE_BUCKET.put(nightlyR2Key(device, `builds/${commit.substring(0, 7)}`), firmwareData, {
     customMetadata: metadata,
   });
-  await env.FIRMWARE_BUCKET.put('builds/latest/firmware.bin', firmwareData, {
+  await env.FIRMWARE_BUCKET.put(nightlyR2Key(device), firmwareData, {
     customMetadata: metadata,
   });
 
-  await env.BUILD_META.put(`sha256:insider:${commit}`, sha256);
+  await env.BUILD_META.put(device ? `sha256:insider:${commit}:${device}` : `sha256:insider:${commit}`, sha256);
 
-  scheduleInstatusTask(
-    ctx,
-    reconcileInsiderStatus(env, {
-      name: version || `master-${commit.substring(0, 7)}`,
-      version: version || `master-${commit.substring(0, 7)}`,
-      fingerprint: commit !== 'unknown' ? commit : sha256,
-    }),
-    'Insider build'
-  );
+  // One Instatus reconcile per nightly run is enough — the shared image
+  // upload carries it; device-suffixed uploads skip it.
+  if (!device) {
+    scheduleInstatusTask(
+      ctx,
+      reconcileInsiderStatus(env, {
+        name: version || `master-${commit.substring(0, 7)}`,
+        version: version || `master-${commit.substring(0, 7)}`,
+        fingerprint: commit !== 'unknown' ? commit : sha256,
+      }),
+      'Insider build'
+    );
+  }
 
   return json({ ok: true, size: firmwareData.byteLength, sha256 }, 200, headers);
 }
@@ -4443,6 +4469,33 @@ async function fetchInsiderForCatalog(env: Env): Promise<CatalogRelease | null> 
   };
 }
 
+// X4 Pro nightly, when the multi-device nightly produced one. Its own entry
+// because the X4 Pro builds from a separate PlatformIO env (different binary).
+// Sticky/papermono nightlies exist too but stay out of the catalog — deployed
+// Unlockers reject unknown device ids (see stableAssetDevices).
+async function fetchInsiderX4ProForCatalog(env: Env): Promise<CatalogRelease | null> {
+  const raw = await env.BUILD_META.get('latest-build');
+  if (!raw) return null;
+  const meta: BuildMetadata = JSON.parse(raw);
+  if (meta.status !== 'success' || !(meta.devices || []).includes('x4pro')) return null;
+
+  const cacheKey = `sha256:insider:${meta.commit}:x4pro`;
+  const result = await getOrComputeR2Sha(env, cacheKey, 'builds/latest/firmware-x4pro.bin');
+  if (!result) return null;
+
+  return {
+    id: `insider-${meta.commitShort}-x4pro`,
+    channel: 'insider',
+    name: `master-${meta.commitShort}`,
+    version: meta.version || `master-${meta.commitShort}`,
+    released_at: meta.buildDate,
+    firmware_url: `${ORIGIN}/api/build/firmware?device=x4pro`,
+    firmware_sha256: result.sha,
+    size: result.size,
+    supported_devices: ['x4pro'],
+  };
+}
+
 async function fetchBetasForCatalog(env: Env): Promise<CatalogRelease[]> {
   const list = await getBetaList(env);
   const out: CatalogRelease[] = [];
@@ -4517,10 +4570,11 @@ async function handleCatalog(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const [stable, rcX4Pro, insider, betas, escapeHatch, escapeHatchX4Pro] = await Promise.all([
+  const [stable, rcX4Pro, insider, insiderX4Pro, betas, escapeHatch, escapeHatchX4Pro] = await Promise.all([
     fetchStableForCatalog(env),
     fetchRcX4ProForCatalog(env),
     fetchInsiderForCatalog(env),
+    fetchInsiderX4ProForCatalog(env),
     fetchBetasForCatalog(env),
     fetchEscapeHatchForCatalog(env),
     fetchEscapeHatchX4ProForCatalog(env),
@@ -4530,6 +4584,7 @@ async function handleCatalog(
   releases.push(...stable);
   if (rcX4Pro) releases.push(rcX4Pro);
   if (insider) releases.push(insider);
+  if (insiderX4Pro) releases.push(insiderX4Pro);
   for (const b of betas) releases.push(b);
   if (escapeHatch) releases.push(escapeHatch);
   if (escapeHatchX4Pro) releases.push(escapeHatchX4Pro);
