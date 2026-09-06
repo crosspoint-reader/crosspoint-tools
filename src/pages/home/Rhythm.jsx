@@ -47,14 +47,14 @@ const RELEASES = [
 const FALLBACK_STATS = {
   contributors: 192,
   forks: 1219,
-  changes: 168,
+  changes: 0,
   downloads: 70547,
 }
 
 const STAT_LABELS = [
   ['contributors', 'contributors around the world'],
   ['forks', 'community forks built on CrossPoint'],
-  ['changes', 'changes in the last major release'],
+  ['changes', 'changes since the latest major release'],
   ['downloads', 'devices running CrossPoint'],
 ]
 

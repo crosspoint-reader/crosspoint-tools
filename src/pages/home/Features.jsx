@@ -42,7 +42,7 @@ function Story({ eyebrow, title, children, reversed = false, shot }) {
 
 export default function Features() {
   return (
-    <section className="eink relative border-t border-stone-200 bg-white py-20 sm:py-28">
+    <section className="eink relative border-t border-stone-200 bg-white pt-20 sm:pt-28">
       <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
         <Story
           eyebrow="the reading experience"
@@ -112,6 +112,26 @@ export default function Features() {
           Finish a book, and CrossPoint <Em>suggests what to read next</Em> from your library.
           If you read on more than one device, <Em>KOReader sync</Em> keeps them all on the
           same page.
+        </Story>
+
+        <Story
+          eyebrow="look it up anywhere"
+          title="Look up words offline"
+          shot={
+            <div className="relative z-10">
+              <EinkShot src="/screenshots/feature-dictionary.png" />
+            </div>
+          }
+        >
+          Look up words without leaving your book or connecting to the internet.{' '}
+          <Em>Bring your own dictionary</Em> in the StarDict format, then follow the{' '}
+          <a
+            href="https://crosspointreader.com/docs#dictionary"
+            className="font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700"
+          >
+            dictionary guide
+          </a>{' '}
+          to add it to CrossPoint.
         </Story>
 
       </div>

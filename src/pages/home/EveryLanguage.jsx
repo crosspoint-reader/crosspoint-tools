@@ -6,7 +6,7 @@ function Em({ children }) {
 
 export default function EveryLanguage() {
   return (
-    <section className="eink relative overflow-hidden border-t border-stone-200 bg-white py-20 sm:py-28">
+    <section className="eink relative overflow-hidden bg-white py-20 sm:py-28">
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:px-8">
         <div>
           <Eyebrow>hola · ciao · hallo</Eyebrow>
@@ -16,15 +16,18 @@ export default function EveryLanguage() {
           <p className="mt-6 max-w-[58ch] font-serif text-xl/9 text-pretty text-stone-600">
             The community has translated CrossPoint into <Em>nearly thirty languages</Em>, from
             Spanish and German to Hebrew, Ukrainian, and Vietnamese. The reader lays out{' '}
-            <Em>right-to-left text</Em> properly, shapes <Em>script languages</Em> correctly,
-            and <Em>hyphenates each language by its own rules</Em>. There&rsquo;s even{' '}
+            <Em>right-to-left text</Em> properly and{' '}
+            <Em>hyphenates each language by its own rules</Em>. There&rsquo;s even{' '}
             <Em>Focus Reading</Em> for readers who like a guided pace. And if your language is
             missing, a translation is one of the easiest ways to contribute.
+          </p>
+          <p className="mt-3 max-w-[58ch] text-sm/6 text-stone-400">
+            Indic scripts aren&rsquo;t supported yet.
           </p>
         </div>
 
         {/* Stacked frames: Focus Reading behind, RTL (Hebrew) in front */}
-        <div className="relative mx-auto" style={{ width: 'min(100%,360px)', height: '520px' }}>
+        <div className="relative order-last mx-auto lg:order-first" style={{ width: 'min(100%,360px)', height: '520px' }}>
           <div className="eink eink-s-50 absolute top-1 left-0" style={{ transform: 'rotate(-5deg)' }}>
             <div className="eink-device">
               <div className="eink-screen">

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { Eyebrow } from '../../components/ui.jsx'
 
-const PHOTO_COUNT = 18
+const PHOTO_COUNT = 22
 
 export default function Community() {
   // Shuffle once per mount, exactly like the old inline script did.
@@ -28,7 +28,7 @@ export default function Community() {
           {[0, 1].map((pass) =>
             order.map((n) => (
               <div key={`${pass}-${n}`} className="marquee-item">
-                <img src={`/community/${n}.webp`} alt="" loading="lazy" />
+                <img src={`/community/${n}.${n === 20 ? 'png' : 'webp'}`} alt="" loading="lazy" />
               </div>
             ))
           )}
