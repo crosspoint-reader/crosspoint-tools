@@ -88,16 +88,7 @@ export default function Features() {
           >
             Calibre
           </a>{' '}
-          with the CrossPoint plugin, or browse{' '}
-          <a
-            href="https://joinmayberry.com"
-            target="_blank"
-            rel="noopener"
-            className="font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700"
-          >
-            OPDS libraries
-          </a>{' '}
-          right on the device. However you keep your library, someone in the community has
+          with the CrossPoint plugin, or browse OPDS libraries right on the device. However you keep your library, someone in the community has
           built a path for it.
         </Story>
 
