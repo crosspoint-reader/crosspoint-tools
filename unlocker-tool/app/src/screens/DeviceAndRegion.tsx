@@ -42,6 +42,12 @@ export function DeviceAndRegion() {
             selected={model === "x4pro"}
             onClick={() => setModel("x4pro")}
           />
+          <DeviceCard
+            title="Xteink X4C"
+            subtitle="ESP32-S3 · encrypted OTA"
+            selected={model === "x4c"}
+            onClick={() => setModel("x4c")}
+          />
         </Section>
 
         <Section

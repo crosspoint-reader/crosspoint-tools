@@ -13,7 +13,13 @@ const MODELS = [
   { id: 'x4', name: 'Xteink X4', res: '480 × 800' },
   { id: 'x3', name: 'Xteink X3', res: '528 × 792' },
   { id: 'x4pro', name: 'Xteink X4 Pro', res: '480 × 800' },
+  { id: 'x4c', name: 'Xteink X4C', res: '480 × 800' },
 ]
+
+// ESP32-S3 devices (X4 Pro, X4C) aren't in /api/catalog and use the encrypted
+// `.xota` stock path; their firmware list is assembled client-side (see the
+// effect below) rather than coming from the catalog.
+const isS3Model = (m) => m === 'x4pro' || m === 'x4c'
 
 const CHANNEL_ORDER = { stable: 0, insider: 1, beta: 2, 'stock-en': 3, 'stock-ch': 4 }
 
@@ -53,9 +59,11 @@ export default function DownloadModal({ open, onClose }) {
   // never blanks the list.
   const [visibility, setVisibility] = useState({ hidden: {} })
   const [betaHidden, setBetaHidden] = useState({})
-  // X4 Pro list: admin-uploaded beta build + pinned stock English build,
-  // mirroring the homepage flasher (the X4 Pro is not in /api/catalog).
-  const [x4proReleases, setX4proReleases] = useState(null)
+  // ESP32-S3 (X4 Pro, X4C) lists: admin-uploaded beta build + pinned stock
+  // build, mirroring the homepage flasher (these devices aren't in
+  // /api/catalog). Keyed by model id so switching devices refetches instead of
+  // showing the other device's list.
+  const [s3Releases, setS3Releases] = useState({})
   const [loadError, setLoadError] = useState(null)
   const [selectedId, setSelectedId] = useState(null)
   const [status, setStatus] = useState({ text: '', error: false })
@@ -110,84 +118,87 @@ export default function DownloadModal({ open, onClose }) {
   }, [open])
 
   useEffect(() => {
-    if (!open || model !== 'x4pro' || x4proReleases) return
+    if (!open || !isS3Model(model) || s3Releases[model]) return
+    const device = model
     let cancelled = false
     Promise.all([
-      fetchDeviceBuildList('x4pro').catch(() => []),
-      fetchStockFirmwareInfo('x4pro', 'en').catch(() => null),
+      fetchDeviceBuildList(device).catch(() => []),
+      fetchStockFirmwareInfo(device, 'en').catch(() => null),
       fetchReleaseMeta().catch(() => null),
       fetchBuildMeta().catch(() => null),
     ]).then(([builds, stockInfo, releaseMeta, buildMeta]) => {
       if (cancelled) return
+      const label = device === 'x4c' ? 'X4C' : 'X4 Pro'
       const list = []
-      // Stable release, when it ships an X4 Pro asset (1.6.0+).
-      const stableAsset = (releaseMeta?.assets || []).find((a) => (a.devices || []).includes('x4pro'))
+      // Stable release, when it ships an asset for this device (1.6.0+).
+      const stableAsset = (releaseMeta?.assets || []).find((a) => (a.devices || []).includes(device))
       if (stableAsset) {
         list.push({
-          id: `x4pro-stable-${releaseMeta.tag}`,
+          id: `${device}-stable-${releaseMeta.tag}`,
           name: `CrossPoint ${releaseMeta.tag}`,
           channel: 'stable',
           version: releaseMeta.tag,
           released_at: releaseMeta.publishedAt || '',
           size: stableAsset.size || 0,
-          firmware_url: '/api/release/firmware?device=x4pro',
+          firmware_url: `/api/release/firmware?device=${device}`,
           filename: stableAsset.name,
-          supported_devices: ['x4pro'],
+          supported_devices: [device],
         })
       }
-      // Nightly, when the multi-device nightly covered the X4 Pro.
-      if (buildMeta?.status === 'success' && (buildMeta.devices || []).includes('x4pro')) {
+      // Nightly, when the multi-device nightly covered this device.
+      if (buildMeta?.status === 'success' && (buildMeta.devices || []).includes(device)) {
         list.push({
-          id: `x4pro-insider-${buildMeta.commitShort}`,
+          id: `${device}-insider-${buildMeta.commitShort}`,
           name: `master-${buildMeta.commitShort}`,
           channel: 'insider',
           version: buildMeta.version || '',
           released_at: buildMeta.buildDate || '',
           size: 0,
-          firmware_url: '/api/build/firmware?device=x4pro',
-          filename: 'x4pro-nightly.bin',
-          supported_devices: ['x4pro'],
+          firmware_url: `/api/build/firmware?device=${device}`,
+          filename: `${device}-nightly.bin`,
+          supported_devices: [device],
         })
       }
       // The worker list is append-ordered (oldest first); show newest first.
       builds.slice().reverse().forEach((build) => {
         list.push({
-          id: `x4pro-beta-${build.id || 'legacy'}`,
-          name: build.name || 'X4 Pro Beta',
+          id: `${device}-beta-${build.id || 'legacy'}`,
+          name: build.name || `${label} Beta`,
           channel: 'beta',
           version: '',
           released_at: build.uploadedAt || '',
           size: build.firmwareSize || 0,
           firmware_url: build.id
-            ? `/api/device-build/x4pro/${build.id}/firmware`
-            : '/api/device-build/x4pro/firmware',
-          filename: 'x4pro-firmware.bin',
-          supported_devices: ['x4pro'],
+            ? `/api/device-build/${device}/${build.id}/firmware`
+            : `/api/device-build/${device}/firmware`,
+          filename: `${device}-firmware.bin`,
+          supported_devices: [device],
         })
       })
-      // Pinned stock build; English only — the X4 Pro has no Chinese variant.
+      // Pinned stock build; English only — these devices have no Chinese variant
+      // wired up on the site.
       list.push({
-        id: 'x4pro-stock-en',
+        id: `${device}-stock-en`,
         name: 'XTeink Factory Firmware (English)',
         channel: 'stock-en',
         version: stockInfo?.version || '',
         released_at: '',
         size: 0,
-        firmware_url: '/api/firmware/stock?model=x4pro&lang=en',
-        filename: 'x4pro-stock-en.bin',
-        supported_devices: ['x4pro'],
+        firmware_url: `/api/firmware/stock?model=${device}&lang=en`,
+        filename: `${device}-stock-en.bin`,
+        supported_devices: [device],
       })
-      setX4proReleases(list)
+      setS3Releases((prev) => ({ ...prev, [device]: list }))
     })
     return () => {
       cancelled = true
     }
-  }, [open, model, x4proReleases])
+  }, [open, model, s3Releases])
 
   // Order: stable, insider, betas, stock (newest first). Options hidden for the
   // selected device (via the admin panel) are filtered out first.
   const releases = useMemo(() => {
-    if (model === 'x4pro') return x4proReleases || []
+    if (isS3Model(model)) return s3Releases[model] || []
     if (!model || !catalog) return []
     const hidden = visibility.hidden || {}
     const isHidden = (key) => (hidden[key] || []).includes(model)
@@ -208,7 +219,7 @@ export default function DownloadModal({ open, onClose }) {
       if (ca !== cb) return ca - cb
       return (b.released_at || '').localeCompare(a.released_at || '')
     })
-  }, [model, catalog, visibility, betaHidden, x4proReleases])
+  }, [model, catalog, visibility, betaHidden, s3Releases])
 
   // Default to the latest stable release (falling back to the top of the list,
   // e.g. for X3 which has no stable build) so SD flashing is one click away.
@@ -221,8 +232,8 @@ export default function DownloadModal({ open, onClose }) {
   const selected = releases.find((r) => r.id === selectedId) || null
   // Stock firmware SD flashing requires the update.bin name; CrossPoint's SD
   // Firmware Flash feature accepts any filename. X4/X3 downloads use update.bin
-  // so they work either way; X4 Pro downloads (CrossPoint- or USB-only) keep
-  // descriptive filenames.
+  // so they work either way; X4 Pro / X4C downloads (CrossPoint- or USB-only)
+  // keep descriptive filenames.
   const downloadName = selected?.filename || 'update.bin'
 
   async function downloadSelected() {
@@ -255,9 +266,9 @@ export default function DownloadModal({ open, onClose }) {
     <Modal open={open} onClose={onClose} title="Download firmware">
       <div className="space-y-6">
         <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
-          {model === 'x4pro' ? (
+          {isS3Model(model) ? (
             <p>
-              On the X4 Pro, devices already running CrossPoint can flash these <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px]">.bin</code>{' '}
+              On the {model === 'x4c' ? 'X4C' : 'X4 Pro'}, devices already running CrossPoint can flash these <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-[11px]">.bin</code>{' '}
               files from the SD card. Stock firmware cannot install them from SD — use the USB flash
               tool on the home page instead.
             </p>
@@ -296,9 +307,9 @@ export default function DownloadModal({ open, onClose }) {
           <div>
             <div className="text-sm font-semibold text-stone-900">Choose firmware</div>
             <div className="mt-3 space-y-2">
-              {(model === 'x4pro' ? !x4proReleases : !catalog) ? (
+              {(isS3Model(model) ? !s3Releases[model] : !catalog) ? (
                 <p className="text-sm text-stone-400">Loading...</p>
-              ) : model !== 'x4pro' && loadError ? (
+              ) : !isS3Model(model) && loadError ? (
                 <p className="text-sm text-red-600">Failed to load firmware list: {loadError}</p>
               ) : releases.length === 0 ? (
                 <p className="text-sm text-stone-400">No firmware available right now.</p>
@@ -352,7 +363,7 @@ export default function DownloadModal({ open, onClose }) {
               <code className="rounded bg-stone-100 px-1 py-0.5 font-mono text-[11px] text-stone-600">
                 {downloadName}
               </code>
-              {model === 'x4pro'
+              {isS3Model(model)
                 ? ', ready to flash from CrossPoint via SD or over USB.'
                 : ', ready to drop on your SD card root.'}
             </p>

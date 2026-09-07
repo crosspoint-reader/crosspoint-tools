@@ -713,8 +713,9 @@ fn x4pro_check_update(cfg: &ServerConfig, q: &UpdateQuery) -> Json<serde_json::V
         );
     }
     let filename = format!(
-        "{version}-X4Pro-{locale}-OTA{ota_type}-PROD-{date}.xota",
+        "{version}-{model}-{locale}-OTA{ota_type}-PROD-{date}.xota",
         version = crate::xota::UNLOCKER_X4PRO_VERSION,
+        model = cfg.model.short(),
         locale = cfg.locale.short(),
         date = chrono::Utc::now().format("%m%d"),
     );
@@ -1875,10 +1876,23 @@ mod tests {
 
         let crossink = build_release(&cfg, "crossink");
         let crossink_assets = crossink["assets"].as_array().unwrap();
-        assert_eq!(crossink_assets.len(), 3);
+        // Two entries per variant (bare + tag-aligned) across the three CrossInk
+        // variants; the asset version must equal `tag_name` (99.9.9), not the old
+        // v99.9.9.1 that made strict matchers return NO_UPDATE.
+        let crossink_names: Vec<&str> = crossink_assets
+            .iter()
+            .map(|a| a["name"].as_str().unwrap())
+            .collect();
         assert_eq!(
-            crossink_assets[0]["name"],
-            "firmware-no_emoji-v99.9.9.1.bin"
+            crossink_names,
+            vec![
+                "firmware-no_emoji.bin",
+                "firmware-no_emoji-v99.9.9.bin",
+                "firmware-tiny.bin",
+                "firmware-tiny-v99.9.9.bin",
+                "firmware-xlarge.bin",
+                "firmware-xlarge-v99.9.9.bin",
+            ]
         );
         assert!(asset_urls(&crossink)
             .iter()

@@ -74,6 +74,13 @@ impl DnsConfig {
                 "ntp.ntsc.ac.cn".to_string(),
                 "ntp1.aliyun.com".to_string(),
                 "ntp2.aliyun.com".to_string(),
+                // Tencent NTP — the CH-domestic units (e.g. the X4C) fall back
+                // to `ntp.tencent.com` / `ntp{N}.tencent.com` when the aliyun
+                // pool doesn't answer. Without these the device's fallback NTP
+                // lookup goes unanswered and it stalls before check-update. The
+                // numbered `ntp{N}.tencent.com` family is matched by pattern in
+                // `is_spoofed`; the bare host is listed for startup logging.
+                "ntp.tencent.com".to_string(),
                 "time1.apple.com".to_string(),
                 "time1.google.com".to_string(),
             ],
@@ -152,11 +159,13 @@ fn is_spoofed(qname_norm: &str, spoofed_hosts: &[String]) -> bool {
         .iter()
         .any(|h| h.eq_ignore_ascii_case(qname_norm))
         || qname_norm.ends_with(".pool.ntp.org")
-        // NTP host families the X4 Pro factory app uses (see DnsConfig): any
-        // numbered `ntp{N}.aliyun.com` and any `time{N}.apple.com` /
-        // `time{N}.google.com`. Scoped to the ntp/time prefixes so we don't
-        // hijack unrelated aliyun/google/apple subdomains.
-        || (qname_norm.starts_with("ntp") && qname_norm.ends_with(".aliyun.com"))
+        // NTP host families the ESP32-S3 factory/main apps use (see DnsConfig):
+        // any numbered `ntp{N}.aliyun.com` / `ntp{N}.tencent.com` and any
+        // `time{N}.apple.com` / `time{N}.google.com`. Scoped to the ntp/time
+        // prefixes so we don't hijack unrelated aliyun/tencent/google/apple
+        // subdomains.
+        || (qname_norm.starts_with("ntp")
+            && (qname_norm.ends_with(".aliyun.com") || qname_norm.ends_with(".tencent.com")))
         || (qname_norm.starts_with("time")
             && (qname_norm.ends_with(".apple.com") || qname_norm.ends_with(".google.com")))
 }
@@ -176,6 +185,9 @@ mod tests {
         // ntp{N}.aliyun.com family (not in the list, matched by pattern)
         assert!(is_spoofed("ntp1.aliyun.com", &hosts));
         assert!(is_spoofed("ntp7.aliyun.com", &hosts));
+        // ntp{N}.tencent.com family (CH-domestic fallback, matched by pattern)
+        assert!(is_spoofed("ntp.tencent.com", &hosts));
+        assert!(is_spoofed("ntp5.tencent.com", &hosts));
         // time{N}.apple.com / time{N}.google.com family
         assert!(is_spoofed("time1.apple.com", &hosts));
         assert!(is_spoofed("time.google.com", &hosts));
@@ -185,6 +197,7 @@ mod tests {
         assert!(!is_spoofed("oss.aliyun.com", &hosts));
         assert!(!is_spoofed("www.google.com", &hosts));
         assert!(!is_spoofed("push.apple.com", &hosts));
+        assert!(!is_spoofed("wup.imtt.qq.tencent.com", &hosts));
     }
 }
 

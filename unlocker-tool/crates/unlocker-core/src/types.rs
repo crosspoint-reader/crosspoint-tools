@@ -9,6 +9,10 @@ pub enum Model {
     /// flow is account-bound and serves an encrypted `encrypted_v1` `.xota`
     /// package rather than a plain image (see `xota.rs`).
     X4Pro,
+    /// Xteink X4C — ESP32-S3 based like the X4 Pro, same encrypted `.xota` OTA
+    /// scheme and firmware-embedded key; differs only in the `device_type` it
+    /// reports (`ESP32S3_X4_CLA` vs the Pro's `ESP32S3_X4_TL`).
+    X4C,
 }
 
 impl Model {
@@ -17,31 +21,33 @@ impl Model {
             Model::X3 => "X3",
             Model::X4 => "X4",
             Model::X4Pro => "X4Pro",
+            Model::X4C => "X4C",
         }
     }
 
     /// Value the device sends in the `device_type` *header* and reports at the
-    /// firmware level. For the X4 Pro the OTA validator strcmps against this
-    /// bare string (no panel suffix).
+    /// firmware level. For the X4 Pro / X4C the OTA validator strcmps against
+    /// this bare string (no panel suffix).
     pub fn device_type(&self) -> &'static str {
         match self {
             Model::X3 => "ESP32C3_X3",
             Model::X4 => "ESP32C3_X4",
             Model::X4Pro => "ESP32S3_X4_TL",
+            Model::X4C => "ESP32S3_X4_CLA",
         }
     }
 
-    /// True for the ESP32-S3 X4 Pro, whose OTA uses the encrypted `.xota`
-    /// pipeline instead of the plain GitHub/stock manifest path.
-    pub fn is_x4pro(&self) -> bool {
-        matches!(self, Model::X4Pro)
+    /// True for the ESP32-S3 devices (X4 Pro, X4C) whose OTA uses the encrypted
+    /// `.xota` pipeline instead of the plain GitHub/stock manifest path.
+    pub fn uses_xota(&self) -> bool {
+        matches!(self, Model::X4Pro | Model::X4C)
     }
 
-    /// Display panel controller. Only the X4 Pro's OTA manifest / `.xota`
-    /// metadata carries this; the C3 devices don't advertise one.
+    /// Display panel controller. Only the ESP32-S3 devices' OTA manifest /
+    /// `.xota` metadata carry this; the C3 devices don't advertise one.
     pub fn panel(&self) -> Option<&'static str> {
         match self {
-            Model::X4Pro => Some("SSD1677"),
+            Model::X4Pro | Model::X4C => Some("SSD1677"),
             _ => None,
         }
     }
@@ -154,6 +160,7 @@ where
                 // the split already isolates whole tokens, so an exact match is
                 // enough. Accept a couple of spellings publishers might emit.
                 "x4pro" | "x4_pro" | "x4-pro" => Model::X4Pro,
+                "x4c" | "x4_c" | "x4-c" | "x4classic" => Model::X4C,
                 "x4" => Model::X4,
                 // Devices this Unlocker build doesn't know (e.g. a new device
                 // added to the catalog later). Skip the token instead of

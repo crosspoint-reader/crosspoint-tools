@@ -81,6 +81,10 @@ const ESCAPE_HATCH_X4PRO_ID = "xteink:recovery-escape-hatch-x4pro";
 const isRecoveryRelease = (r: CrossPointRelease) =>
   r.id.includes(":recovery-") || r.id.startsWith("recovery-");
 
+// ESP32-S3 devices (X4 Pro, X4C) share the encrypted `.xota` OTA path: the
+// unlocker wraps a plain `.bin` into the stock encrypted package before serving.
+const usesEncryptedOta = (model: Model) => model === "x4pro" || model === "x4c";
+
 export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +114,7 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
     const isHidden = (r: CrossPointRelease) =>
       (HIDDEN_RELEASES[r.id] ?? []).includes(model);
     const isHiddenChannel = (r: CrossPointRelease) =>
-      model !== "x4pro" &&
+      !usesEncryptedOta(model) &&
       !showPrereleaseFirmware &&
       (r.channel === "beta" || r.channel === "insider");
     const eligible = catalog.releases.filter(
@@ -241,10 +245,11 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
         <Heading>Pick a release</Heading>
       </div>
 
-      {model === "x4pro" && (
+      {usesEncryptedOta(model) && (
         <Callout variant="info" title="Encrypted OTA — packaged automatically">
           Choose the latest stable or release-candidate build. The unlocker
-          automatically wraps its X4 Pro <code>.bin</code> in the stock encrypted
+          automatically wraps its {model === "x4c" ? "X4C" : "X4 Pro"}{" "}
+          <code>.bin</code> in the stock encrypted
           <code>.xota</code> format before flashing it.
         </Callout>
       )}
@@ -299,7 +304,7 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
           </summary>
           <div className="space-y-3 px-4 pb-4 pl-8">
             <p>
-              {model === "x4pro"
+              {usesEncryptedOta(model)
                 ? "If a normal stable or release-candidate install fails, use Escape Hatch as a recovery path, then flash your real firmware from the SD card."
                 : "Some firmware (such as crosspet 1.8.3+) forces an encrypted OTA download that these devices can't reliably finish. If a normal install keeps failing, flash Escape Hatch instead, then flash your real firmware directly from the SD card."}
             </p>

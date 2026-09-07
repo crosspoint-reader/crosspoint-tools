@@ -880,12 +880,14 @@ async fn run_local_install(
     run_prepared_install(orch, log, runtime, helper, firmware, crosspet_http).await
 }
 
-/// Wrap a prepared plain image into an X4 Pro `encrypted_v1` `.xota` and cache
-/// it. Xteink uses distinct keys for OTA channels 0 and 1, so a plain input is
-/// wrapped twice and the server selects the artifact matching the device's
-/// `ota_type` request. A pre-built `.xota` is served only for its detected
-/// channel.
-async fn prepare_x4pro_xota(
+/// Wrap a prepared plain image into an ESP32-S3 `encrypted_v1` `.xota` (X4 Pro
+/// or X4C — `model` selects the `device_type` written into the metadata) and
+/// cache it. Xteink uses distinct keys for OTA channels 0 and 1, so a plain
+/// input is wrapped twice and the server selects the artifact matching the
+/// device's `ota_type` request. A pre-built `.xota` is served only for its
+/// detected channel.
+async fn prepare_xota(
+    model: Model,
     log: &SessionLog,
     firmware: &PreparedFirmware,
 ) -> anyhow::Result<Vec<unlocker_core::types::XotaOta>> {
@@ -934,7 +936,7 @@ async fn prepare_x4pro_xota(
     let mut variants = Vec::with_capacity(2);
     for ota_type in 0..=1 {
         let enc = unlocker_core::xota::encrypt(
-            Model::X4Pro,
+            model,
             &plain,
             unlocker_core::xota::UNLOCKER_X4PRO_VERSION,
             ota_type,
@@ -947,7 +949,8 @@ async fn prepare_x4pro_xota(
         log.push(
             "info",
             format!(
-                "encrypted X4 Pro ota_type {ota_type}: plain {} bytes (sha {}), package {} bytes",
+                "encrypted {} ota_type {ota_type}: plain {} bytes (sha {}), package {} bytes",
+                model.short(),
                 enc.plain_size,
                 &enc.plain_sha256[..16],
                 enc.bytes.len()
@@ -1044,8 +1047,8 @@ async fn run_prepared_install(
     // the plain image we prepared into an encrypted package the device will
     // decrypt-and-verify. The served artifact becomes the `.xota`; the manifest
     // then advertises the plain image's size + sha256 for the on-device check.
-    let xota_variants = if model.is_x4pro() {
-        prepare_x4pro_xota(&log, &firmware).await?
+    let xota_variants = if model.uses_xota() {
+        prepare_xota(model, &log, &firmware).await?
     } else {
         Vec::new()
     };
