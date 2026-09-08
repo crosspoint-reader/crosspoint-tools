@@ -14,6 +14,7 @@ const KosyncPage = lazy(() => import('./pages/KosyncPage.jsx'))
 const UnlockerPage = lazy(() => import('./pages/UnlockerPage.jsx'))
 const ContactPage = lazy(() => import('./pages/ContactPage.jsx'))
 const UnlockPage = lazy(() => import('./pages/UnlockPage.jsx'))
+const ReportIssuePage = lazy(() => import('./pages/ReportIssuePage.jsx'))
 const AccessoriesPage = lazy(() => import('./pages/AccessoriesPage.jsx'))
 const DevicesPage = lazy(() => import('./pages/DevicesPage.jsx'))
 const BlogPage = lazy(() => import('./pages/BlogPage.jsx'))
@@ -87,6 +88,7 @@ export default function App() {
           <Route path="/unlocker" element={<UnlockerPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/unlock" element={<UnlockPage />} />
+          <Route path="/report-issue" element={<ReportIssuePage />} />
           <Route path="/accessories" element={<AccessoriesPage />} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/blog" element={<BlogPage />} />

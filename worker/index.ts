@@ -224,6 +224,15 @@ async function handleApi(
       case '/api/contact':
         return handleContact(request, env, corsHeaders);
 
+      case '/api/issues':
+        return handleCreateIssue(request, env, corsHeaders);
+
+      case '/api/issues/config':
+        return handleIssueConfig(env, corsHeaders);
+
+      case '/api/issues/admin':
+        return handleIssueAdminList(request, env, corsHeaders);
+
       case '/api/fonts':
         return handleFontList(env, corsHeaders);
 
@@ -4762,4 +4771,294 @@ async function handleContact(
   }
 
   return json({ ok: true }, 200, headers);
+}
+
+// --- Anonymous GitHub Issues ---
+//
+// Lets website visitors file a GitHub issue without a GitHub account. The Worker
+// creates the issue on their behalf using a dedicated least-privilege token
+// (GITHUB_ISSUES_TOKEN, a fine-grained PAT scoped to Issues:write on this one
+// repo — deliberately NOT the broader GITHUB_TOKEN that can dispatch builds).
+//
+// Abuse controls: a Cloudflare Turnstile token verified server-side, a per-IP
+// KV cooldown, a honeypot field, and strict length caps. The submitter's email
+// is NEVER written to the public issue; it's kept in a KV-backed admin log
+// (issue-submissions) so the maintainer can reach out privately.
+
+const ISSUE_REPO = 'crosspoint-reader/crosspoint-reader';
+const ISSUE_LOG_KEY = 'issue-submissions';
+const ISSUE_LOG_MAX = 500;
+const ISSUE_RATE_TTL_SECONDS = 120; // one submission per IP per 2 minutes
+
+// GitHub body hard limit is 65536; cap the whole assembled body under it and
+// reserve the rest for an embedded serial log.
+const ISSUE_BODY_MAX = 65000;
+const SERIAL_LOG_MAX = 40000; // chars of serial log kept (tail); rest truncated
+
+// Form value -> GitHub label. The frontend renders these exact options (served
+// via /api/issues/config) so the two never drift; the worker is the source of
+// truth and re-validates every value it receives.
+const ISSUE_TYPE_OPTIONS = [
+  { value: 'bug', label: 'Bug report', gh: 'bug' },
+  { value: 'feature', label: 'Feature request', gh: 'feature-request' },
+] as const;
+
+const ISSUE_DEVICE_OPTIONS = [
+  { value: 'x3', label: 'Xteink X3', gh: 'device-x3-only' },
+  { value: 'x4', label: 'Xteink X4', gh: 'device-x4-only' },
+  { value: 'x4pro', label: 'Xteink X4 Pro', gh: 'device-x4pro' },
+  { value: 'x4c', label: 'Xteink X4C', gh: 'device-x4c' },
+  { value: 'x3x4', label: 'Both X3 & X4', gh: 'x4-and-x3-issue' },
+  { value: 'other', label: 'Other / not sure', gh: null },
+] as const;
+
+// Curated topic labels (value === the real GitHub label name).
+const ISSUE_TOPIC_OPTIONS = [
+  { value: 'reader', label: 'Reading experience' },
+  { value: 'font', label: 'Fonts' },
+  { value: 'wifi', label: 'Wi‑Fi' },
+  { value: 'syncing', label: 'Syncing' },
+  { value: 'file-transfer', label: 'File transfer (OPDS/Calibre/web)' },
+  { value: 'images', label: 'Images' },
+  { value: 'keyboard', label: 'Keyboard' },
+  { value: 'crash', label: 'Crash' },
+  { value: 'performance', label: 'Performance' },
+  { value: 'ota-update', label: 'OTA update' },
+  { value: 'settings', label: 'Settings' },
+  { value: 'language', label: 'Language / character set' },
+  { value: 'ui-device', label: 'Device UI' },
+  { value: 'ui-web', label: 'Web UI' },
+] as const;
+
+type IssueSubmission = {
+  number: number;
+  url: string;
+  title: string;
+  email: string;
+  createdAt: string;
+};
+
+// Action the issue-form widget declares (data-action) and that siteverify must
+// echo back — binds a token to this specific surface.
+const TURNSTILE_ISSUE_ACTION = 'report-issue';
+
+// Verify a Cloudflare Turnstile token against the siteverify API. Follows the
+// documented existing-widget flow: POST urlencoded {secret,response,remoteip},
+// then validate success + action + hostname. Fails closed on any error/mismatch
+// or missing config.
+async function verifyTurnstile(
+  token: string | undefined,
+  request: Request,
+  env: Env,
+  expectedAction?: string
+): Promise<boolean> {
+  const secret = (env.TURNSTILE_SECRET_KEY || '').trim();
+  if (!secret || !token) return false;
+  try {
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ secret, response: token, remoteip: ip }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json() as { success?: boolean; action?: string; hostname?: string };
+    if (data.success !== true) return false;
+    // Bind the token to this surface's action (if the response carries one).
+    if (expectedAction && data.action && data.action !== expectedAction) return false;
+    // Hostname allowlist so a leaked sitekey can't be farmed from another domain.
+    const allowed = (env.TURNSTILE_ALLOWED_HOSTNAMES ||
+      'crosspointreader.com,www.crosspointreader.com,localhost,127.0.0.1')
+      .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (data.hostname && allowed.length && !allowed.includes(data.hostname.toLowerCase())) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Public config for the issue form: the Turnstile *site* key (public by design)
+// + widget action, whether the feature is configured, and the exact type/device/
+// topic options the worker accepts (so the form never drifts from validation).
+function handleIssueConfig(env: Env, headers: Record<string, string>): Response {
+  return json(
+    {
+      siteKey: (env.TURNSTILE_SITE_KEY || '').trim() || null,
+      action: TURNSTILE_ISSUE_ACTION,
+      enabled: Boolean((env.GITHUB_ISSUES_TOKEN || '').trim()),
+      types: ISSUE_TYPE_OPTIONS.map((t) => ({ value: t.value, label: t.label })),
+      devices: ISSUE_DEVICE_OPTIONS.map((d) => ({ value: d.value, label: d.label })),
+      topics: ISSUE_TOPIC_OPTIONS.map((t) => ({ value: t.value, label: t.label })),
+    },
+    200,
+    headers
+  );
+}
+
+async function handleCreateIssue(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+
+  const token = (env.GITHUB_ISSUES_TOKEN || '').trim();
+  if (!token) {
+    return json({ error: 'Issue submission is not configured.' }, 503, headers);
+  }
+
+  let body: {
+    title?: string; body?: string; email?: string;
+    type?: string; device?: string; topics?: unknown; serialLog?: string;
+    turnstileToken?: string; website?: string;
+  };
+  try {
+    body = await request.json() as typeof body;
+  } catch {
+    return json({ error: 'Invalid request body' }, 400, headers);
+  }
+
+  // Honeypot tripped: pretend success, create nothing.
+  if ((body.website || '').trim()) {
+    return json({ ok: true }, 200, headers);
+  }
+
+  // Anti-bot: Turnstile must pass before we touch GitHub. Dev-only bypass mirrors
+  // ALLOW_INSECURE_DEV_WEBHOOKS so the form can be exercised locally before a
+  // Turnstile widget is provisioned; never enable that flag in production.
+  const allowInsecure = /^(1|true|yes)$/i.test((env.ALLOW_INSECURE_DEV_WEBHOOKS || '').trim());
+  if (!allowInsecure && !(await verifyTurnstile(body.turnstileToken, request, env, TURNSTILE_ISSUE_ACTION))) {
+    return json({ error: 'Bot check failed — please retry.' }, 403, headers);
+  }
+
+  // Per-IP cooldown.
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const rlKey = `issue-rl-${ip}`;
+  if (await env.BUILD_META.get(rlKey)) {
+    return json({ error: 'You just submitted an issue — please wait a moment before another.' }, 429, headers);
+  }
+
+  const title = (body.title || '').trim();
+  const desc = (body.body || '').trim();
+  const email = (body.email || '').trim();
+
+  if (title.length < 5 || title.length > 200) {
+    return json({ error: 'Title must be between 5 and 200 characters.' }, 400, headers);
+  }
+  if (desc.length < 10 || desc.length > 8000) {
+    return json({ error: 'Description must be between 10 and 8000 characters.' }, 400, headers);
+  }
+  // Email is optional, but if supplied it must look valid. It is NOT put in the
+  // public issue — only stored in the admin log below.
+  if (email && (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+    return json({ error: 'Please enter a valid email address (or leave it blank).' }, 400, headers);
+  }
+
+  // Required type + device; both must be values we know how to map to labels.
+  const typeOpt = ISSUE_TYPE_OPTIONS.find((t) => t.value === body.type);
+  if (!typeOpt) {
+    return json({ error: 'Please choose whether this is a bug or a feature request.' }, 400, headers);
+  }
+  const deviceOpt = ISSUE_DEVICE_OPTIONS.find((d) => d.value === body.device);
+  if (!deviceOpt) {
+    return json({ error: 'Please choose a device.' }, 400, headers);
+  }
+  // Optional topics: keep only known values, cap the count.
+  const topicValues = Array.isArray(body.topics)
+    ? body.topics.filter((t): t is string => typeof t === 'string')
+    : [];
+  const topicLabels = ISSUE_TOPIC_OPTIONS
+    .filter((t) => topicValues.includes(t.value))
+    .map((t) => t.value)
+    .slice(0, 8);
+
+  // Assemble labels: always tag from-website, plus type, device (when mapped),
+  // and any selected topics.
+  const labels = ['from-website', typeOpt.gh];
+  if (deviceOpt.gh) labels.push(deviceOpt.gh);
+  labels.push(...topicLabels);
+
+  // Build the public body. Device/type context up top; email intentionally absent.
+  const footer = `\n\n---\n**Device:** ${deviceOpt.label}\n\n_Submitted anonymously via [crosspointreader.com](https://crosspointreader.com/report-issue) on behalf of a website visitor._`;
+
+  // Optional serial log: embed collapsed + capped, sanitizing fences so a stray
+  // ``` in the log can't break out of the code block.
+  let serialBlock = '';
+  const serialRaw = typeof body.serialLog === 'string' ? body.serialLog : '';
+  if (serialRaw.trim()) {
+    let logText = serialRaw;
+    let truncated = false;
+    if (logText.length > SERIAL_LOG_MAX) {
+      logText = logText.slice(logText.length - SERIAL_LOG_MAX); // keep the tail
+      truncated = true;
+    }
+    logText = logText.replace(/```/g, "'''");
+    const note = truncated ? ` (last ${SERIAL_LOG_MAX.toLocaleString()} chars)` : '';
+    serialBlock = `\n\n<details>\n<summary>Serial log${note}</summary>\n\n\`\`\`\n${logText}\n\`\`\`\n\n</details>`;
+  }
+
+  // Compose and enforce the overall body cap (trim the description first, then
+  // drop the serial block if it still doesn't fit).
+  let issueBody = `${desc}${footer}${serialBlock}`;
+  if (issueBody.length > ISSUE_BODY_MAX) {
+    issueBody = `${desc}${footer}`;
+    if (issueBody.length > ISSUE_BODY_MAX) {
+      issueBody = issueBody.slice(0, ISSUE_BODY_MAX);
+    }
+  }
+
+  const ghRes = await fetch(`https://api.github.com/repos/${ISSUE_REPO}/issues`, {
+    method: 'POST',
+    headers: {
+      'User-Agent': 'crosspoint-tools',
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ title, body: issueBody, labels }),
+  });
+
+  if (!ghRes.ok) {
+    return json({ error: 'Failed to create the issue. Please try again later.' }, 502, headers);
+  }
+
+  const issue = await ghRes.json() as { html_url: string; number: number };
+
+  // Record for the admin panel (issue number + link + submitter email). Prepend
+  // newest first and cap the log length.
+  const record: IssueSubmission = {
+    number: issue.number,
+    url: issue.html_url,
+    title,
+    email,
+    createdAt: new Date().toISOString(),
+  };
+  try {
+    const raw = await env.BUILD_META.get(ISSUE_LOG_KEY);
+    const log: IssueSubmission[] = raw ? JSON.parse(raw) : [];
+    log.unshift(record);
+    await env.BUILD_META.put(ISSUE_LOG_KEY, JSON.stringify(log.slice(0, ISSUE_LOG_MAX)));
+  } catch {
+    // Logging is best-effort; the issue was already created successfully.
+  }
+
+  await env.BUILD_META.put(rlKey, '1', { expirationTtl: ISSUE_RATE_TTL_SECONDS });
+
+  return json({ ok: true, url: issue.html_url, number: issue.number }, 200, headers);
+}
+
+// Admin-only: the log of anonymous submissions (issue number, link, email).
+async function handleIssueAdminList(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+  const raw = await env.BUILD_META.get(ISSUE_LOG_KEY);
+  const submissions: IssueSubmission[] = raw ? JSON.parse(raw) : [];
+  return json({ submissions }, 200, headers);
 }

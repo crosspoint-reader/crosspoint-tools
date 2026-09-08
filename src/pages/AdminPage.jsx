@@ -1834,6 +1834,95 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
 
 // --- Activity log -------------------------------------------------------------
 
+// Anonymous website issue submissions (issue #, link, and the email the
+// submitter left so an admin can follow up). Emails are never in the public
+// issue — they live only in this admin-only log.
+function IssueSubmissionsCard({ secret, log }) {
+  const [submissions, setSubmissions] = useState(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/issues/admin', {
+        headers: { Authorization: `Bearer ${secret}` },
+      })
+      const r = await readJsonResponse(res)
+      if (!r.ok) {
+        setError(describeFailure(r))
+        return
+      }
+      setSubmissions(r.data.submissions || [])
+    } catch {
+      setError('Connection error')
+    } finally {
+      setLoading(false)
+    }
+  }, [secret])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between">
+        <CardTitle>Website Issue Submissions</CardTitle>
+        <button
+          type="button"
+          onClick={load}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-500 hover:text-stone-700"
+          disabled={loading}
+        >
+          <RefreshIcon />
+          {loading ? 'Loading…' : 'Refresh'}
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-stone-500">
+        Anonymous issues filed via <Link to="/report-issue" className="font-medium text-brand-500 underline underline-offset-2">/report-issue</Link>.
+        The email is private to this panel — reach out if you need more info.
+      </p>
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {submissions && submissions.length === 0 && !error && (
+        <p className="mt-3 text-sm text-stone-400">No submissions yet.</p>
+      )}
+      {submissions && submissions.length > 0 && (
+        <div className="mt-3 max-h-80 space-y-2 overflow-y-auto">
+          {submissions.map((s) => (
+            <div key={s.number} className="rounded-lg border border-stone-200 p-3 text-left">
+              <div className="flex items-baseline justify-between gap-3">
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-xs font-semibold text-brand-600 underline underline-offset-2 hover:text-brand-700"
+                >
+                  #{s.number}
+                </a>
+                <span className="shrink-0 font-mono text-[11px] text-stone-400 tabular-nums">
+                  {s.createdAt ? new Date(s.createdAt).toLocaleString() : ''}
+                </span>
+              </div>
+              <div className="mt-1 text-sm text-stone-800">{s.title}</div>
+              <div className="mt-1 text-xs text-stone-500">
+                {s.email ? (
+                  <a href={`mailto:${s.email}`} className="font-medium text-stone-600 underline underline-offset-2 hover:text-stone-800">
+                    {s.email}
+                  </a>
+                ) : (
+                  <span className="text-stone-400">no email provided</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 function LogCard({ entries }) {
   return (
     <Card>
@@ -2037,6 +2126,7 @@ export default function AdminPage() {
               baseUrl="/api/device-build/lilygo"
               description="Upload the LilyGo T5 build offered in the homepage web flasher. Each upload is added alongside the existing builds."
             />
+            <IssueSubmissionsCard secret={secret} log={log} />
             <LogCard entries={entries} />
           </div>
         )}

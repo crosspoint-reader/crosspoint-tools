@@ -21,6 +21,19 @@ export interface Env {
   AI: Ai;
   GITHUB_WEBHOOK_SECRET: string;
   GITHUB_TOKEN?: string;
+  // Dedicated least-privilege token for anonymous website issue submissions:
+  // a fine-grained PAT scoped to Issues:write on crosspoint-reader/crosspoint-reader
+  // only. Kept separate from GITHUB_TOKEN (which can dispatch builds) so a public
+  // endpoint can't reach that broader scope. (secret)
+  GITHUB_ISSUES_TOKEN?: string;
+  // Cloudflare Turnstile keys for the anonymous issue form. The secret key is a
+  // Worker secret; the site key is public and served to the form via
+  // /api/issues/config.
+  TURNSTILE_SECRET_KEY?: string;
+  TURNSTILE_SITE_KEY?: string;
+  // Optional comma-separated hostname allowlist for Turnstile siteverify. When
+  // unset, defaults to crosspointreader.com + www + localhost.
+  TURNSTILE_ALLOWED_HOSTNAMES?: string;
   // Instatus release notification integration. The API key is a Worker secret;
   // page, group, and component IDs are public configuration in wrangler.jsonc.
   INSTATUS_API_KEY?: string;

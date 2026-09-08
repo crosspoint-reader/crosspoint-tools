@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import DownloadModal from '../components/DownloadModal.jsx'
 import { Eyebrow } from '../components/ui.jsx'
@@ -198,10 +199,22 @@ const MONITOR_MAX_CHARS = 400_000
 const MONITOR_BAUD_RATES = [115200, 74880, 230400, 460800, 921600]
 
 function SerialMonitorCard() {
+  const navigate = useNavigate()
   const [connected, setConnected] = useState(false)
   const [log, setLog] = useState('')
   const [autoScroll, setAutoScroll] = useState(true)
   const [error, setError] = useState('')
+
+  // Hand the captured log to the issue form (read once in ReportIssue.jsx via
+  // the matching sessionStorage key) and jump there.
+  function reportWithLog() {
+    try {
+      sessionStorage.setItem('crosspoint-issue-serial-log', log)
+    } catch {
+      /* sessionStorage unavailable; the form still opens, just without the log */
+    }
+    navigate('/report-issue')
+  }
 
   const baudRef = useRef(null)
   const portRef = useRef(null)
@@ -359,6 +372,9 @@ function SerialMonitorCard() {
           className={btnOutline}
         >
           Download log
+        </button>
+        <button type="button" onClick={reportWithLog} disabled={!log} className={btnOutline}>
+          Report an issue with this log
         </button>
         <label className="ml-auto flex items-center gap-2 text-sm text-stone-600">
           <input
