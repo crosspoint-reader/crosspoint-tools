@@ -4808,6 +4808,8 @@ const ISSUE_DEVICE_OPTIONS = [
   { value: 'x4', label: 'Xteink X4', gh: 'device-x4-only' },
   { value: 'x4pro', label: 'Xteink X4 Pro', gh: 'device-x4pro' },
   { value: 'x4c', label: 'Xteink X4C', gh: 'device-x4c' },
+  { value: 'sticky', label: 'Seeed Sticky', gh: 'device-sticky' },
+  { value: 'papermono', label: 'M5PaperMono', gh: 'device-papermono' },
   { value: 'x3x4', label: 'Both X3 & X4', gh: 'x4-and-x3-issue' },
   { value: 'other', label: 'Other / not sure', gh: null },
 ] as const;
