@@ -247,6 +247,9 @@ async function handleApi(
       case '/api/issues/admin':
         return handleIssueAdminList(request, env, corsHeaders);
 
+      case '/api/issues/reindex':
+        return handleIssueReindex(request, env, corsHeaders);
+
       case '/api/fonts':
         return handleFontList(env, corsHeaders);
 
@@ -4190,6 +4193,7 @@ interface RcAsset {
   size: number;
   devices: string[];
   downloadUrl: string;
+  updatedAt: string;
 }
 
 interface RcRelease {
@@ -4243,7 +4247,7 @@ async function fetchRcRelease(env: Env): Promise<RcRelease | null> {
       continue;
     }
     if (!assetVersion && parsed.version) assetVersion = parsed.version;
-    assets.push({ name: a.name, size: a.size, devices: parsed.devices, downloadUrl: a.browser_download_url });
+    assets.push({ name: a.name, size: a.size, devices: parsed.devices, downloadUrl: a.browser_download_url, updatedAt: a.updated_at || '' });
   }
   if (!assets.length) return null;
 
@@ -4394,7 +4398,7 @@ async function fetchStableForCatalog(env: Env): Promise<CatalogRelease[]> {
       name: string;
       published_at: string;
       body: string;
-      assets: Array<{ name: string; browser_download_url: string; size: number }>;
+      assets: Array<{ name: string; browser_download_url: string; size: number; updated_at: string }>;
     };
     // 1.6.0+ ships both the legacy shared `firmware.bin` and a device-named
     // `crosspoint-<ver>-x3-x4.bin` for the same image; keep only the named one
@@ -4408,7 +4412,10 @@ async function fetchStableForCatalog(env: Env): Promise<CatalogRelease[]> {
       const devices = stableAssetDevices(asset.name);
       if (!devices.length) continue;
 
-      const cacheKey = `sha256:stable:${release.tag_name}:${asset.name}`;
+      // Include the asset's updated_at so re-uploading a binary under the same
+      // tag (which changes the served bytes) invalidates the cached hash instead
+      // of serving a stale sha256 that fails on-device verification.
+      const cacheKey = `sha256:stable:${release.tag_name}:${asset.name}:${asset.updated_at}`;
       let sha = await env.BUILD_META.get(cacheKey);
       if (!sha) {
         const fwRes = await fetch(asset.browser_download_url, {
@@ -4447,7 +4454,9 @@ async function fetchRcX4ProForCatalog(env: Env): Promise<CatalogRelease | null> 
   const asset = release.assets.find(a => a.devices.includes('x4pro'));
   if (!asset) return null;
 
-  const cacheKey = `sha256:rc:${release.tag}:${asset.name}`;
+  // Keyed by updatedAt so a re-pushed RC binary invalidates the cached hash
+  // (same stale-sha failure mode the stable path had).
+  const cacheKey = `sha256:rc:${release.tag}:${asset.name}:${asset.updatedAt}`;
   let sha = await env.BUILD_META.get(cacheKey);
   if (!sha) {
     const fwRes = await fetch(asset.downloadUrl, { headers: { 'User-Agent': 'crosspoint-tools' } });
@@ -4813,6 +4822,7 @@ const SERIAL_LOG_MAX = 40000; // chars of serial log kept (tail); rest truncated
 const EMBED_MODEL = '@cf/baai/bge-large-en-v1.5'; // 1024-dim, matches the index
 const RERANK_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const ISSUE_INDEX_SYNC_KEY = 'issues-index-sync'; // KV watermark (ISO timestamp)
+const ISSUE_INDEX_BACKFILL_KEY = 'issues-index-backfill'; // KV cursor {page, done}
 const EMBED_INPUT_MAX = 4000; // chars of title+body fed to the embedder
 const SIMILAR_MIN_SCORE = 0.7; // cosine floor for a candidate to enter re-rank
 const SIMILAR_STRICT_SCORE = 0.82; // floor used only if the LLM re-rank is unavailable
@@ -5204,6 +5214,27 @@ async function handleIssueAdminList(
   return json({ submissions }, 200, headers);
 }
 
+// Admin: drive one bounded pass of the issue-index sync on demand (so the
+// index can be backfilled without waiting for the cron). `?reset=1` restarts
+// the backfill from scratch (e.g. after changing the embedding format).
+async function handleIssueReindex(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (!isAuthorizedWebhookRequest(request, env)) {
+    return json({ error: 'Unauthorized' }, 401, headers);
+  }
+  const url = new URL(request.url);
+  if (url.searchParams.get('reset') === '1') {
+    await env.BUILD_META.delete(ISSUE_INDEX_BACKFILL_KEY);
+    await env.BUILD_META.delete(ISSUE_INDEX_SYNC_KEY);
+  }
+  await syncIssuesIndex(env);
+  const bfRaw = await env.BUILD_META.get(ISSUE_INDEX_BACKFILL_KEY);
+  return json({ ok: true, backfill: bfRaw ? JSON.parse(bfRaw) : null }, 200, headers);
+}
+
 // --- Semantic issue de-duplication (Workers AI + Vectorize) ---
 
 // Embed arbitrary text with the bge model. Returns a 1024-float vector, or null
@@ -5224,7 +5255,13 @@ async function embedText(env: Env, text: string): Promise<number[] | null> {
 
 // Text we embed for an issue: title carries the most signal, body adds context.
 function issueEmbedText(title: string, body: string): string {
-  return `${title}\n\n${body || ''}`.trim();
+  // Title + body in one embedding. This already matches a new issue's title
+  // against existing titles AND descriptions (shared embedding space). Repeating
+  // the title was tried and hurt paraphrase recall (over-anchored on exact title
+  // wording), so keep it 1×. Used identically for indexing + queries.
+  const t = (title || '').trim();
+  const b = (body || '').trim();
+  return `${t}\n\n${b}`.trim();
 }
 
 // Upsert a single issue's vector. Best-effort; never throws to the caller.
@@ -5257,12 +5294,46 @@ type GhIssue = {
   pull_request?: unknown;
 };
 
-// Incrementally sync open issues into Vectorize. Pulls issues updated since the
-// last watermark (ascending), upserts open ones, removes closed/locked ones, and
-// advances the watermark. Bounded per run (a few pages) so a cron tick stays
-// cheap; the next tick continues where this left off.
+// Sync open issues into Vectorize in two phases:
+//   1. Backfill — page through all currently-OPEN issues (oldest first) and
+//      upsert them. This is what actually populates the index; walking the full
+//      updated_at history first (as an incremental-only design does) wastes runs
+//      on ancient closed issues before reaching current open ones.
+//   2. Incremental — once backfilled, pull issues updated since a watermark,
+//      upserting open ones and removing closed ones so the index stays fresh.
+// Bounded per run so a cron tick stays cheap; the next tick continues.
 async function syncIssuesIndex(env: Env): Promise<void> {
   if (!env.ISSUES_INDEX || !env.AI) return;
+
+  // --- Phase 1: backfill open issues ---
+  const bfRaw = await env.BUILD_META.get(ISSUE_INDEX_BACKFILL_KEY);
+  const bf = bfRaw ? JSON.parse(bfRaw) as { page: number; done: boolean } : { page: 1, done: false };
+  if (!bf.done) {
+    const MAX_PAGES = 2; // ~200 open issues/run (each = embed + upsert subrequests)
+    let page = bf.page;
+    let done = false;
+    for (let n = 0; n < MAX_PAGES; n++) {
+      const url =
+        `https://api.github.com/repos/${ISSUE_REPO}/issues` +
+        `?state=open&sort=created&direction=asc&per_page=100&page=${page}`;
+      const res = await fetch(url, { headers: ghFetchHeaders(env) });
+      if (!res.ok) break;
+      const issues = await res.json() as GhIssue[];
+      for (const it of issues) {
+        if (it.pull_request) continue; // the issues endpoint also returns PRs
+        await upsertIssueVector(env, { number: it.number, title: it.title, body: it.body || '', html_url: it.html_url });
+      }
+      page++;
+      if (issues.length < 100) { done = true; break; }
+    }
+    await env.BUILD_META.put(ISSUE_INDEX_BACKFILL_KEY, JSON.stringify({ page, done }));
+    if (!done) return; // more backfill on the next run
+    // Backfill complete — start incremental updates from now.
+    await env.BUILD_META.put(ISSUE_INDEX_SYNC_KEY, new Date().toISOString());
+    return;
+  }
+
+  // --- Phase 2: incremental updates/closures since the watermark ---
   const since = (await env.BUILD_META.get(ISSUE_INDEX_SYNC_KEY)) || '1970-01-01T00:00:00Z';
   const MAX_PAGES = 4; // ~400 issues/run cap
   let newestSeen = since;
@@ -5395,8 +5466,11 @@ async function rerankDuplicates(
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 80,
       temperature: 0,
-    }) as { response?: string };
-    const text = res.response || '';
+    }) as { response?: unknown };
+    // `response` is usually a string, but this model can return a non-string
+    // (e.g. a bare JSON array) — coerce so .match never throws.
+    const raw = res.response;
+    const text = typeof raw === 'string' ? raw : raw == null ? '' : JSON.stringify(raw);
     // Take the LAST JSON array in the reply (models sometimes preamble).
     const arrays = text.match(/\[[\d,\s]*\]/g);
     if (!arrays || !arrays.length) {
