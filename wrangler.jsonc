@@ -54,6 +54,16 @@
     "binding": "AI"
   },
 
+  // Vectorize index for semantic issue de-duplication (bge-large-en-v1.5,
+  // 1024-dim, cosine). Populated incrementally from GitHub issues in
+  // scheduled(); queried by /api/issues/similar.
+  "vectorize": [
+    {
+      "binding": "ISSUES_INDEX",
+      "index_name": "crosspoint-issues"
+    }
+  ],
+
   // Email Sending (contact form). Domain onboarded via
   // `wrangler email sending enable crosspointreader.com`.
   "send_email": [{ "name": "EMAIL" }],

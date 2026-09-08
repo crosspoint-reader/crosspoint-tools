@@ -19,6 +19,8 @@ export interface Env {
   BUILD_META: KVNamespace;
   ASSETS: Fetcher;
   AI: Ai;
+  // Vectorize index of GitHub issue embeddings for semantic de-duplication.
+  ISSUES_INDEX: VectorizeIndex;
   GITHUB_WEBHOOK_SECRET: string;
   GITHUB_TOKEN?: string;
   // Dedicated least-privilege token for anonymous website issue submissions:

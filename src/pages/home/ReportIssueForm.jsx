@@ -49,6 +49,15 @@ export default function ReportIssueForm() {
   const [status, setStatus] = useState(null) // { ok, msg, url }
   const [config, setConfig] = useState(null) // { siteKey, action, enabled, types, devices, topics }
 
+  // Duplicate detection.
+  const [matches, setMatches] = useState([]) // [{ number, title, url, score }]
+  const [similarLoading, setSimilarLoading] = useState(false)
+  const [ackedDupes, setAckedDupes] = useState(false) // soft gate: seen the matches
+  const [commentFor, setCommentFor] = useState(null) // issue number being commented on
+  const [commentText, setCommentText] = useState('')
+  const [commentBusy, setCommentBusy] = useState(false)
+  const [commentStatus, setCommentStatus] = useState(null) // { ok, msg, url }
+
   const widgetRef = useRef(null)
   const widgetIdRef = useRef(null)
   const tokenRef = useRef('')
@@ -101,8 +110,83 @@ export default function ReportIssueForm() {
     }
   }, [config])
 
+  // Debounced semantic duplicate search as the user writes title + description.
+  useEffect(() => {
+    const t = title.trim()
+    const b = body.trim()
+    if (t.length < 5 || b.length < 10) {
+      setMatches([])
+      return
+    }
+    let cancelled = false
+    setSimilarLoading(true)
+    const handle = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/issues/similar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: t, body: b }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (cancelled) return
+        const next = Array.isArray(data.matches) ? data.matches : []
+        setMatches(next)
+        if (next.length) setAckedDupes(false) // re-surface the gate when matches change
+      } catch {
+        if (!cancelled) setMatches([])
+      } finally {
+        if (!cancelled) setSimilarLoading(false)
+      }
+    }, 700)
+    return () => {
+      cancelled = true
+      clearTimeout(handle)
+    }
+  }, [title, body])
+
   function toggleTopic(value) {
     setTopics((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]))
+  }
+
+  async function submitComment(number) {
+    if (commentBusy) return
+    if (commentText.trim().length < 5) {
+      setCommentStatus({ ok: false, msg: 'Please write a comment (at least 5 characters).' })
+      return
+    }
+    if (config?.siteKey && !tokenRef.current) {
+      setCommentStatus({ ok: false, msg: 'Please complete the bot check below first.' })
+      return
+    }
+    setCommentBusy(true)
+    setCommentStatus(null)
+    try {
+      const res = await fetch('/api/issues/comment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ number, comment: commentText, email, website, turnstileToken: tokenRef.current }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setCommentStatus({ ok: true, msg: 'Comment posted!', url: data.url })
+        setCommentText('')
+        setCommentFor(null)
+      } else {
+        setCommentStatus({ ok: false, msg: data.error || 'Something went wrong. Please try again.' })
+      }
+    } catch {
+      setCommentStatus({ ok: false, msg: 'Something went wrong. Please try again.' })
+    } finally {
+      tokenRef.current = ''
+      if (window.turnstile && widgetIdRef.current !== null) {
+        try {
+          window.turnstile.reset(widgetIdRef.current)
+        } catch {
+          /* noop */
+        }
+      }
+      setCommentBusy(false)
+    }
   }
 
   function appendSerial(chunk) {
@@ -135,6 +219,16 @@ export default function ReportIssueForm() {
     }
     if (!device) {
       setStatus({ ok: false, msg: 'Please choose your device.' })
+      return
+    }
+    // Soft duplicate gate: if we found similar issues and they haven't been
+    // acknowledged yet, surface them once before allowing a new issue.
+    if (matches.length && !ackedDupes) {
+      setAckedDupes(true)
+      setStatus({
+        ok: false,
+        msg: 'We found similar issues above — please check them. If none match, click “Submit issue” again to file a new one.',
+      })
       return
     }
     if (config?.siteKey && !tokenRef.current) {
@@ -171,6 +265,11 @@ export default function ReportIssueForm() {
         setSerialLog('')
         setSerialFromDebug(false)
         setShowCapture(false)
+        setMatches([])
+        setAckedDupes(false)
+        setCommentFor(null)
+        setCommentText('')
+        setCommentStatus(null)
       } else {
         setStatus({ ok: false, msg: data.error || 'Something went wrong. Please try again.' })
       }
@@ -259,6 +358,80 @@ export default function ReportIssueForm() {
         rows={7}
         className={`${inputCls} resize-none`}
       />
+
+      {/* Similar issues (semantic search) */}
+      {(similarLoading || matches.length > 0) && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+            {similarLoading && matches.length === 0 ? 'Checking for similar issues…' : 'Similar existing issues'}
+          </div>
+          {matches.length > 0 && (
+            <p className="mt-1 text-xs text-amber-800">
+              These look related. Commenting on an existing issue helps us more than a duplicate — but you can still file a new one below.
+            </p>
+          )}
+          <div className="mt-2 space-y-2">
+            {matches.map((m) => (
+              <div key={m.number} className="rounded-lg border border-amber-200 bg-white p-2.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <a
+                    href={m.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
+                  >
+                    #{m.number} {m.title}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCommentFor((n) => (n === m.number ? null : m.number))
+                      setCommentStatus(null)
+                    }}
+                    className="shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700"
+                  >
+                    {commentFor === m.number ? 'Cancel' : 'Comment instead'}
+                  </button>
+                </div>
+                {commentFor === m.number && (
+                  <div className="mt-2">
+                    <textarea
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      rows={3}
+                      maxLength={8000}
+                      placeholder="Add your details to this existing issue…"
+                      className={`${inputCls} resize-none`}
+                    />
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <Button
+                        as="button"
+                        type="button"
+                        variant="primary"
+                        className="px-4 py-1.5 text-xs"
+                        onClick={() => submitComment(m.number)}
+                        disabled={commentBusy}
+                      >
+                        {commentBusy ? 'Posting…' : 'Post comment'}
+                      </Button>
+                      {commentStatus && (
+                        <span className={`text-xs ${commentStatus.ok ? 'text-brand-700' : 'text-red-700'}`}>
+                          {commentStatus.msg}{' '}
+                          {commentStatus.ok && commentStatus.url && (
+                            <a href={commentStatus.url} target="_blank" rel="noreferrer" className="font-medium underline">
+                              view
+                            </a>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Topics */}
       {topicOptions.length > 0 && (

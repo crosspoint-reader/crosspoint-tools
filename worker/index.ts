@@ -130,6 +130,14 @@ export default {
             error: error instanceof Error ? error.message : String(error),
           }));
         }
+        try {
+          await syncIssuesIndex(env);
+        } catch (error) {
+          console.error(JSON.stringify({
+            message: 'Scheduled issue index sync failed',
+            error: error instanceof Error ? error.message : String(error),
+          }));
+        }
       })()
     );
   },
@@ -225,10 +233,16 @@ async function handleApi(
         return handleContact(request, env, corsHeaders);
 
       case '/api/issues':
-        return handleCreateIssue(request, env, corsHeaders);
+        return handleCreateIssue(request, env, ctx, corsHeaders);
 
       case '/api/issues/config':
         return handleIssueConfig(env, corsHeaders);
+
+      case '/api/issues/similar':
+        return handleSimilarIssues(request, env, corsHeaders);
+
+      case '/api/issues/comment':
+        return handleCreateIssueComment(request, env, corsHeaders);
 
       case '/api/issues/admin':
         return handleIssueAdminList(request, env, corsHeaders);
@@ -4795,6 +4809,14 @@ const ISSUE_RATE_TTL_SECONDS = 120; // one submission per IP per 2 minutes
 const ISSUE_BODY_MAX = 65000;
 const SERIAL_LOG_MAX = 40000; // chars of serial log kept (tail); rest truncated
 
+// Semantic de-duplication (Workers AI + Vectorize).
+const EMBED_MODEL = '@cf/baai/bge-large-en-v1.5'; // 1024-dim, matches the index
+const RERANK_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+const ISSUE_INDEX_SYNC_KEY = 'issues-index-sync'; // KV watermark (ISO timestamp)
+const EMBED_INPUT_MAX = 4000; // chars of title+body fed to the embedder
+const SIMILAR_MIN_SCORE = 0.6; // cosine floor for a candidate to be shown
+const SIMILAR_TOP_K = 8; // vector candidates fetched before re-rank
+
 // Form value -> GitHub label. The frontend renders these exact options (served
 // via /api/issues/config) so the two never drift; the worker is the source of
 // truth and re-validates every value it receives.
@@ -4900,6 +4922,7 @@ function handleIssueConfig(env: Env, headers: Record<string, string>): Response 
 async function handleCreateIssue(
   request: Request,
   env: Env,
+  ctx: ExecutionContext,
   headers: Record<string, string>
 ): Promise<Response> {
   if (request.method !== 'POST') {
@@ -5028,6 +5051,12 @@ async function handleCreateIssue(
 
   const issue = await ghRes.json() as { html_url: string; number: number };
 
+  // Index the new issue immediately so it's searchable for de-duplication
+  // before the next cron sync runs. Best-effort, off the response path.
+  ctx.waitUntil(
+    upsertIssueVector(env, { number: issue.number, title, body: desc, html_url: issue.html_url })
+  );
+
   // Record for the admin panel (issue number + link + submitter email). Prepend
   // newest first and cap the log length.
   const record: IssueSubmission = {
@@ -5063,4 +5092,277 @@ async function handleIssueAdminList(
   const raw = await env.BUILD_META.get(ISSUE_LOG_KEY);
   const submissions: IssueSubmission[] = raw ? JSON.parse(raw) : [];
   return json({ submissions }, 200, headers);
+}
+
+// --- Semantic issue de-duplication (Workers AI + Vectorize) ---
+
+// Embed arbitrary text with the bge model. Returns a 1024-float vector, or null
+// on failure so callers can degrade gracefully.
+async function embedText(env: Env, text: string): Promise<number[] | null> {
+  const input = text.slice(0, EMBED_INPUT_MAX);
+  try {
+    const res = await env.AI.run(EMBED_MODEL, { text: [input] }) as { data?: number[][] };
+    const vec = res.data?.[0];
+    return Array.isArray(vec) && vec.length ? vec : null;
+  } catch {
+    return null;
+  }
+}
+
+// Text we embed for an issue: title carries the most signal, body adds context.
+function issueEmbedText(title: string, body: string): string {
+  return `${title}\n\n${body || ''}`.trim();
+}
+
+// Upsert a single issue's vector. Best-effort; never throws to the caller.
+async function upsertIssueVector(
+  env: Env,
+  issue: { number: number; title: string; body?: string; html_url: string }
+): Promise<void> {
+  try {
+    const vec = await embedText(env, issueEmbedText(issue.title, issue.body || ''));
+    if (!vec) return;
+    await env.ISSUES_INDEX.upsert([
+      {
+        id: String(issue.number),
+        values: vec,
+        metadata: { number: issue.number, title: issue.title.slice(0, 300), url: issue.html_url },
+      },
+    ]);
+  } catch (error) {
+    console.error(JSON.stringify({ message: 'upsertIssueVector failed', number: issue.number, error: String(error) }));
+  }
+}
+
+type GhIssue = {
+  number: number;
+  title: string;
+  body?: string | null;
+  html_url: string;
+  state: string;
+  updated_at: string;
+  pull_request?: unknown;
+};
+
+// Incrementally sync open issues into Vectorize. Pulls issues updated since the
+// last watermark (ascending), upserts open ones, removes closed/locked ones, and
+// advances the watermark. Bounded per run (a few pages) so a cron tick stays
+// cheap; the next tick continues where this left off.
+async function syncIssuesIndex(env: Env): Promise<void> {
+  if (!env.ISSUES_INDEX || !env.AI) return;
+  const since = (await env.BUILD_META.get(ISSUE_INDEX_SYNC_KEY)) || '1970-01-01T00:00:00Z';
+  const MAX_PAGES = 4; // ~400 issues/run cap
+  let newestSeen = since;
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url =
+      `https://api.github.com/repos/${ISSUE_REPO}/issues` +
+      `?state=all&sort=updated&direction=asc&since=${encodeURIComponent(since)}&per_page=100&page=${page}`;
+    const res = await fetch(url, { headers: ghFetchHeaders(env) });
+    if (!res.ok) break;
+    const issues = await res.json() as GhIssue[];
+    if (!issues.length) break;
+
+    const toUpsert: GhIssue[] = [];
+    const toDelete: string[] = [];
+    for (const it of issues) {
+      if (it.pull_request) continue; // the issues endpoint also returns PRs
+      if (it.updated_at > newestSeen) newestSeen = it.updated_at;
+      if (it.state === 'open') toUpsert.push(it);
+      else toDelete.push(String(it.number));
+    }
+
+    // Embed + upsert open issues (sequential keeps AI/subrequest use modest).
+    for (const it of toUpsert) {
+      await upsertIssueVector(env, { number: it.number, title: it.title, body: it.body || '', html_url: it.html_url });
+    }
+    if (toDelete.length) {
+      try {
+        await env.ISSUES_INDEX.deleteByIds(toDelete);
+      } catch {
+        /* deleting a not-present id is fine */
+      }
+    }
+
+    if (issues.length < 100) break; // last page
+  }
+
+  if (newestSeen !== since) {
+    // Nudge 1ms past the newest so the same issue isn't reprocessed forever.
+    const next = new Date(new Date(newestSeen).getTime() + 1000).toISOString();
+    await env.BUILD_META.put(ISSUE_INDEX_SYNC_KEY, next);
+  }
+}
+
+type SimilarIssue = { number: number; title: string; url: string; score: number };
+
+// POST /api/issues/similar — { title, body } -> ranked list of likely duplicates.
+// Vector search, then (best-effort) an LLM pass that keeps only true matches.
+async function handleSimilarIssues(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+  if (!env.ISSUES_INDEX || !env.AI) {
+    return json({ matches: [] }, 200, headers);
+  }
+
+  let body: { title?: string; body?: string };
+  try {
+    body = await request.json() as typeof body;
+  } catch {
+    return json({ error: 'Invalid request body' }, 400, headers);
+  }
+
+  const title = (body.title || '').trim();
+  const desc = (body.body || '').trim();
+  const query = issueEmbedText(title, desc);
+  // Not enough signal to bother searching.
+  if (query.length < 8) return json({ matches: [] }, 200, headers);
+
+  const vec = await embedText(env, query);
+  if (!vec) return json({ matches: [] }, 200, headers);
+
+  let candidates: SimilarIssue[] = [];
+  try {
+    const result = await env.ISSUES_INDEX.query(vec, { topK: SIMILAR_TOP_K, returnMetadata: 'all' });
+    candidates = (result.matches || [])
+      .filter((m) => m.score >= SIMILAR_MIN_SCORE)
+      .map((m) => ({
+        number: Number(m.metadata?.number ?? m.id),
+        title: String(m.metadata?.title ?? ''),
+        url: String(m.metadata?.url ?? ''),
+        score: m.score,
+      }))
+      .filter((m) => m.number && m.url);
+  } catch (error) {
+    console.error(JSON.stringify({ message: 'Vectorize query failed', error: String(error) }));
+    return json({ matches: [] }, 200, headers);
+  }
+
+  if (!candidates.length) return json({ matches: [] }, 200, headers);
+
+  // LLM re-rank: ask which candidates are genuine duplicates of the new report.
+  // Degrade to the raw vector list if the model call/parse fails.
+  const reranked = await rerankDuplicates(env, title, desc, candidates);
+  return json({ matches: reranked ?? candidates.slice(0, 5) }, 200, headers);
+}
+
+async function rerankDuplicates(
+  env: Env,
+  title: string,
+  desc: string,
+  candidates: SimilarIssue[]
+): Promise<SimilarIssue[] | null> {
+  try {
+    const list = candidates.map((c) => `#${c.number}: ${c.title}`).join('\n');
+    const prompt =
+      `A user is filing a new issue for an e-reader firmware project.\n\n` +
+      `New issue title: ${title}\nNew issue description: ${desc.slice(0, 1500)}\n\n` +
+      `Existing issues:\n${list}\n\n` +
+      `Which existing issue numbers are likely DUPLICATES of the new issue (same underlying bug or request)? ` +
+      `Reply with ONLY a JSON array of issue numbers, e.g. [123, 456]. If none, reply [].`;
+    const res = await env.AI.run(RERANK_MODEL, {
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 100,
+    }) as { response?: string };
+    const text = res.response || '';
+    const match = text.match(/\[[\d,\s]*\]/);
+    if (!match) return null;
+    const keep = new Set((JSON.parse(match[0]) as number[]).map(Number));
+    const filtered = candidates.filter((c) => keep.has(c.number));
+    return filtered.length ? filtered.slice(0, 5) : [];
+  } catch {
+    return null;
+  }
+}
+
+// POST /api/issues/comment — { number, comment, email?, turnstileToken } — add a
+// comment to an existing issue on behalf of an anonymous visitor (same guards as
+// issue creation). Email is kept private in the admin log, never in the comment.
+async function handleCreateIssueComment(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405, headers);
+  }
+  const token = (env.GITHUB_ISSUES_TOKEN || '').trim();
+  if (!token) {
+    return json({ error: 'Commenting is not configured.' }, 503, headers);
+  }
+
+  let body: { number?: unknown; comment?: string; email?: string; turnstileToken?: string; website?: string };
+  try {
+    body = await request.json() as typeof body;
+  } catch {
+    return json({ error: 'Invalid request body' }, 400, headers);
+  }
+
+  if ((body.website || '').trim()) {
+    return json({ ok: true }, 200, headers); // honeypot
+  }
+
+  const allowInsecure = /^(1|true|yes)$/i.test((env.ALLOW_INSECURE_DEV_WEBHOOKS || '').trim());
+  if (!allowInsecure && !(await verifyTurnstile(body.turnstileToken, request, env, TURNSTILE_ISSUE_ACTION))) {
+    return json({ error: 'Bot check failed — please retry.' }, 403, headers);
+  }
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const rlKey = `issue-rl-${ip}`;
+  if (await env.BUILD_META.get(rlKey)) {
+    return json({ error: 'You just posted — please wait a moment before another.' }, 429, headers);
+  }
+
+  const number = Number(body.number);
+  if (!Number.isInteger(number) || number <= 0) {
+    return json({ error: 'Invalid issue number.' }, 400, headers);
+  }
+  const comment = (body.comment || '').trim();
+  if (comment.length < 5 || comment.length > 8000) {
+    return json({ error: 'Comment must be between 5 and 8000 characters.' }, 400, headers);
+  }
+  const email = (body.email || '').trim();
+  if (email && (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+    return json({ error: 'Please enter a valid email address (or leave it blank).' }, 400, headers);
+  }
+
+  const commentBody = `${comment}\n\n---\n_Added anonymously via [crosspointreader.com](https://crosspointreader.com/report-issue) on behalf of a website visitor._`;
+  const ghRes = await fetch(`https://api.github.com/repos/${ISSUE_REPO}/issues/${number}/comments`, {
+    method: 'POST',
+    headers: {
+      'User-Agent': 'crosspoint-tools',
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ body: commentBody }),
+  });
+  if (!ghRes.ok) {
+    return json({ error: 'Failed to add the comment. Please try again later.' }, 502, headers);
+  }
+  const created = await ghRes.json() as { html_url: string };
+
+  // Log for the admin panel (reuses the submissions log; kind='comment').
+  try {
+    const raw = await env.BUILD_META.get(ISSUE_LOG_KEY);
+    const log: IssueSubmission[] = raw ? JSON.parse(raw) : [];
+    log.unshift({
+      number,
+      url: created.html_url,
+      title: `Comment on #${number}`,
+      email,
+      createdAt: new Date().toISOString(),
+    });
+    await env.BUILD_META.put(ISSUE_LOG_KEY, JSON.stringify(log.slice(0, ISSUE_LOG_MAX)));
+  } catch {
+    /* best-effort */
+  }
+
+  await env.BUILD_META.put(rlKey, '1', { expirationTtl: ISSUE_RATE_TTL_SECONDS });
+  return json({ ok: true, url: created.html_url, number }, 200, headers);
 }
