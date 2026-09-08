@@ -5213,8 +5213,11 @@ async function embedText(env: Env, text: string): Promise<number[] | null> {
   try {
     const res = await env.AI.run(EMBED_MODEL, { text: [input] }) as { data?: number[][] };
     const vec = res.data?.[0];
-    return Array.isArray(vec) && vec.length ? vec : null;
-  } catch {
+    if (Array.isArray(vec) && vec.length) return vec;
+    console.error(JSON.stringify({ message: 'embedText: empty embedding', model: EMBED_MODEL }));
+    return null;
+  } catch (error) {
+    console.error(JSON.stringify({ message: 'embedText: AI.run failed', model: EMBED_MODEL, error: String(error) }));
     return null;
   }
 }
@@ -5363,6 +5366,11 @@ async function handleSimilarIssues(
     return json({ matches: reranked }, 200, headers);
   }
   const strict = candidates.filter((c) => c.score >= SIMILAR_STRICT_SCORE).slice(0, 5);
+  console.error(JSON.stringify({
+    message: 'handleSimilarIssues: re-rank unavailable, using strict vector fallback',
+    candidates: candidates.length,
+    strict: strict.length,
+  }));
   return json({ matches: strict }, 200, headers);
 }
 
@@ -5391,10 +5399,14 @@ async function rerankDuplicates(
     const text = res.response || '';
     // Take the LAST JSON array in the reply (models sometimes preamble).
     const arrays = text.match(/\[[\d,\s]*\]/g);
-    if (!arrays || !arrays.length) return null; // couldn't parse → caller fails closed
+    if (!arrays || !arrays.length) {
+      console.error(JSON.stringify({ message: 'rerankDuplicates: unparseable reply', model: RERANK_MODEL, reply: text.slice(0, 200) }));
+      return null; // caller fails closed
+    }
     const keep = new Set((JSON.parse(arrays[arrays.length - 1]) as number[]).map(Number));
     return candidates.filter((c) => keep.has(c.number)).slice(0, 5);
-  } catch {
+  } catch (error) {
+    console.error(JSON.stringify({ message: 'rerankDuplicates: AI.run failed', model: RERANK_MODEL, error: String(error) }));
     return null;
   }
 }

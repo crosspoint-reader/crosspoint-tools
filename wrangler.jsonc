@@ -8,6 +8,13 @@
     { "pattern": "crosspointreader.com", "custom_domain": true }
   ],
 
+  // Persistent Worker Logs (viewable in the dashboard + `wrangler tail`). Lets
+  // us see AI / Vectorize / GitHub failures after the fact, not just live.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+
   // Reconcile GitHub stable releases and repair any missed status updates.
   // Upload-backed channels also update Instatus immediately from their API.
   "triggers": {
