@@ -6,7 +6,13 @@ GITHUB_WEBHOOK_SECRET=your-webhook-secret-here
 # ALLOW_INSECURE_DEV_WEBHOOKS=true
 CONTACT_CHAT_WEBHOOK=https://chat.googleapis.com/v1/spaces/XXXX/messages?key=...&token=...
 # Anonymous GitHub issue form (see /api/issues):
-# GITHUB_ISSUES_TOKEN - fine-grained PAT, Issues:write on crosspoint-reader/crosspoint-reader ONLY
+# Preferred — GitHub App so issues/comments are authored by <app>[bot]:
+# GITHUB_APP_ID=123456
+# GITHUB_APP_INSTALLATION_ID=12345678
+# GITHUB_APP_PRIVATE_KEY - PKCS#8 PEM (convert the App's downloaded PKCS#1 key:
+#   openssl pkcs8 -topk8 -nocrypt -in app.private-key.pem -out app.pkcs8.pem)
+#   set via: npx wrangler secret put GITHUB_APP_PRIVATE_KEY < app.pkcs8.pem
+# Fallback if no App — fine-grained PAT, Issues:write on the repo ONLY:
 # GITHUB_ISSUES_TOKEN=github_pat_...
 # TURNSTILE_SECRET_KEY - Cloudflare Turnstile secret (from the widget you create in the dashboard)
 # TURNSTILE_SECRET_KEY=0x...

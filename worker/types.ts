@@ -25,9 +25,17 @@ export interface Env {
   GITHUB_TOKEN?: string;
   // Dedicated least-privilege token for anonymous website issue submissions:
   // a fine-grained PAT scoped to Issues:write on crosspoint-reader/crosspoint-reader
-  // only. Kept separate from GITHUB_TOKEN (which can dispatch builds) so a public
-  // endpoint can't reach that broader scope. (secret)
+  // only. Fallback when the GitHub App below isn't configured. (secret)
   GITHUB_ISSUES_TOKEN?: string;
+  // Preferred: a GitHub App so issues/comments are authored by `<app>[bot]`
+  // instead of a personal account. The Worker signs a JWT with the private key
+  // and exchanges it for a short-lived installation token (cached in KV).
+  //   GITHUB_APP_ID              - numeric App ID (var or secret)
+  //   GITHUB_APP_INSTALLATION_ID - installation ID on the org/repo (var or secret)
+  //   GITHUB_APP_PRIVATE_KEY     - PKCS#8 PEM private key (secret)
+  GITHUB_APP_ID?: string;
+  GITHUB_APP_INSTALLATION_ID?: string;
+  GITHUB_APP_PRIVATE_KEY?: string;
   // Cloudflare Turnstile keys for the anonymous issue form. The secret key is a
   // Worker secret; the site key is public and served to the form via
   // /api/issues/config.

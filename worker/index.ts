@@ -4901,6 +4901,115 @@ async function verifyTurnstile(
   }
 }
 
+// --- GitHub App auth (bot identity for issues/comments) ---
+//
+// When a GitHub App is configured, issues/comments are authored by `<app>[bot]`
+// rather than a personal account. We sign a short-lived JWT with the App's
+// private key, exchange it for an installation access token (~1h), and cache
+// that token in KV until shortly before it expires.
+
+const GH_APP_TOKEN_CACHE_KEY = 'gh-app-installation-token';
+
+function base64url(input: Uint8Array | string): string {
+  const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : input;
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// Import a PKCS#8 PEM private key for RS256 signing.
+async function importAppPrivateKey(pem: string): Promise<CryptoKey> {
+  const body = pem
+    .replace(/-----BEGIN [^-]+-----/g, '')
+    .replace(/-----END [^-]+-----/g, '')
+    .replace(/\s+/g, '');
+  const der = Uint8Array.from(atob(body), (c) => c.charCodeAt(0));
+  return crypto.subtle.importKey(
+    'pkcs8',
+    der,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+}
+
+async function makeAppJwt(env: Env): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = base64url(JSON.stringify({ iat: now - 60, exp: now + 540, iss: env.GITHUB_APP_ID }));
+  const signingInput = `${header}.${payload}`;
+  const key = await importAppPrivateKey(env.GITHUB_APP_PRIVATE_KEY || '');
+  const sig = await crypto.subtle.sign(
+    { name: 'RSASSA-PKCS1-v1_5' },
+    key,
+    new TextEncoder().encode(signingInput)
+  );
+  return `${signingInput}.${base64url(new Uint8Array(sig))}`;
+}
+
+function appConfigured(env: Env): boolean {
+  return Boolean(
+    (env.GITHUB_APP_ID || '').trim() &&
+      (env.GITHUB_APP_INSTALLATION_ID || '').trim() &&
+      (env.GITHUB_APP_PRIVATE_KEY || '').trim()
+  );
+}
+
+// Return a cached-or-fresh installation access token, or null on failure.
+async function getInstallationToken(env: Env): Promise<string | null> {
+  if (!appConfigured(env)) return null;
+  try {
+    const cachedRaw = await env.BUILD_META.get(GH_APP_TOKEN_CACHE_KEY);
+    if (cachedRaw) {
+      const cached = JSON.parse(cachedRaw) as { token: string; expires_at: string };
+      // Reuse until 5 minutes before expiry.
+      if (cached.token && Date.parse(cached.expires_at) - Date.now() > 5 * 60 * 1000) {
+        return cached.token;
+      }
+    }
+    const jwt = await makeAppJwt(env);
+    const res = await fetch(
+      `https://api.github.com/app/installations/${env.GITHUB_APP_INSTALLATION_ID}/access_tokens`,
+      {
+        method: 'POST',
+        headers: {
+          'User-Agent': 'crosspoint-tools',
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${jwt}`,
+        },
+      }
+    );
+    if (!res.ok) {
+      console.error(JSON.stringify({ message: 'GitHub App token exchange failed', status: res.status }));
+      return null;
+    }
+    const data = await res.json() as { token: string; expires_at: string };
+    await env.BUILD_META.put(
+      GH_APP_TOKEN_CACHE_KEY,
+      JSON.stringify({ token: data.token, expires_at: data.expires_at }),
+      { expirationTtl: 3600 }
+    );
+    return data.token;
+  } catch (error) {
+    console.error(JSON.stringify({ message: 'getInstallationToken error', error: String(error) }));
+    return null;
+  }
+}
+
+// Bearer token for writing issues/comments: prefer the GitHub App (bot identity),
+// fall back to the dedicated PAT if the App isn't configured.
+async function getIssuesBearer(env: Env): Promise<string | null> {
+  const appToken = await getInstallationToken(env);
+  if (appToken) return appToken;
+  const pat = (env.GITHUB_ISSUES_TOKEN || '').trim();
+  return pat || null;
+}
+
+// Whether anonymous issue submission is available at all (App or PAT configured).
+function issuesConfigured(env: Env): boolean {
+  return appConfigured(env) || Boolean((env.GITHUB_ISSUES_TOKEN || '').trim());
+}
+
 // Public config for the issue form: the Turnstile *site* key (public by design)
 // + widget action, whether the feature is configured, and the exact type/device/
 // topic options the worker accepts (so the form never drifts from validation).
@@ -4909,7 +5018,7 @@ function handleIssueConfig(env: Env, headers: Record<string, string>): Response 
     {
       siteKey: (env.TURNSTILE_SITE_KEY || '').trim() || null,
       action: TURNSTILE_ISSUE_ACTION,
-      enabled: Boolean((env.GITHUB_ISSUES_TOKEN || '').trim()),
+      enabled: issuesConfigured(env),
       types: ISSUE_TYPE_OPTIONS.map((t) => ({ value: t.value, label: t.label })),
       devices: ISSUE_DEVICE_OPTIONS.map((d) => ({ value: d.value, label: d.label })),
       topics: ISSUE_TOPIC_OPTIONS.map((t) => ({ value: t.value, label: t.label })),
@@ -4929,7 +5038,7 @@ async function handleCreateIssue(
     return json({ error: 'Method not allowed' }, 405, headers);
   }
 
-  const token = (env.GITHUB_ISSUES_TOKEN || '').trim();
+  const token = await getIssuesBearer(env);
   if (!token) {
     return json({ error: 'Issue submission is not configured.' }, 503, headers);
   }
@@ -5291,7 +5400,7 @@ async function handleCreateIssueComment(
   if (request.method !== 'POST') {
     return json({ error: 'Method not allowed' }, 405, headers);
   }
-  const token = (env.GITHUB_ISSUES_TOKEN || '').trim();
+  const token = await getIssuesBearer(env);
   if (!token) {
     return json({ error: 'Commenting is not configured.' }, 503, headers);
   }
