@@ -4814,7 +4814,8 @@ const EMBED_MODEL = '@cf/baai/bge-large-en-v1.5'; // 1024-dim, matches the index
 const RERANK_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const ISSUE_INDEX_SYNC_KEY = 'issues-index-sync'; // KV watermark (ISO timestamp)
 const EMBED_INPUT_MAX = 4000; // chars of title+body fed to the embedder
-const SIMILAR_MIN_SCORE = 0.6; // cosine floor for a candidate to be shown
+const SIMILAR_MIN_SCORE = 0.7; // cosine floor for a candidate to enter re-rank
+const SIMILAR_STRICT_SCORE = 0.82; // floor used only if the LLM re-rank is unavailable
 const SIMILAR_TOP_K = 8; // vector candidates fetched before re-rank
 
 // Form value -> GitHub label. The frontend renders these exact options (served
@@ -5354,10 +5355,15 @@ async function handleSimilarIssues(
 
   if (!candidates.length) return json({ matches: [] }, 200, headers);
 
-  // LLM re-rank: ask which candidates are genuine duplicates of the new report.
-  // Degrade to the raw vector list if the model call/parse fails.
+  // LLM re-rank decides which candidates are genuine duplicates. If it succeeds
+  // (even returning an empty list), trust it. If it's unavailable, fail CLOSED:
+  // only surface very-high-similarity matches so we don't spam unrelated issues.
   const reranked = await rerankDuplicates(env, title, desc, candidates);
-  return json({ matches: reranked ?? candidates.slice(0, 5) }, 200, headers);
+  if (reranked) {
+    return json({ matches: reranked }, 200, headers);
+  }
+  const strict = candidates.filter((c) => c.score >= SIMILAR_STRICT_SCORE).slice(0, 5);
+  return json({ matches: strict }, 200, headers);
 }
 
 async function rerankDuplicates(
@@ -5369,21 +5375,25 @@ async function rerankDuplicates(
   try {
     const list = candidates.map((c) => `#${c.number}: ${c.title}`).join('\n');
     const prompt =
-      `A user is filing a new issue for an e-reader firmware project.\n\n` +
-      `New issue title: ${title}\nNew issue description: ${desc.slice(0, 1500)}\n\n` +
-      `Existing issues:\n${list}\n\n` +
-      `Which existing issue numbers are likely DUPLICATES of the new issue (same underlying bug or request)? ` +
-      `Reply with ONLY a JSON array of issue numbers, e.g. [123, 456]. If none, reply [].`;
+      `You are triaging GitHub issues for an e-reader firmware project.\n` +
+      `Decide which EXISTING issues describe the SAME underlying bug or feature request as the NEW issue.\n` +
+      `Be strict: include an issue ONLY if it is truly the same topic — not merely in the same general area ` +
+      `(e.g. both about "the screen" or both mentioning "USB" is NOT enough).\n\n` +
+      `NEW issue:\nTitle: ${title}\nDescription: ${desc.slice(0, 1500)}\n\n` +
+      `EXISTING issues:\n${list}\n\n` +
+      `Respond with ONLY a JSON array of the matching existing issue numbers, e.g. [123,456]. ` +
+      `If none are the same, respond exactly []. Output nothing else.`;
     const res = await env.AI.run(RERANK_MODEL, {
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 100,
+      max_tokens: 80,
+      temperature: 0,
     }) as { response?: string };
     const text = res.response || '';
-    const match = text.match(/\[[\d,\s]*\]/);
-    if (!match) return null;
-    const keep = new Set((JSON.parse(match[0]) as number[]).map(Number));
-    const filtered = candidates.filter((c) => keep.has(c.number));
-    return filtered.length ? filtered.slice(0, 5) : [];
+    // Take the LAST JSON array in the reply (models sometimes preamble).
+    const arrays = text.match(/\[[\d,\s]*\]/g);
+    if (!arrays || !arrays.length) return null; // couldn't parse → caller fails closed
+    const keep = new Set((JSON.parse(arrays[arrays.length - 1]) as number[]).map(Number));
+    return candidates.filter((c) => keep.has(c.number)).slice(0, 5);
   } catch {
     return null;
   }

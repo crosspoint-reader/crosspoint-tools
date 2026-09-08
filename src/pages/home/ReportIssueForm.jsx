@@ -52,7 +52,6 @@ export default function ReportIssueForm() {
   // Duplicate detection.
   const [matches, setMatches] = useState([]) // [{ number, title, url, score }]
   const [similarLoading, setSimilarLoading] = useState(false)
-  const [ackedDupes, setAckedDupes] = useState(false) // soft gate: seen the matches
   const [commentFor, setCommentFor] = useState(null) // issue number being commented on
   const [commentText, setCommentText] = useState('')
   const [commentBusy, setCommentBusy] = useState(false)
@@ -129,9 +128,7 @@ export default function ReportIssueForm() {
         })
         const data = await res.json().catch(() => ({}))
         if (cancelled) return
-        const next = Array.isArray(data.matches) ? data.matches : []
-        setMatches(next)
-        if (next.length) setAckedDupes(false) // re-surface the gate when matches change
+        setMatches(Array.isArray(data.matches) ? data.matches : [])
       } catch {
         if (!cancelled) setMatches([])
       } finally {
@@ -221,16 +218,6 @@ export default function ReportIssueForm() {
       setStatus({ ok: false, msg: 'Please choose your device.' })
       return
     }
-    // Soft duplicate gate: if we found similar issues and they haven't been
-    // acknowledged yet, surface them once before allowing a new issue.
-    if (matches.length && !ackedDupes) {
-      setAckedDupes(true)
-      setStatus({
-        ok: false,
-        msg: 'We found similar issues above — please check them. If none match, click “Submit issue” again to file a new one.',
-      })
-      return
-    }
     if (config?.siteKey && !tokenRef.current) {
       setStatus({ ok: false, msg: 'Please complete the bot check before submitting.' })
       return
@@ -266,7 +253,6 @@ export default function ReportIssueForm() {
         setSerialFromDebug(false)
         setShowCapture(false)
         setMatches([])
-        setAckedDupes(false)
         setCommentFor(null)
         setCommentText('')
         setCommentStatus(null)
