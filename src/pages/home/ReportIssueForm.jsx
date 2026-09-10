@@ -353,11 +353,20 @@ export default function ReportIssueForm() {
           </div>
           {matches.length > 0 && (
             <p className="mt-1 text-xs text-amber-800">
-              These look related. Commenting on an existing issue helps us more than a duplicate — but you can still file a new one below.
+              {matches.some((m) => m.state === 'closed')
+                ? 'This might have already been fixed. Read this first.'
+                : 'These look related. Commenting on an existing issue helps us more than a duplicate — but you can still file a new one below.'}
             </p>
           )}
           <div className="mt-2 space-y-2">
-            {matches.map((m) => (
+            {matches.map((m) => {
+              const resolved = m.state === 'closed'
+              const badge = resolved
+                ? m.stateReason === 'completed'
+                  ? { text: 'Resolved', cls: 'bg-green-100 text-green-800' }
+                  : { text: 'Closed', cls: 'bg-stone-200 text-stone-700' }
+                : null
+              return (
               <div key={m.number} className="rounded-lg border border-amber-200 bg-white p-2.5">
                 <div className="flex items-baseline justify-between gap-2">
                   <a
@@ -366,6 +375,11 @@ export default function ReportIssueForm() {
                     rel="noreferrer"
                     className="text-sm font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800"
                   >
+                    {badge && (
+                      <span className={`mr-1.5 rounded px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase tracking-wide ${badge.cls}`}>
+                        {badge.text}
+                      </span>
+                    )}
                     #{m.number} {m.title}
                   </a>
                   <button
@@ -376,7 +390,7 @@ export default function ReportIssueForm() {
                     }}
                     className="shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700"
                   >
-                    {commentFor === m.number ? 'Cancel' : 'Comment instead'}
+                    {commentFor === m.number ? 'Cancel' : resolved ? 'Comment / reopen' : 'Comment instead'}
                   </button>
                 </div>
                 {commentFor === m.number && (
@@ -414,7 +428,8 @@ export default function ReportIssueForm() {
                   </div>
                 )}
               </div>
-            ))}
+            )
+            })}
           </div>
         </div>
       )}

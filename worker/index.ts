@@ -5174,7 +5174,7 @@ async function handleCreateIssue(
   // Index the new issue immediately so it's searchable for de-duplication
   // before the next cron sync runs. Best-effort, off the response path.
   ctx.waitUntil(
-    upsertIssueVector(env, { number: issue.number, title, body: desc, html_url: issue.html_url })
+    upsertIssueVector(env, { number: issue.number, title, body: desc, html_url: issue.html_url, state: 'open' })
   );
 
   // Record for the admin panel (issue number + link + submitter email). Prepend
@@ -5265,9 +5265,11 @@ function issueEmbedText(title: string, body: string): string {
 }
 
 // Upsert a single issue's vector. Best-effort; never throws to the caller.
+// `state` ('open' | 'closed') is stored so the form can tell users a match is
+// already resolved and worth reading before filing.
 async function upsertIssueVector(
   env: Env,
-  issue: { number: number; title: string; body?: string; html_url: string }
+  issue: { number: number; title: string; body?: string; html_url: string; state?: string; state_reason?: string | null }
 ): Promise<void> {
   try {
     const vec = await embedText(env, issueEmbedText(issue.title, issue.body || ''));
@@ -5276,7 +5278,13 @@ async function upsertIssueVector(
       {
         id: String(issue.number),
         values: vec,
-        metadata: { number: issue.number, title: issue.title.slice(0, 300), url: issue.html_url },
+        metadata: {
+          number: issue.number,
+          title: issue.title.slice(0, 300),
+          url: issue.html_url,
+          state: issue.state === 'closed' ? 'closed' : 'open',
+          state_reason: issue.state_reason || '',
+        },
       },
     ]);
   } catch (error) {
@@ -5290,38 +5298,39 @@ type GhIssue = {
   body?: string | null;
   html_url: string;
   state: string;
+  state_reason?: string | null;
   updated_at: string;
   pull_request?: unknown;
 };
 
-// Sync open issues into Vectorize in two phases:
-//   1. Backfill — page through all currently-OPEN issues (oldest first) and
-//      upsert them. This is what actually populates the index; walking the full
-//      updated_at history first (as an incremental-only design does) wastes runs
-//      on ancient closed issues before reaching current open ones.
-//   2. Incremental — once backfilled, pull issues updated since a watermark,
-//      upserting open ones and removing closed ones so the index stays fresh.
+// Sync issues into Vectorize in two phases. Both OPEN and CLOSED issues are
+// indexed (with a `state` tag) so a new submission can be matched against an
+// already-resolved issue and the user pointed to it before filing a duplicate.
+//   1. Backfill — page through ALL issues (oldest first) and upsert them.
+//   2. Incremental — once backfilled, pull issues updated since a watermark and
+//      re-upsert them with their current state (close → tagged closed, reopen →
+//      tagged open); nothing is deleted so resolved issues stay searchable.
 // Bounded per run so a cron tick stays cheap; the next tick continues.
 async function syncIssuesIndex(env: Env): Promise<void> {
   if (!env.ISSUES_INDEX || !env.AI) return;
 
-  // --- Phase 1: backfill open issues ---
+  // --- Phase 1: backfill all issues (open + closed) ---
   const bfRaw = await env.BUILD_META.get(ISSUE_INDEX_BACKFILL_KEY);
   const bf = bfRaw ? JSON.parse(bfRaw) as { page: number; done: boolean } : { page: 1, done: false };
   if (!bf.done) {
-    const MAX_PAGES = 2; // ~200 open issues/run (each = embed + upsert subrequests)
+    const MAX_PAGES = 2; // ~200 issues/run (each = embed + upsert subrequests)
     let page = bf.page;
     let done = false;
     for (let n = 0; n < MAX_PAGES; n++) {
       const url =
         `https://api.github.com/repos/${ISSUE_REPO}/issues` +
-        `?state=open&sort=created&direction=asc&per_page=100&page=${page}`;
+        `?state=all&sort=created&direction=asc&per_page=100&page=${page}`;
       const res = await fetch(url, { headers: ghFetchHeaders(env) });
       if (!res.ok) break;
       const issues = await res.json() as GhIssue[];
       for (const it of issues) {
         if (it.pull_request) continue; // the issues endpoint also returns PRs
-        await upsertIssueVector(env, { number: it.number, title: it.title, body: it.body || '', html_url: it.html_url });
+        await upsertIssueVector(env, { number: it.number, title: it.title, body: it.body || '', html_url: it.html_url, state: it.state, state_reason: it.state_reason });
       }
       page++;
       if (issues.length < 100) { done = true; break; }
@@ -5333,7 +5342,7 @@ async function syncIssuesIndex(env: Env): Promise<void> {
     return;
   }
 
-  // --- Phase 2: incremental updates/closures since the watermark ---
+  // --- Phase 2: incremental — re-upsert anything updated since the watermark ---
   const since = (await env.BUILD_META.get(ISSUE_INDEX_SYNC_KEY)) || '1970-01-01T00:00:00Z';
   const MAX_PAGES = 4; // ~400 issues/run cap
   let newestSeen = since;
@@ -5347,25 +5356,12 @@ async function syncIssuesIndex(env: Env): Promise<void> {
     const issues = await res.json() as GhIssue[];
     if (!issues.length) break;
 
-    const toUpsert: GhIssue[] = [];
-    const toDelete: string[] = [];
     for (const it of issues) {
       if (it.pull_request) continue; // the issues endpoint also returns PRs
       if (it.updated_at > newestSeen) newestSeen = it.updated_at;
-      if (it.state === 'open') toUpsert.push(it);
-      else toDelete.push(String(it.number));
-    }
-
-    // Embed + upsert open issues (sequential keeps AI/subrequest use modest).
-    for (const it of toUpsert) {
-      await upsertIssueVector(env, { number: it.number, title: it.title, body: it.body || '', html_url: it.html_url });
-    }
-    if (toDelete.length) {
-      try {
-        await env.ISSUES_INDEX.deleteByIds(toDelete);
-      } catch {
-        /* deleting a not-present id is fine */
-      }
+      // Upsert open and closed alike, tagged with current state, so a resolved
+      // issue remains searchable (and a reopened one flips back to open).
+      await upsertIssueVector(env, { number: it.number, title: it.title, body: it.body || '', html_url: it.html_url, state: it.state, state_reason: it.state_reason });
     }
 
     if (issues.length < 100) break; // last page
@@ -5378,7 +5374,7 @@ async function syncIssuesIndex(env: Env): Promise<void> {
   }
 }
 
-type SimilarIssue = { number: number; title: string; url: string; score: number };
+type SimilarIssue = { number: number; title: string; url: string; score: number; state: string; stateReason: string };
 
 // POST /api/issues/similar — { title, body } -> ranked list of likely duplicates.
 // Vector search, then (best-effort) an LLM pass that keeps only true matches.
@@ -5420,6 +5416,8 @@ async function handleSimilarIssues(
         title: String(m.metadata?.title ?? ''),
         url: String(m.metadata?.url ?? ''),
         score: m.score,
+        state: m.metadata?.state === 'closed' ? 'closed' : 'open',
+        stateReason: String(m.metadata?.state_reason ?? ''),
       }))
       .filter((m) => m.number && m.url);
   } catch (error) {
@@ -5452,10 +5450,13 @@ async function rerankDuplicates(
   candidates: SimilarIssue[]
 ): Promise<SimilarIssue[] | null> {
   try {
-    const list = candidates.map((c) => `#${c.number}: ${c.title}`).join('\n');
+    const list = candidates
+      .map((c) => `#${c.number} [${c.state === 'closed' ? 'closed/resolved' : 'open'}]: ${c.title}`)
+      .join('\n');
     const prompt =
       `You are triaging GitHub issues for an e-reader firmware project.\n` +
-      `Decide which EXISTING issues describe the SAME underlying bug or feature request as the NEW issue.\n` +
+      `Decide which EXISTING issues describe the SAME underlying bug or feature request as the NEW issue ` +
+      `(include closed/resolved ones — those are especially useful to surface).\n` +
       `Be strict: include an issue ONLY if it is truly the same topic — not merely in the same general area ` +
       `(e.g. both about "the screen" or both mentioning "USB" is NOT enough).\n\n` +
       `NEW issue:\nTitle: ${title}\nDescription: ${desc.slice(0, 1500)}\n\n` +
