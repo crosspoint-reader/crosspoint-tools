@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>EPUBs, ESP32s, and Everyone's a Developer Now · Pitch Deck</title>
+<link rel="preconnect" href="https://rsms.me/" />
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Geist+Mono:wght@400;500;600&family=Caveat:wght@500;600&family=Noto+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<style>
+  /* ==== CrossPoint design tokens (mirrors src/index.css) ==== */
+  :root {
+    --font-sans: "InterVariable", "Inter", ui-sans-serif, system-ui, sans-serif;
+    --font-display: "Lora", ui-serif, serif;
+    --font-mono: "Geist Mono", ui-monospace, monospace;
+    --font-hand: "Caveat", cursive;
+
+    --brand-50:#f0f5f3; --brand-100:#d6e5de; --brand-200:#b3cfc2; --brand-300:#8fb9a6;
+    --brand-400:#69917d; --brand-500:#4a7a62; --brand-600:#3d6652; --brand-700:#315243;
+    --brand-800:#253e33; --brand-900:#1a2c24; --brand-950:#101c16;
+
+    --stone-50:#fafaf9; --stone-100:#f5f5f4; --stone-200:#e7e5e4; --stone-300:#d6d3d1;
+    --stone-400:#a8a29e; --stone-500:#78716c; --stone-600:#57534e; --stone-700:#44403c;
+    --stone-800:#292524; --stone-900:#1c1917;
+
+    --royalty:#b8953a;
+  }
+
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: var(--stone-300); }
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+    color: var(--stone-900);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ==== Slide chrome ==== */
+  .slide {
+    width: 1920px;
+    height: 1080px;
+    position: relative;
+    overflow: hidden;
+    background: #fff;
+    margin: 40px auto;
+    box-shadow: 0 30px 60px -30px rgba(0,0,0,0.35);
+  }
+  body.export .slide { margin: 0; box-shadow: none; }
+  body.export .slide.hidden { display: none; }
+
+  .paper-grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 160px 160px;
+  }
+  .dot-field {
+    background-image: radial-gradient(currentColor 1.5px, transparent 2.2px);
+    background-size: 21px 21px;
+    background-position: center;
+  }
+  .blueprint-grid {
+    background-image:
+      linear-gradient(to right, currentColor 1px, transparent 1px),
+      linear-gradient(to bottom, currentColor 1px, transparent 1px);
+    background-size: 42px 42px;
+  }
+  .abs { position: absolute; inset: 0; pointer-events: none; }
+  .wash { background: linear-gradient(to bottom right, var(--stone-50), #fff 55%, rgba(240,245,243,0.55)); }
+  .grain { opacity: 0.05; }
+
+  .pad { position: relative; height: 100%; padding: 110px 140px 96px; display: flex; flex-direction: column; }
+
+  /* footer strip on every slide */
+  .foot {
+    position: absolute; left: 140px; right: 140px; bottom: 52px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--font-mono); font-size: 20px; color: var(--stone-400);
+    letter-spacing: 0.02em;
+  }
+  .foot .brandline { display: none; }
+  .foot img { height: 34px; width: auto; display: block; }
+  .slide.dark .foot { color: rgba(255,255,255,0.38); }
+
+  /* ==== Type ==== */
+  .eyebrow {
+    display: inline-block; transform: rotate(-1deg);
+    font-family: var(--font-hand); font-weight: 500;
+    font-size: 44px; line-height: 1.1; color: var(--brand-600);
+  }
+  .slide.dark .eyebrow { color: var(--brand-300); }
+
+  h1, h2 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; }
+  h1 { font-size: 118px; line-height: 1.04; }
+  h2 { font-size: 92px; line-height: 1.06; margin-top: 22px; }
+  .accent { color: var(--brand-600); }
+  .slide.dark .accent { color: var(--brand-300); }
+
+  .lede {
+    font-family: var(--font-display); font-weight: 400;
+    font-size: 40px; line-height: 1.55; color: var(--stone-600);
+    text-wrap: pretty; margin-top: 44px; max-width: 30em;
+  }
+  .lede strong { font-weight: 500; color: var(--stone-900); }
+  .slide.dark .lede { color: var(--stone-300); }
+  .slide.dark .lede strong { color: #fff; }
+
+  .mono-tag {
+    font-family: var(--font-mono); font-size: 22px; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone-400);
+  }
+
+  /* hand-drawn margin note */
+  .hand-note {
+    font-family: var(--font-hand); font-weight: 500; font-size: 38px;
+    line-height: 1.15; color: var(--stone-500); transform: rotate(-2deg);
+  }
+
+  /* ==== Cards ==== */
+  .card {
+    background: #fff; border-radius: 24px;
+    box-shadow: 0 0 0 1px rgba(28,25,23,0.08), 0 24px 48px -24px rgba(28,25,23,0.12);
+    padding: 48px 52px;
+  }
+  .card .k {
+    font-family: var(--font-mono); font-size: 21px; font-weight: 500;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--brand-500);
+    margin-bottom: 20px;
+  }
+  .card h3 { font-family: var(--font-display); font-weight: 600; font-size: 42px; line-height: 1.15; letter-spacing: -0.01em; }
+  .card p { font-size: 28px; line-height: 1.5; color: var(--stone-600); margin-top: 18px; text-wrap: pretty; }
+
+  /* ==== Dark slide ==== */
+  .slide.dark { background: var(--brand-950); color: #fff; }
+  .slide.dark h1, .slide.dark h2 { color: #fff; }
+
+  /* ==== E-ink frame (mirrors .eink-device) ==== */
+  .eink-frame {
+    background: #f5f4ef; border-radius: 12px; padding: 12px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 20px 40px -16px rgba(0,0,0,0.15), 0 50px 80px -30px rgba(0,0,0,0.18);
+  }
+  .eink-frame img { display: block; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08); outline: 1px solid rgba(0,0,0,0.08); outline-offset: -1px; }
+
+  /* big statistic */
+  .stat-num {
+    font-family: var(--font-display); font-weight: 600; letter-spacing: -0.03em;
+    color: var(--stone-900); line-height: 0.95;
+  }
+  .stat-label { font-family: var(--font-mono); font-size: 24px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--stone-500); margin-top: 22px; }
+</style>
+</head>
+<body>
+
+<!-- ============ 01 · TITLE ============ -->
+<section class="slide" id="s1">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="abs dot-field" style="color:var(--brand-200); opacity:0.35; -webkit-mask-image:linear-gradient(115deg, transparent 62%, black 92%); mask-image:linear-gradient(115deg, transparent 62%, black 92%);"></div>
+  <div class="pad" style="justify-content:center;">
+    <div style="display:grid; grid-template-columns: 1fr 560px; gap: 90px; align-items:center;">
+      <div>
+        <span class="eyebrow">a talk about open source, e-readers &amp; AI</span>
+        <h1 style="margin-top:26px; max-width: 12.5em;">EPUBs, ESP32s, and Everyone's a Developer&nbsp;Now</h1>
+        <p class="lede" style="margin-top:38px;">What happens to an open source project when most of its
+          contributors <strong>aren't developers anymore</strong>, and why that's mostly wonderful.</p>
+        <div style="margin-top:64px; display:flex; align-items:center; gap:22px;">
+          <img src="../crosspoint-reader-logo.png" alt="CrossPoint Reader" style="height:64px; width:auto;" />
+          <span style="width:1px; height:44px; background:var(--stone-300);"></span>
+          <span class="mono-tag" style="font-size:24px; letter-spacing:0.1em; text-transform:none;">crosspointreader.com</span>
+        </div>
+      </div>
+      <div style="position:relative;">
+        <img src="../public/hero-device.png" alt="" style="width:560px; border-radius:28px; box-shadow: 0 0 0 1px rgba(28,25,23,0.08), 0 40px 80px -32px rgba(28,25,23,0.45); transform: rotate(2deg);" />
+        <span class="hand-note" style="position:absolute; left:-30px; bottom:-64px; color:var(--brand-600);">a $60 e-reader running our firmware &nearr;</span>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>01</span></div>
+</section>
+
+<!-- ============ 02 · WHAT IS CROSSPOINT ============ -->
+<section class="slide" id="s-what">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad">
+    <div style="display:grid; grid-template-columns: 1fr 440px; gap:100px; align-items:center; flex:1;">
+      <div>
+        <span class="eyebrow">first: what is CrossPoint?</span>
+        <h2 style="font-size:66px;">Open source e-reader software your device should have shipped with.</h2>
+        <div style="margin-top:30px; display:flex; flex-direction:column;">
+          <div style="display:grid; grid-template-columns: 400px 1fr; gap:48px; align-items:baseline; padding:15px 0; border-top:1px solid var(--stone-200);">
+            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">Typography done properly</h3>
+            <p style="font-size:28px; color:var(--stone-600);">Real justification, hyphenation, working footnotes. The layout of a printed book.</p>
+          </div>
+          <div style="display:grid; grid-template-columns: 400px 1fr; gap:48px; align-items:baseline; padding:15px 0; border-top:1px solid var(--stone-200);">
+            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">Bring your own fonts</h3>
+            <p style="font-size:28px; color:var(--stone-600);">A growing built-in library, plus a converter for any font you own.</p>
+          </div>
+          <div style="display:grid; grid-template-columns: 400px 1fr; gap:48px; align-items:baseline; padding:15px 0; border-top:1px solid var(--stone-200);">
+            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">Books move over WiFi</h3>
+            <p style="font-size:28px; color:var(--stone-600);">Drag &amp; drop from the browser, send from Calibre, browse OPDS libraries.</p>
+          </div>
+          <div style="display:grid; grid-template-columns: 400px 1fr; gap:48px; align-items:baseline; padding:15px 0; border-top:1px solid var(--stone-200);">
+            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">Never lose your page</h3>
+            <p style="font-size:28px; color:var(--stone-600);">Quick Resume, bookmarks, and KOReader sync across devices.</p>
+          </div>
+          <div style="display:grid; grid-template-columns: 400px 1fr; gap:48px; align-items:baseline; padding:15px 0; border-top:1px solid var(--stone-200); border-bottom:1px solid var(--stone-200);">
+            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">Offline dictionary</h3>
+            <p style="font-size:28px; color:var(--stone-600);">Look up words without leaving your book, or touching the internet.</p>
+          </div>
+        </div>
+      </div>
+      <div class="eink-frame" style="transform: rotate(2deg); justify-self:end;">
+        <img src="../public/screenshots/feature-reader.png" alt="" style="width:400px;" />
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>02</span></div>
+</section>
+
+<!-- ============ 03 · PRESS QUOTES ============ -->
+<section class="slide" id="s-press">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad" style="justify-content:center;">
+    <span class="eyebrow">don't take our word for it</span>
+    <h2>Better than the software it replaces. Their words, not ours.</h2>
+    <div style="margin-top:90px; display:grid; grid-template-columns: 1fr 1fr 1fr; gap:72px;">
+      <figure style="margin:0;">
+        <blockquote style="font-family:var(--font-display); font-style:italic; font-size:38px; line-height:1.5; color:var(--stone-800); text-wrap:pretty;">
+          &ldquo;The excellent CrossPoint Reader alternative firmware was the X4's saving grace&rdquo;
+        </blockquote>
+        <figcaption style="margin-top:34px;">
+          <img src="../public/press/theverge.svg" alt="The Verge" style="height:44px; width:auto; opacity:0.45; filter:brightness(0);" />
+        </figcaption>
+      </figure>
+      <figure style="margin:0;">
+        <blockquote style="font-family:var(--font-display); font-style:italic; font-size:38px; line-height:1.5; color:var(--stone-800); text-wrap:pretty;">
+          &ldquo;CrossPoint is unquestionably superior to the OS that ships with the device&rdquo;
+        </blockquote>
+        <figcaption style="margin-top:34px;">
+          <img src="../public/press/lifehacker.svg" alt="Lifehacker" style="height:42px; width:auto; opacity:0.45; filter:brightness(0);" />
+        </figcaption>
+      </figure>
+      <figure style="margin:0;">
+        <blockquote style="font-family:var(--font-display); font-style:italic; font-size:38px; line-height:1.5; color:var(--stone-800); text-wrap:pretty;">
+          &ldquo;reTerminal Sticky is built open &mdash; CrossPoint was the perfect fit for us since day 1.&rdquo;
+        </blockquote>
+        <figcaption style="margin-top:34px;">
+          <img src="../public/press/seeedstudio.png" alt="Seeed Studio" style="height:34px; width:auto; opacity:0.45; filter:brightness(0);" />
+        </figcaption>
+      </figure>
+    </div>
+    <p class="hand-note" style="margin-top:80px;">manufacturers now ship devices expecting people to install us &nearr;</p>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>03</span></div>
+</section>
+
+<!-- ============ 04 · GITHUB CHARTS ============ -->
+<section class="slide" id="s-charts">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad">
+    <span class="eyebrow">nine months on GitHub, in one chart</span>
+    <h2 style="font-size:76px;">Cumulative downloads, release by release.</h2>
+    <div id="chart" style="margin-top:40px;"></div>
+    <div style="margin-top:44px; display:flex; gap:110px; align-items:baseline;">
+      <div>
+        <div class="stat-num" style="font-size:76px;">7,714</div>
+        <div class="stat-label" style="margin-top:10px;">GitHub stars</div>
+      </div>
+      <div>
+        <div class="stat-num" style="font-size:76px;">1,691</div>
+        <div class="stat-label" style="margin-top:10px;">forks</div>
+      </div>
+      <div>
+        <div class="stat-num" style="font-size:76px;">230</div>
+        <div class="stat-label" style="margin-top:10px;">contributors</div>
+      </div>
+      <div>
+        <div class="stat-num" style="font-size:76px;">300,000<span class="accent">+</span></div>
+        <div class="stat-label" style="margin-top:10px;">installs</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>04</span></div>
+</section>
+
+<!-- ============ 05 · NINE DOWNLOADS ============ -->
+<section class="slide" id="s2">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad" style="justify-content:center;">
+    <div style="display:grid; grid-template-columns: 620px 1fr; gap: 110px; align-items:center;">
+      <div style="text-align:center;">
+        <div class="stat-num" style="font-size:560px;">9</div>
+        <div class="stat-label">downloads of our first release</div>
+      </div>
+      <div>
+        <span class="eyebrow">a few months later&hellip;</span>
+        <div style="margin-top:36px;">
+          <div class="stat-num" style="font-size:170px;">300,000<span class="accent">+</span></div>
+          <div class="stat-label">total installs</div>
+        </div>
+        <div style="margin-top:66px; display:flex; gap:96px;">
+          <div>
+            <div class="stat-num" style="font-size:96px;">1,600<span class="accent">+</span></div>
+            <div class="stat-label">forks</div>
+          </div>
+          <div>
+            <div class="stat-num" style="font-size:96px;">15<span class="accent">+</span></div>
+            <div class="stat-label">supported devices</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>02</span></div>
+</section>
+
+<!-- ============ 03 · THE EXPLOSION ============ -->
+<section class="slide" id="s3">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad">
+    <span class="eyebrow">then the internet found the hardware</span>
+    <h2>Micro e-readers exploded.</h2>
+    <div style="margin-top:70px; display:grid; grid-template-columns: 1fr 1fr 1fr; gap:36px;">
+      <div class="card">
+        <div class="k">Virality</div>
+        <h3>TikTok &amp; Reddit made them a phenomenon</h3>
+        <p>Xteink devices started appearing ahead of Kindles on Amazon's bestseller lists.</p>
+      </div>
+      <div class="card">
+        <div class="k">The press</div>
+        <h3>Recommended for firmware the manufacturer didn't write</h3>
+        <p>One reviewer installed CrossPoint before ever powering up the stock firmware.</p>
+      </div>
+      <div class="card">
+        <div class="k">The readers</div>
+        <h3>&ldquo;I write words, not code&rdquo;</h3>
+        <p>&hellip;said one intimidated reviewer, who flashed it anyway, because Reddit told him to.</p>
+      </div>
+    </div>
+    <div style="margin-top:78px; display:flex; align-items:center; gap:72px;">
+      <span class="mono-tag">as seen in</span>
+      <span style="font-family:var(--font-display); font-size:40px; font-weight:600; color:var(--stone-700);">The Atlantic</span>
+      <img src="../public/press/techcrunch.svg" alt="TechCrunch" style="height:42px; opacity:0.75;" />
+      <img src="../public/press/theverge.svg" alt="The Verge" style="height:46px; opacity:0.75;" />
+      <img src="../public/press/lifehacker.svg" alt="Lifehacker" style="height:40px; opacity:0.75;" />
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>03</span></div>
+</section>
+
+<!-- ============ 04 · WHO WE BUILD FOR ============ -->
+<section class="slide" id="s4">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad" style="justify-content:center; align-items:center; text-align:center;">
+    <span class="eyebrow">the moment everything changed</span>
+    <p style="font-family:var(--font-display); font-size:74px; line-height:1.28; max-width: 22em; margin-top:48px; color:var(--stone-500); text-wrap:balance;">
+      We weren't making software for <em style="color:var(--stone-900); font-style:italic;">hackers who happened to like books</em> anymore.
+    </p>
+    <p style="font-family:var(--font-display); font-weight:600; font-size:74px; line-height:1.28; max-width: 22em; margin-top:44px; color:var(--brand-600); text-wrap:balance;">
+      We were making software for book lovers who happened to discover GitHub.
+    </p>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>04</span></div>
+</section>
+
+<!-- ============ 05 · AI CHANGED WHO GETS TO BE A DEVELOPER ============ -->
+<section class="slide" id="s5">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad">
+    <span class="eyebrow">most CrossPoint users aren't developers</span>
+    <h2>AI changed who gets to be a software developer.</h2>
+    <div style="margin-top:64px; display:flex; align-items:stretch; gap:0;">
+      <div class="card" style="flex:1;">
+        <div class="k">Step 1</div>
+        <h3>Find a feature you want</h3>
+        <p>While reading, on a device you love.</p>
+      </div>
+      <div style="display:flex; align-items:center; padding:0 28px; font-family:var(--font-display); font-size:64px; color:var(--brand-400);">&rarr;</div>
+      <div class="card" style="flex:1;">
+        <div class="k">Step 2</div>
+        <h3>Describe it to an AI coding tool</h3>
+        <p>No compiler, no toolchain, no CS degree.</p>
+      </div>
+      <div style="display:flex; align-items:center; padding:0 28px; font-family:var(--font-display); font-size:64px; color:var(--brand-400);">&rarr;</div>
+      <div class="card" style="flex:1; background:var(--brand-50);">
+        <div class="k">A few hours later</div>
+        <h3>There's a pull request</h3>
+        <p>From someone who learned GitHub over the weekend.</p>
+      </div>
+    </div>
+    <p class="lede" style="margin-top:56px; font-size:36px; max-width:40em;">There is something <strong>genuinely wonderful</strong> about that,      and it also broke an assumption open source has quietly depended on for decades.</p>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>05</span></div>
+</section>
+
+<!-- ============ 06 · THE ACCIDENTAL ENTRANCE EXAM ============ -->
+<section class="slide" id="s6">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad">
+    <span class="eyebrow">nobody designed this on purpose</span>
+    <h2>The accidental entrance exam.</h2>
+    <p class="lede" style="margin-top:32px; font-size:36px;">To submit a reasonably complicated pull request, you used to have to learn enough about&hellip;</p>
+    <div style="margin-top:44px; display:flex; gap:28px;">
+      <div class="card" style="flex:1; padding:38px 44px;"><h3 style="font-size:38px;">Programming</h3></div>
+      <div class="card" style="flex:1; padding:38px 44px;"><h3 style="font-size:38px;">Git</h3></div>
+      <div class="card" style="flex:1; padding:38px 44px;"><h3 style="font-size:38px;">The project</h3></div>
+      <div class="card" style="flex:1; padding:38px 44px;"><h3 style="font-size:38px;">The problem itself</h3></div>
+    </div>
+    <div style="margin-top:56px; background:var(--brand-950); border-radius:24px; padding:52px 64px; position:relative; overflow:hidden;">
+      <div class="abs dot-field" style="color:var(--brand-700); opacity:0.4;"></div>
+      <p style="position:relative; font-family:var(--font-display); font-size:46px; line-height:1.35; color:#fff; text-wrap:balance;">
+        AI removed that screening process. The ability to <em style="color:var(--brand-300);">produce code</em> and the ability to
+        <em style="color:var(--brand-300);">understand its consequences</em> are no longer particularly correlated.
+      </p>
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>06</span></div>
+</section>
+
+<!-- ============ 07 · THE CONTRIBUTION SPECTRUM ============ -->
+<section class="slide" id="s7">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad">
+    <span class="eyebrow">a very different world for maintainers</span>
+    <h2>The hard part isn't the slop.<br/>It's everything in between.</h2>
+    <div style="margin-top:76px; display:grid; grid-template-columns: 1fr 1.25fr 1fr; gap:36px; align-items:stretch;">
+      <div class="card">
+        <div class="k" style="color:var(--stone-400);">Easy call</div>
+        <h3>The obvious AI contributions</h3>
+        <p>A hundred changed files. A blank pull request template. Six new abstractions to fix a typo.</p>
+      </div>
+      <div class="card" style="background:var(--brand-50); box-shadow: 0 0 0 2px var(--brand-300), 0 24px 48px -24px rgba(28,25,23,0.18);">
+        <div class="k" style="color:var(--brand-600);">The uncomfortable middle</div>
+        <h3>Well-intentioned. Often works. Sometimes clever.</h3>
+        <p>And sometimes it solves today's bug by creating the one we'll spend three weeks diagnosing six months from now.</p>
+      </div>
+      <div class="card">
+        <div class="k" style="color:var(--stone-400);">Easy call</div>
+        <h3>The beautiful contributions</h3>
+        <p>Someone hits a bug while reading, understands exactly what's wrong, changes one line, and fixes it for thousands of people.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>07</span></div>
+</section>
+
+<!-- ============ 08 · REJECTING PARTICIPATION ============ -->
+<section class="slide" id="s8">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad" style="justify-content:center;">
+    <span class="eyebrow">where maintaining gets uncomfortable</span>
+    <p style="font-family:var(--font-display); font-size:56px; line-height:1.3; margin-top:36px; max-width:27em; color:var(--stone-600); text-wrap:pretty;">
+      Rejecting a PR from an experienced developer is just software development.
+      Rejecting one from someone who bought a little e-reader, fell in love with your project,
+      and learned GitHub over the weekend feels very different.
+    </p>
+    <p style="font-family:var(--font-display); font-weight:600; font-size:60px; line-height:1.3; margin-top:44px; color:var(--stone-900); max-width:26em; text-wrap:balance;">
+      You're not just rejecting code. <span class="accent">It can feel like you're rejecting their participation.</span>
+    </p>
+    <p class="hand-note" style="margin-top:44px; max-width:38em;">&ldquo;maintaining standards&rdquo; can quietly become a very efficient way to destroy the community that made you successful</p>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>08</span></div>
+</section>
+
+<!-- ============ 09 · STABILITY IS A FEATURE (dark) ============ -->
+<section class="slide dark" id="s9">
+  <div class="abs dot-field" style="color:var(--brand-800); opacity:0.5;"></div>
+  <div class="abs paper-grain" style="opacity:0.06;"></div>
+  <div class="pad" style="justify-content:center;">
+    <span class="eyebrow">and the stakes are physical</span>
+    <h2 style="max-width: 15em;">Bad firmware doesn't throw an exception.</h2>
+    <p class="lede" style="font-size:42px; margin-top:32px; max-width:28em;">It can leave somebody holding a tiny plastic rectangle
+      that <strong>no longer turns on</strong>. There's no app store between us and the device in their hand.</p>
+    <p style="font-family:var(--font-display); font-weight:600; font-size:72px; line-height:1.15; margin-top:52px; color:var(--brand-300); max-width:17em; text-wrap:balance;">
+      Once hundreds of thousands of people trust your software, stability is a feature too.
+    </p>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>09</span></div>
+</section>
+
+<!-- ============ 10 · FRAGMENTATION ============ -->
+<section class="slide" id="s10">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad">
+    <span class="eyebrow">when we say no, AI makes forking trivial</span>
+    <h2>Fragmentation has become dramatically cheaper.</h2>
+    <div style="margin-top:52px; display:grid; grid-template-columns: 560px 1fr; gap:100px; align-items:center;">
+      <div>
+        <div style="display:flex; align-items:baseline; gap:40px; font-family:var(--font-display); font-weight:600; color:var(--stone-900);">
+          <span style="font-size:120px;">2</span>
+          <span style="font-size:72px; color:var(--brand-400);">&rarr;</span>
+          <span style="font-size:120px;">8</span>
+          <span style="font-size:72px; color:var(--brand-400);">&rarr;</span>
+          <span style="font-size:120px;">20</span>
+        </div>
+        <div class="stat-label" style="margin-top:8px;">forks advertising on Reddit</div>
+        <div style="margin-top:44px;">
+          <div class="stat-num" style="font-size:140px;">1,600<span class="accent">+</span></div>
+          <div class="stat-label">forks of CrossPoint today</div>
+        </div>
+      </div>
+      <div>
+        <p class="lede" style="margin-top:0; font-size:38px;">Eventually a non-technical user is choosing firmware based on a
+          <strong>six-month-old Reddit comment</strong>, and the fork they pick hasn't incorporated:</p>
+        <ul style="margin-top:28px; padding:0; list-style:none; font-size:32px; line-height:1.5; color:var(--stone-700);">
+          <li style="padding:16px 0; border-top:1px solid var(--stone-200);">Our latest <strong>battery fix</strong></li>
+          <li style="padding:16px 0; border-top:1px solid var(--stone-200);">Support for a <strong>new hardware revision</strong></li>
+          <li style="padding:16px 0; border-top:1px solid var(--stone-200); border-bottom:1px solid var(--stone-200);">The change that <strong>prevents a device from becoming unbootable</strong></li>
+        </ul>
+        <p class="hand-note" style="margin-top:28px; font-size:34px;">AI lowered the cost of creating an ecosystem nobody can actually maintain</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>10</span></div>
+</section>
+
+<!-- ============ 11 · OUR ANSWER ============ -->
+<section class="slide" id="s11">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad">
+    <span class="eyebrow">the tempting response: make contributing harder. we didn't.</span>
+    <h2>Make participation easier, without every idea becoming firmware.</h2>
+    <div style="margin-top:48px; display:grid; grid-template-columns: 1fr 1fr; gap:26px;">
+      <div class="card" style="padding:34px 44px;">
+        <div class="k" style="margin-bottom:12px;">Lower the floor</div>
+        <h3 style="font-size:38px;">A browser flasher</h3>
+        <p style="font-size:26px; margin-top:12px;">Our users shouldn't need to know what PlatformIO is.</p>
+      </div>
+      <div class="card" style="padding:34px 44px;">
+        <div class="k" style="margin-bottom:12px;">Meet people where they are</div>
+        <h3 style="font-size:38px;">Support on Reddit &amp; Discord</h3>
+        <p style="font-size:26px; margin-top:12px;">GitHub Issues aren't where most readers live.</p>
+      </div>
+      <div class="card" style="padding:34px 44px;">
+        <div class="k" style="margin-bottom:12px;">Creativity outside the core</div>
+        <h3 style="font-size:38px;">SD-loadable themes</h3>
+        <p style="font-size:26px; margin-top:12px;">Personalization that lives entirely outside the firmware.</p>
+      </div>
+      <div class="card" style="padding:34px 44px; background:var(--brand-50);">
+        <div class="k" style="margin-bottom:12px;">Yes, without merging</div>
+        <h3 style="font-size:38px;">An SD-card plugin system</h3>
+        <p style="font-size:26px; margin-top:12px;">Build the extremely specific feature you've always wanted, no fork required. One of the first community plugins implements something we'd repeatedly rejected from core.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>11</span></div>
+</section>
+
+<!-- ============ 12 · FREEINK ============ -->
+<!-- Styled in Free Ink's own design language (freeink.org): Space Grotesk,
+     IBM Plex Mono eyebrows, flame #e2451e accent, blueprint schematic. -->
+<section class="slide" id="s12" style="background:#fafaf9;">
+  <div class="abs blueprint-grid" style="color:#e7e5e4; opacity:0.55; -webkit-mask-image:linear-gradient(to left, black 25%, transparent 60%); mask-image:linear-gradient(to left, black 25%, transparent 60%);"></div>
+  <div class="pad">
+    <div style="display:flex; align-items:center; gap:18px;">
+      <img src="freeink-mark.svg" alt="" style="width:56px; height:56px;" />
+      <span style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:40px; color:#0c0a09;">Free<span style="color:#e2451e;">Ink</span></span>
+    </div>
+    <div style="display:grid; grid-template-columns: 1fr 700px; gap:60px; align-items:center; flex:1;">
+      <div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:24px; font-weight:500; letter-spacing:0.16em; color:#e2451e;">&mdash;&nbsp; THE SDK &middot; FREEINK.ORG</div>
+        <h2 style="font-family:'Space Grotesk',sans-serif; font-weight:600; letter-spacing:-0.03em; font-size:96px; line-height:1.04; color:#0c0a09; margin-top:26px;">One firmware API.<br/>Any e-paper device.</h2>
+        <p style="font-family:var(--font-sans); font-size:34px; line-height:1.6; color:#57534e; margin-top:36px; max-width:26em; text-wrap:pretty;">
+          The community wasn't forming around one device. It was forming around small, inexpensive, hackable
+          e-paper hardware. So we pulled the hardware layer underneath CrossPoint into an open SDK:
+          <strong style="color:#0c0a09;">something common to build on</strong>, instead of fifteen incompatible islands.
+        </p>
+        <div style="margin-top:52px; display:flex; gap:100px;">
+          <div>
+            <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:96px; line-height:0.95; color:#0c0a09;">15<span style="color:#e2451e;">+</span></div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:22px; letter-spacing:0.14em; text-transform:uppercase; color:#78716c; margin-top:16px;">e-readers &amp; display boards</div>
+          </div>
+          <div>
+            <div style="font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:96px; line-height:0.95; color:#0c0a09;">Weekly</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:22px; letter-spacing:0.14em; text-transform:uppercase; color:#78716c; margin-top:16px;">new devices appearing</div>
+          </div>
+        </div>
+      </div>
+      <!-- the actual freeink.org hero schematic, captured from the live site -->
+      <img src="freeink-schematic.png" alt="" style="width:700px; justify-self:end;" />
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>12</span></div>
+</section>
+
+<!-- ============ 13 · BOUNDARIES LET US SAY YES ============ -->
+<section class="slide" id="s13">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad">
+    <span class="eyebrow">boundaries are how open stays open</span>
+    <h2>Those boundaries let us say <span class="accent">yes</span> far more often.</h2>
+    <div style="margin-top:72px; display:flex; flex-direction:column;">
+      <div style="display:grid; grid-template-columns: 480px 1fr; gap:60px; align-items:baseline; padding:34px 0; border-top:1px solid var(--stone-200);">
+        <h3 style="font-family:var(--font-display); font-weight:600; font-size:52px;">CrossPoint core</h3>
+        <p style="font-size:36px; color:var(--stone-600);">stays <strong style="color:var(--stone-900);">opinionated</strong>, and stable for 300,000 readers.</p>
+      </div>
+      <div style="display:grid; grid-template-columns: 480px 1fr; gap:60px; align-items:baseline; padding:34px 0; border-top:1px solid var(--stone-200);">
+        <h3 style="font-family:var(--font-display); font-weight:600; font-size:52px;">Plugins</h3>
+        <p style="font-size:36px; color:var(--stone-600);">can be <strong style="color:var(--stone-900);">weird</strong>, as specific as one reader's wish.</p>
+      </div>
+      <div style="display:grid; grid-template-columns: 480px 1fr; gap:60px; align-items:baseline; padding:34px 0; border-top:1px solid var(--stone-200);">
+        <h3 style="font-family:var(--font-display); font-weight:600; font-size:52px;">Forks</h3>
+        <p style="font-size:36px; color:var(--stone-600);">can <strong style="color:var(--stone-900);">experiment</strong>, without carrying the ecosystem.</p>
+      </div>
+      <div style="display:grid; grid-template-columns: 480px 1fr; gap:60px; align-items:baseline; padding:34px 0; border-top:1px solid var(--stone-200); border-bottom:1px solid var(--stone-200);">
+        <h3 style="font-family:var(--font-display); font-weight:600; font-size:52px;">Manufacturers</h3>
+        <p style="font-size:36px; color:var(--stone-600);">can <strong style="color:var(--stone-900);">build on FreeInk</strong>, instead of shipping incompatible islands.</p>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>13</span></div>
+</section>
+
+<!-- ============ 14 · THE SCARCE RESOURCE ============ -->
+<section class="slide dark" id="s14">
+  <div class="abs dot-field" style="color:var(--brand-800); opacity:0.5;"></div>
+  <div class="abs paper-grain" style="opacity:0.06;"></div>
+  <div class="pad" style="justify-content:center;">
+    <span class="eyebrow">what I got wrong about this job</span>
+    <h2 style="max-width:15em;">The scarce resource isn't code.<br/>
+      <span style="color:var(--stone-400); font-weight:400; font-size:0.72em;">We have more code than we know what to do with.</span></h2>
+    <div style="margin-top:56px; display:flex; gap:36px; font-family:var(--font-display); font-weight:600; font-size:88px; color:var(--brand-300); letter-spacing:-0.02em;">
+      <span>Judgment.</span><span>Trust.</span><span>Responsibility.</span>
+    </div>
+    <p class="lede" style="font-size:34px; max-width:40em; margin-top:48px;">Someone has to decide what belongs in the core. Someone has to protect the boring
+      battery fix from the exciting rewrite. Someone has to make sure the firmware found through a six-month-old
+      TikTok video won't brick a brand-new device. And someone has to build the places where ideas can flourish
+      when the answer for core is <strong>no</strong>.</p>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>14</span></div>
+</section>
+
+<!-- ============ 15 · CLOSING ============ -->
+<section class="slide" id="s15">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="abs dot-field" style="color:var(--brand-200); opacity:0.3; -webkit-mask-image:linear-gradient(to top, black 8%, transparent 42%); mask-image:linear-gradient(to top, black 8%, transparent 42%);"></div>
+  <div class="pad" style="justify-content:center; align-items:center; text-align:center;">
+    <span class="eyebrow">the atlantic, on these little e-readers</span>
+    <p style="font-family:var(--font-display); font-style:italic; font-weight:500; font-size:84px; line-height:1.22; max-width:16em; margin-top:40px; color:var(--stone-900); text-wrap:balance;">
+      &ldquo;Fun in a way gadgets haven't been for a long&nbsp;time.&rdquo;
+    </p>
+    <p style="font-family:var(--font-display); font-size:44px; line-height:1.5; max-width:28em; margin-top:44px; color:var(--stone-600); text-wrap:balance;">
+      That's what we want CrossPoint to remain. And keeping it that open doesn't mean never saying no.
+    </p>
+    <p style="font-family:var(--font-display); font-weight:600; font-size:56px; line-height:1.35; max-width:22em; margin-top:36px; color:var(--brand-600); text-wrap:balance;">
+      Sometimes the most important thing a maintainer can do is decide where the answer should be yes.
+    </p>
+    <div style="margin-top:64px; display:flex; align-items:center; gap:24px;">
+      <img src="../crosspoint-reader-logo.png" alt="CrossPoint Reader" style="height:60px;" />
+      <span style="width:1px; height:40px; background:var(--stone-300);"></span>
+      <span class="mono-tag" style="text-transform:none; letter-spacing:0.08em; font-size:26px;">crosspointreader.com &middot; github.com/crosspoint-reader</span>
+    </div>
+  </div>
+  <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>15</span></div>
+</section>
+
+<script>
+  // Footer slide numbers stay correct no matter how slides are reordered.
+  document.querySelectorAll('.slide').forEach((el, i) => {
+    const num = el.querySelector('.foot span:last-child')
+    if (num) num.textContent = String(i + 1).padStart(2, '0')
+  })
+
+  // Downloads-per-release bar chart, real data from the GitHub releases API
+  // (gh api repos/crosspoint-reader/crosspoint-reader/releases, Sep 2026).
+  const RELEASES = [
+    ['0.1.0', 9], ['0.1.1', 7], ['0.2.0', 8], ['0.2.1', 9], ['0.2.2', 10],
+    ['0.2.3', 10], ['0.2.4', 48], ['0.3.0', 15], ['0.4.0', 8], ['0.5.0', 12],
+    ['0.5.1', 111], ['0.6.0', 56], ['0.7.0', 95], ['0.8.0', 70], ['0.8.1', 169],
+    ['0.9.0', 225], ['0.10.0', 213], ['0.11.0', 58], ['0.11.1', 139], ['0.11.2', 555],
+    ['0.12.0', 2337], ['0.13.0', 103], ['0.13.1', 1786], ['0.14.0', 2880], ['0.15.0', 2959],
+    ['0.16.0', 6401], ['1.0.0', 8842], ['1.1.0', 1707], ['1.1.1', 20379], ['1.2.0', 34842],
+    ['1.3.0', 70660], ['1.4.0', 10779], ['1.4.1', 87696], ['1.5.0-rc', 562], ['1.5.0', 77179],
+    ['1.6.0rc', 4567], ['1.6.0', 11704],
+  ]
+  const chart = document.getElementById('chart')
+  if (chart) {
+    // running total per release, so the curve only ever climbs
+    let running = 0
+    const CUM = RELEASES.map(([tag, d]) => { running += d; return [tag, running] })
+    const W = 1640, H = 430, max = CUM[CUM.length - 1][1]
+    const gap = 8, bw = (W - gap * (CUM.length - 1)) / CUM.length
+    const css = getComputedStyle(document.documentElement)
+    const brand = css.getPropertyValue('--brand-500').trim()
+    const brandLight = css.getPropertyValue('--brand-200').trim()
+    const stone4 = css.getPropertyValue('--stone-400').trim()
+    let bars = '', labels = ''
+    const HOT = ['0.1.0', '1.0.0', '1.3.0', '1.4.1', '1.6.0']
+    const fmt = (c, first, last) => first ? '9 downloads'
+      : last ? c.toLocaleString('en-US')
+      : Math.round(c / 1000) + 'k'
+    CUM.forEach(([tag, c], i) => {
+      const h = Math.max(4, (c / max) * (H - 70))
+      const x = i * (bw + gap), y = H - 40 - h
+      const hot = HOT.includes(tag)
+      bars += `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="4" fill="${hot ? brand : brandLight}"/>`
+      if (hot) {
+        const first = i === 0, last = i === CUM.length - 1
+        const anchor = first ? 'start' : last ? 'end' : 'middle'
+        const tx = first ? x : last ? x + bw : x + bw / 2
+        labels += `<text x="${tx}" y="${y - 14}" text-anchor="${anchor}" font-family="Geist Mono, monospace" font-size="22" fill="${brand}" font-weight="600">${fmt(c, first, last)}</text>`
+      }
+    })
+    // baseline + first/last release ticks
+    labels += `<line x1="0" y1="${H - 40}" x2="${W}" y2="${H - 40}" stroke="${stone4}" stroke-opacity="0.4" stroke-width="1.5"/>`
+    labels += `<text x="0" y="${H - 8}" font-family="Geist Mono, monospace" font-size="22" fill="${stone4}">v0.1.0 &middot; DEC 2025</text>`
+    labels += `<text x="${W}" y="${H - 8}" text-anchor="end" font-family="Geist Mono, monospace" font-size="22" fill="${stone4}">v1.6.0 &middot; SEP 2026</text>`
+    chart.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${bars}${labels}</svg>`
+  }
+
+  // ?slide=N → export mode: show only that slide, edge to edge.
+  const n = new URLSearchParams(location.search).get('slide')
+  if (n) {
+    document.body.classList.add('export')
+    document.querySelectorAll('.slide').forEach((el, i) => {
+      if (String(i + 1) !== n) el.classList.add('hidden')
+    })
+  }
+</script>
+</body>
+</html>
