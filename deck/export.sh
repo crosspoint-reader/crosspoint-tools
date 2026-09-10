@@ -5,7 +5,7 @@ set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 QUALITY="${1:-92}"
-SLIDES=18
+SLIDES=20
 OUT="$DIR/slides"
 mkdir -p "$OUT"
 

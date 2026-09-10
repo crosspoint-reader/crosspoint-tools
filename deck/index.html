@@ -69,13 +69,9 @@
 
   .pad { position: relative; height: 100%; padding: 110px 140px 96px; display: flex; flex-direction: column; }
 
-  /* footer strip on every slide */
-  .foot {
-    position: absolute; left: 140px; right: 140px; bottom: 52px;
-    display: flex; align-items: center; justify-content: space-between;
-    font-family: var(--font-mono); font-size: 20px; color: var(--stone-400);
-    letter-spacing: 0.02em;
-  }
+  /* footer strip removed: no slide numbers, so slides can be inserted or
+     reordered without regenerating the whole deck */
+  .foot { display: none; }
   .foot .brandline { display: none; }
   .foot img { height: 34px; width: auto; display: block; }
   .slide.dark .foot { color: rgba(255,255,255,0.38); }
@@ -188,23 +184,23 @@
         <div style="margin-top:30px; display:flex; flex-direction:column;">
           <div style="display:grid; grid-template-columns: 400px 1fr; gap:48px; align-items:baseline; padding:15px 0; border-top:1px solid var(--stone-200);">
             <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">Proper typography</h3>
-            <p style="font-size:28px; color:var(--stone-600);">Real justification, hyphenation, working footnotes. The layout of a printed book.</p>
+            <p style="font-size:28px; color:var(--stone-600);">Real justification, footnotes, and hyphenation that follows each language's own rules.</p>
           </div>
           <div style="display:grid; grid-template-columns: 400px 1fr; gap:48px; align-items:baseline; padding:15px 0; border-top:1px solid var(--stone-200);">
-            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">Bring your own fonts</h3>
-            <p style="font-size:28px; color:var(--stone-600);">A growing built-in library, plus a converter for any font you own.</p>
+            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">Reads your language</h3>
+            <p style="font-size:28px; color:var(--stone-600);">The community has translated the entire UI into nearly thirty languages.</p>
           </div>
           <div style="display:grid; grid-template-columns: 400px 1fr; gap:48px; align-items:baseline; padding:15px 0; border-top:1px solid var(--stone-200);">
-            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">Books move over WiFi</h3>
-            <p style="font-size:28px; color:var(--stone-600);">Drag &amp; drop from the browser, send from Calibre, browse OPDS libraries.</p>
+            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">RTL done right</h3>
+            <p style="font-size:28px; color:var(--stone-600);">Hebrew and Arabic lay out properly, in scripts the stock firmware can't render.</p>
           </div>
           <div style="display:grid; grid-template-columns: 400px 1fr; gap:48px; align-items:baseline; padding:15px 0; border-top:1px solid var(--stone-200);">
-            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">Never lose your page</h3>
-            <p style="font-size:28px; color:var(--stone-600);">Quick Resume, bookmarks, and KOReader sync across devices.</p>
+            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">OPDS library browsing</h3>
+            <p style="font-size:28px; color:var(--stone-600);">Browse public catalogs and download books right on the device.</p>
           </div>
           <div style="display:grid; grid-template-columns: 400px 1fr; gap:48px; align-items:baseline; padding:15px 0; border-top:1px solid var(--stone-200); border-bottom:1px solid var(--stone-200);">
-            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">Offline dictionary</h3>
-            <p style="font-size:28px; color:var(--stone-600);">Look up words without leaving your book, or touching the internet.</p>
+            <h3 style="font-family:var(--font-display); font-weight:600; font-size:32px;">KOReader sync</h3>
+            <p style="font-size:28px; color:var(--stone-600);">KOSync picks up your page wherever you left off on your other devices.</p>
           </div>
         </div>
       </div>
@@ -367,12 +363,62 @@
   <div class="foot"><span class="brandline">EPUBs, ESP32s, and Everyone's a Developer Now</span><span>04</span></div>
 </section>
 
+<!-- ============ ACCESSIBILITY PIVOT ============ -->
+<section class="slide" id="s-pivot">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad">
+    <span class="eyebrow">our new users were confused by GitHub</span>
+    <h2>So we stopped shipping like a repo and started shipping like a product.</h2>
+    <div style="margin-top:40px; display:grid; grid-template-columns: 1fr 1fr; gap:26px;">
+      <div class="card" style="padding:34px 44px;">
+        <div class="k" style="margin-bottom:12px;">No toolchain</div>
+        <h3 style="font-size:38px;">The web flasher</h3>
+        <p style="font-size:26px; margin-top:12px;">Plug in, click, read. Nobody should need to know what esptool or PlatformIO is.</p>
+      </div>
+      <div class="card" style="padding:34px 44px;">
+        <div class="k" style="margin-bottom:12px;">No scripts</div>
+        <h3 style="font-size:38px;">The font builder</h3>
+        <p style="font-size:26px; margin-top:12px;">Convert any font you own into a device-ready one, right on the site.</p>
+      </div>
+      <div class="card" style="padding:34px 44px;">
+        <div class="k" style="margin-bottom:12px;">No lockouts</div>
+        <h3 style="font-size:38px;">The automated unlocker</h3>
+        <p style="font-size:26px; margin-top:12px;">Devices that ship locked down get a guided, automated way out.</p>
+      </div>
+      <div class="card" style="padding:34px 44px; background:var(--brand-50);">
+        <div class="k" style="margin-bottom:12px;">No README required</div>
+        <h3 style="font-size:38px;">crosspointreader.com</h3>
+        <p style="font-size:26px; margin-top:12px;">Everything moved to a friendly domain that pitches like a startup, not a repository.</p>
+      </div>
+    </div>
+    <p class="hand-note" style="margin-top:26px; text-align:right;">releases lived on GitHub. our readers didn't.</p>
+  </div>
+  <div class="foot"><span class="brandline"></span><span>08</span></div>
+</section>
+
+<!-- ============ BRIDGE: USING IT → CHANGING IT ============ -->
+<section class="slide" id="s-bridge">
+  <div class="abs wash"></div>
+  <div class="abs paper-grain grain"></div>
+  <div class="pad" style="justify-content:center; align-items:center; text-align:center;">
+    <span class="eyebrow">then something we didn't plan for</span>
+    <p style="font-family:var(--font-display); font-size:74px; line-height:1.28; max-width: 21em; margin-top:48px; color:var(--stone-500); text-wrap:balance;">
+      Installing custom firmware became so easy that it emboldened readers to imagine ways to <em style="color:var(--stone-900); font-style:italic;">make it their own</em>.
+    </p>
+    <p style="font-family:var(--font-display); font-weight:600; font-size:74px; line-height:1.28; max-width: 21em; margin-top:44px; color:var(--brand-600); text-wrap:balance;">
+      And AI made building those ideas just as easy.
+    </p>
+  </div>
+  <div class="foot"><span class="brandline"></span><span>09</span></div>
+</section>
+
 <!-- ============ 05 · AI CHANGED WHO GETS TO BE A DEVELOPER ============ -->
 <section class="slide" id="s5">
   <div class="abs wash"></div>
   <div class="abs paper-grain grain"></div>
   <div class="pad">
-    <span class="eyebrow">most CrossPoint users aren't developers</span>
+    <span class="eyebrow">they didn't stop at installing it</span>
     <h2>AI changed who gets to be a software developer.</h2>
     <div style="margin-top:64px; display:flex; align-items:stretch; gap:0;">
       <div class="card" style="flex:1;">
@@ -530,26 +576,21 @@
   <div class="pad">
     <span class="eyebrow">the tempting response: make contributing harder. we didn't.</span>
     <h2>Make participation easier, without every idea becoming firmware.</h2>
-    <div style="margin-top:48px; display:grid; grid-template-columns: 1fr 1fr; gap:26px;">
-      <div class="card" style="padding:34px 44px;">
-        <div class="k" style="margin-bottom:12px;">Lower the floor</div>
-        <h3 style="font-size:38px;">A browser flasher</h3>
-        <p style="font-size:26px; margin-top:12px;">Our users shouldn't need to know what PlatformIO is.</p>
+    <div style="margin-top:56px; display:grid; grid-template-columns: 1fr 1fr 1fr; gap:30px;">
+      <div class="card" style="padding:40px 46px;">
+        <div class="k" style="margin-bottom:14px;">Meet people where they are</div>
+        <h3 style="font-size:40px;">Support on Reddit &amp; Discord</h3>
+        <p style="font-size:27px; margin-top:14px;">GitHub Issues aren't where most readers live.</p>
       </div>
-      <div class="card" style="padding:34px 44px;">
-        <div class="k" style="margin-bottom:12px;">Meet people where they are</div>
-        <h3 style="font-size:38px;">Support on Reddit &amp; Discord</h3>
-        <p style="font-size:26px; margin-top:12px;">GitHub Issues aren't where most readers live.</p>
+      <div class="card" style="padding:40px 46px;">
+        <div class="k" style="margin-bottom:14px;">Creativity outside the core</div>
+        <h3 style="font-size:40px;">SD-loadable themes</h3>
+        <p style="font-size:27px; margin-top:14px;">Personalization that lives entirely outside the firmware.</p>
       </div>
-      <div class="card" style="padding:34px 44px;">
-        <div class="k" style="margin-bottom:12px;">Creativity outside the core</div>
-        <h3 style="font-size:38px;">SD-loadable themes</h3>
-        <p style="font-size:26px; margin-top:12px;">Personalization that lives entirely outside the firmware.</p>
-      </div>
-      <div class="card" style="padding:34px 44px; background:var(--brand-50);">
-        <div class="k" style="margin-bottom:12px;">Yes, without merging</div>
-        <h3 style="font-size:38px;">An SD-card plugin system</h3>
-        <p style="font-size:26px; margin-top:12px;">Build the extremely specific feature you've always wanted, no fork required. One of the first community plugins implements something we'd repeatedly rejected from core.</p>
+      <div class="card" style="padding:40px 46px; background:var(--brand-50);">
+        <div class="k" style="margin-bottom:14px;">Yes, without merging</div>
+        <h3 style="font-size:40px;">An SD-card plugin system</h3>
+        <p style="font-size:27px; margin-top:14px;">Build the extremely specific feature you've always wanted, no fork required. One of the first community plugins implements something we'd repeatedly rejected from core.</p>
       </div>
     </div>
   </div>
@@ -655,7 +696,7 @@
       That's what we want CrossPoint to remain. And keeping it that open doesn't mean never saying no.
     </p>
     <p style="font-family:var(--font-display); font-weight:600; font-size:56px; line-height:1.35; max-width:22em; margin-top:36px; color:var(--stone-900); text-wrap:balance;">
-      Sometimes the most important thing a maintainer can do is decide where the answer should be <em style="color:var(--brand-600); font-size:1.25em;">yes</em>.
+      Sometimes the most important thing a maintainer can do is decide <em style="color:var(--brand-600);">where</em> the answer should be yes.
     </p>
     <div style="margin-top:64px; display:flex; align-items:center; gap:24px;">
       <img src="../crosspoint-reader-logo.png" alt="CrossPoint Reader" style="height:60px;" />
