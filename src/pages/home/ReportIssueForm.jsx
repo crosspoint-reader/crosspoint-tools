@@ -14,6 +14,10 @@ export const SERIAL_HANDOFF_KEY = 'crosspoint-issue-serial-log'
 // Keep the in-form log bounded; the server caps the embedded portion further.
 const SERIAL_MAX_CHARS = 400_000
 
+// Where GitHub-account holders go to file directly (template chooser, falls back
+// to a blank issue if no templates are configured).
+const GITHUB_NEW_ISSUE_URL = 'https://github.com/crosspoint-reader/crosspoint-reader/issues/new/choose'
+
 // Load the Turnstile script once and resolve when window.turnstile is ready.
 function loadTurnstile() {
   if (window.turnstile) return Promise.resolve()
@@ -48,6 +52,8 @@ export default function ReportIssueForm() {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState(null) // { ok, msg, url }
   const [config, setConfig] = useState(null) // { siteKey, action, enabled, types, devices, topics }
+  // null = show the account chooser; 'form' = show the no-account submission form.
+  const [mode, setMode] = useState(null)
 
   // Duplicate detection.
   const [matches, setMatches] = useState([]) // [{ number, title, url, score }]
@@ -75,6 +81,7 @@ export default function ReportIssueForm() {
         setSerialLog(handoff)
         setSerialFromDebug(true)
         setType((t) => t || 'bug') // a captured log almost always accompanies a bug
+        setMode('form') // arriving from /debug with a log — skip the chooser
         sessionStorage.removeItem(SERIAL_HANDOFF_KEY)
       }
     } catch {
@@ -82,9 +89,10 @@ export default function ReportIssueForm() {
     }
   }, [])
 
-  // Render the Turnstile widget once we have a site key.
+  // Render the Turnstile widget once we have a site key and the form is shown
+  // (the widget container only exists in form mode).
   useEffect(() => {
-    if (!config?.siteKey || !widgetRef.current) return
+    if (mode !== 'form' || !config?.siteKey || !widgetRef.current) return
     let cancelled = false
     loadTurnstile()
       .then(() => {
@@ -107,7 +115,7 @@ export default function ReportIssueForm() {
     return () => {
       cancelled = true
     }
-  }, [config])
+  }, [config, mode])
 
   // Debounced semantic duplicate search as the user writes title + description.
   useEffect(() => {
@@ -278,8 +286,49 @@ export default function ReportIssueForm() {
   const devices = config?.devices || []
   const topicOptions = config?.topics || []
 
+  // Account chooser (default): GitHub users go straight to the repo; everyone
+  // else reveals the on-site form.
+  if (mode !== 'form') {
+    return (
+      <div className="mx-auto max-w-xl">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <a
+            href={GITHUB_NEW_ISSUE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="group flex flex-col rounded-xl border border-stone-200 bg-white p-5 text-left shadow-sm transition hover:border-brand-400 hover:shadow"
+          >
+            <span className="text-sm font-semibold text-stone-900">I have a GitHub account</span>
+            <span className="mt-1 text-xs/5 text-stone-500">
+              File directly on our issue tracker — fastest, and you&rsquo;ll get notified of replies.
+            </span>
+            <span className="mt-3 text-sm font-medium text-brand-600 group-hover:text-brand-700">Open on GitHub →</span>
+          </a>
+          <button
+            type="button"
+            onClick={() => setMode('form')}
+            className="group flex flex-col rounded-xl border border-stone-200 bg-white p-5 text-left shadow-sm transition hover:border-brand-400 hover:shadow"
+          >
+            <span className="text-sm font-semibold text-stone-900">I don&rsquo;t have a GitHub account</span>
+            <span className="mt-1 text-xs/5 text-stone-500">
+              Submit right here — no account needed. Attach a serial log and we&rsquo;ll file it for you.
+            </span>
+            <span className="mt-3 text-sm font-medium text-brand-600 group-hover:text-brand-700">Continue here →</span>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-xl space-y-4 text-left">
+      <button
+        type="button"
+        onClick={() => setMode(null)}
+        className="text-xs font-medium text-stone-500 hover:text-stone-700"
+      >
+        ← Back
+      </button>
       {/* Type */}
       <fieldset>
         <legend className="text-sm font-medium text-stone-700">What kind of issue is this?</legend>

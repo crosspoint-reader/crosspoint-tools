@@ -4809,6 +4809,10 @@ async function handleContact(
 // (issue-submissions) so the maintainer can reach out privately.
 
 const ISSUE_REPO = 'crosspoint-reader/crosspoint-reader';
+// Auto-assign website-filed issues so the maintainer is notified. Invalid/
+// unassignable logins are silently ignored by GitHub, so this never blocks
+// issue creation.
+const ISSUE_DEFAULT_ASSIGNEES = ['itsthisjustin'];
 const ISSUE_LOG_KEY = 'issue-submissions';
 const ISSUE_LOG_MAX = 500;
 const ISSUE_RATE_TTL_SECONDS = 120; // one submission per IP per 2 minutes
@@ -5162,7 +5166,7 @@ async function handleCreateIssue(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ title, body: issueBody, labels }),
+    body: JSON.stringify({ title, body: issueBody, labels, assignees: ISSUE_DEFAULT_ASSIGNEES }),
   });
 
   if (!ghRes.ok) {
