@@ -98,8 +98,12 @@ INTERVAL_PRESETS = {
 # custom ranges are additive.
 BASE_INTERVAL_PRESETS = ("base",)
 
-# Regex for parsing unnamed hex range intervals: (0xSTART-0xEND)
-_HEX_RANGE_PATTERN = re.compile(r'^\(0x([0-9a-fA-F]+)-0x([0-9a-fA-F]+)\)$')
+# Regex for parsing unnamed hex range intervals. Canonical form is
+# (0xSTART-0xEND), but users type these by hand on the website, so also
+# accept bare ranges without parens (0xSTART-0xEND) and single codepoints
+# (0x2122), which mean a one-codepoint range.
+_HEX_RANGE_PATTERN = re.compile(
+    r'^\(?\s*0x([0-9a-fA-F]+)\s*(?:-\s*0x([0-9a-fA-F]+)\s*)?\)?$')
 
 def parse_hex_range(s: str) -> tuple[int, int] | None:
     match = _HEX_RANGE_PATTERN.fullmatch(s)
@@ -107,7 +111,8 @@ def parse_hex_range(s: str) -> tuple[int, int] | None:
         return None
 
     start_hex, end_hex = match.groups()
-    start, end = int(start_hex, 16), int(end_hex, 16)
+    start = int(start_hex, 16)
+    end = int(end_hex, 16) if end_hex is not None else start
 
     # Validating Unicode range bounds.
     if start > end or end > 0x10FFFF:
@@ -123,10 +128,10 @@ def resolve_intervals(preset_str):
     for name in [name.strip().lower() for name in preset_str.split(",") if name.strip()]:
         unnamed_interval = parse_hex_range(name)
         if name not in INTERVAL_PRESETS and unnamed_interval is None:
-            print(f"Error: unknown interval preset '{name}'", file=sys.stderr)
             print(f"Available presets: {', '.join(sorted(INTERVAL_PRESETS.keys()))}", file=sys.stderr)
-            print("You can also specify unnamed hex ranges like (0x2100-0x214F)", file=sys.stderr)
-            sys.exit(1)
+            raise FontBuildError(
+                f"Unknown Unicode coverage entry '{name}'. Use a preset name or a hex "
+                f"range like (0x2100-0x214F); single codepoints like 0x2122 also work.")
         parsed_tokens.append((name, unnamed_interval))
 
     for name, unnamed_interval in parsed_tokens:
@@ -718,10 +723,24 @@ def rasterize_font_style(fontfile, size, intervals, style_id=0, force_autohint=F
                 pixels2b.append(px)
 
             packed = bytes(pixels2b)
+            advance_x = fp4_from_ft16_16(f.glyph.linearHoriAdvance)
+            # The on-device EpdGlyph struct stores width/height as uint8,
+            # advance as uint16 and data_length as uint16. Some decorative or
+            # malformed fonts render glyphs beyond those limits; ship them as
+            # blank (advance-only) glyphs instead of failing the whole build.
+            if (bitmap.width > 0xFF or bitmap.rows > 0xFF
+                    or len(packed) > 0xFFFF or not 0 <= advance_x <= 0xFFFF):
+                print(f"  [{style_label}] WARNING: glyph U+{code_point:04X} "
+                      f"({bitmap.width}x{bitmap.rows}, {len(packed)} bytes) exceeds "
+                      f"cpfont format limits; emitting blank glyph", file=sys.stderr)
+                glyph = GlyphProps(0, 0, max(0, min(advance_x, 0xFFFF)), 0, 0,
+                                   0, total_bitmap_size, code_point)
+                all_glyphs.append((glyph, b''))
+                continue
             glyph = GlyphProps(
                 width=bitmap.width,
                 height=bitmap.rows,
-                advance_x=fp4_from_ft16_16(f.glyph.linearHoriAdvance),
+                advance_x=advance_x,
                 left=f.glyph.bitmap_left,
                 top=f.glyph.bitmap_top,
                 data_length=len(packed),

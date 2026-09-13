@@ -44,7 +44,8 @@ jobs:
         run: |
           payload=$(jq -nc --arg buildId "$BUILD_ID" --arg status "building" \
             '{buildId: $buildId, status: $status}')
-          curl -sf -X POST "${WEBHOOK_BASE_URL}/api/font-build/status-update" \
+          curl -sf --retry 5 --retry-all-errors --retry-delay 2 \
+            -X POST "${WEBHOOK_BASE_URL}/api/font-build/status-update" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
             -d "$payload"
@@ -59,7 +60,7 @@ jobs:
           ARGS=()
           for style in regular bold italic bolditalic; do
             target="/tmp/ttfs/$style.ttf"
-            if curl -sf \
+            if curl -sf --retry 3 --retry-delay 2 \
                 -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
                 -o "$target" \
                 "${WEBHOOK_BASE_URL}/api/font-build/files/${BUILD_ID_URLENC}/$style.ttf"; then
@@ -70,7 +71,7 @@ jobs:
             fi
           done
           target="/tmp/ttfs/fallback-regular.ttf"
-          if curl -sf \
+          if curl -sf --retry 3 --retry-delay 2 \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
               -o "$target" \
               "${WEBHOOK_BASE_URL}/api/font-build/files/${BUILD_ID_URLENC}/fallback1/regular.ttf"; then
@@ -80,7 +81,7 @@ jobs:
             rm -f "$target"
           fi
           target="/tmp/ttfs/fallback2-regular.ttf"
-          if curl -sf \
+          if curl -sf --retry 3 --retry-delay 2 \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
               -o "$target" \
               "${WEBHOOK_BASE_URL}/api/font-build/files/${BUILD_ID_URLENC}/fallback2/regular.ttf"; then
@@ -159,7 +160,7 @@ jobs:
             name=$(basename "$f")
             size=$(stat -c%s "$f")
             echo "Uploading $name ($size bytes)"
-            curl -sf -X PUT \
+            curl -sf --retry 5 --retry-all-errors --retry-delay 2 -X PUT \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
               -H "X-Build-Id: $BUILD_ID" \
               -H "X-Filename: $name" \
@@ -184,7 +185,8 @@ jobs:
             --arg generatorVersion "${{ github.sha }}" \
             --argjson log "$LOG_TAIL" \
             '{buildId: $buildId, status: $status, generatorVersion: $generatorVersion, log: $log}')
-          curl -sf -X POST "${WEBHOOK_BASE_URL}/api/font-build/status-update" \
+          curl -sf --retry 5 --retry-all-errors --retry-delay 2 \
+            -X POST "${WEBHOOK_BASE_URL}/api/font-build/status-update" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
             -d "$payload"
@@ -204,7 +206,8 @@ jobs:
             --arg error "$ERROR_MSG" \
             --argjson log "$LOG_TAIL" \
             '{buildId: $buildId, status: $status, error: $error, log: $log}')
-          curl -sf -X POST "${WEBHOOK_BASE_URL}/api/font-build/status-update" \
+          curl -sf --retry 5 --retry-all-errors --retry-delay 2 \
+            -X POST "${WEBHOOK_BASE_URL}/api/font-build/status-update" \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
             -H "Content-Type: application/json" \
             -d "$payload" || true

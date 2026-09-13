@@ -149,6 +149,39 @@ const CJK_BLOCKS = [
   [0x30000, 0x323af], // CJK Extensions G-H
 ]
 
+// Normalize the free-text custom-ranges field into the canonical
+// "(0xSTART-0xEND)" comma-separated form the build pipeline expects.
+// Accepts lenient input: bare ranges without parens (0x2900-0x29FF),
+// single codepoints (0x2122), and stray whitespace. Returns
+// { ok: true, value } with the canonical string (empty if no input), or
+// { ok: false, error } with a message suitable for showing to the user.
+export function normalizeCustomIntervals(text) {
+  const trimmed = (text || '').trim()
+  if (!trimmed) return { ok: true, value: '' }
+  const out = []
+  for (const rawPart of trimmed.split(',')) {
+    const part = rawPart.trim()
+    if (!part) continue
+    const m = /^\(?\s*0x([0-9a-f]{1,6})\s*(?:-\s*0x([0-9a-f]{1,6})\s*)?\)?$/i.exec(part)
+    if (!m) {
+      return {
+        ok: false,
+        error: `"${part}" is not a valid Unicode range. Use hex ranges like (0x2900-0x29FF) or single codepoints like 0x2122, comma-separated.`,
+      }
+    }
+    const lo = parseInt(m[1], 16)
+    const hi = m[2] ? parseInt(m[2], 16) : lo
+    if (lo > hi) {
+      return { ok: false, error: `"${part}" is not a valid Unicode range: start is greater than end.` }
+    }
+    if (hi > 0x10ffff) {
+      return { ok: false, error: `"${part}" is out of range: codepoints go up to 0x10FFFF.` }
+    }
+    out.push(`(0x${lo.toString(16).toUpperCase()}-0x${hi.toString(16).toUpperCase()})`)
+  }
+  return { ok: true, value: out.join(',') }
+}
+
 // True when the custom-ranges field (e.g. "(0x4E00-0x9FFF),(0x3040-0x309F)")
 // overlaps any CJK block, so CJK typed as raw ranges also gets the UI sizes.
 export function customIntervalsContainCjk(text) {

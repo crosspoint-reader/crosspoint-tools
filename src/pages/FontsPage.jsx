@@ -9,6 +9,7 @@ import {
   CJK_PRESET_VALUES,
   DEFAULT_UI_SIZES,
   customIntervalsContainCjk,
+  normalizeCustomIntervals,
   formatSize,
   loadJSZip,
 } from './fonts/fontBuilder.js'
@@ -177,8 +178,8 @@ export default function FontsPage() {
   // -- intervals ------------------------------------------------------------
   function intervalSelection() {
     const parts = INTERVAL_PRESETS.filter((p) => presets[p.value]).map((p) => p.value)
-    const custom = customIntervals.trim()
-    if (custom) parts.push(custom)
+    const custom = normalizeCustomIntervals(customIntervals)
+    if (custom.ok && custom.value) parts.push(custom.value)
     return parts.length ? parts.join(',') : 'base'
   }
 
@@ -289,6 +290,11 @@ export default function FontsPage() {
     const familyRaw = familyName.trim()
     if (!familyRaw) {
       alert('Please enter a font family name.')
+      return
+    }
+    const customCheck = normalizeCustomIntervals(customIntervals)
+    if (!customCheck.ok) {
+      alert(customCheck.error)
       return
     }
     const intervals = intervalSelection()
@@ -829,10 +835,18 @@ export default function FontsPage() {
                     placeholder="(0x2900-0x29FF),(0x2E00-0x2EFF)"
                     className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 font-mono text-sm text-stone-900 shadow-sm placeholder:text-stone-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                   />
-                  <p className="mt-1.5 max-w-[42rem] text-xs text-stone-400">
-                    Comma-separated hex ranges added on top of the checked presets. Example:{' '}
-                    <Code className="text-[11px]">(0x2900-0x29FF),(0x2E00-0x2EFF)</Code>
-                  </p>
+                  {(() => {
+                    const check = normalizeCustomIntervals(customIntervals)
+                    return check.ok ? (
+                      <p className="mt-1.5 max-w-[42rem] text-xs text-stone-400">
+                        Comma-separated hex ranges added on top of the checked presets. Example:{' '}
+                        <Code className="text-[11px]">(0x2900-0x29FF),(0x2E00-0x2EFF)</Code>. Single
+                        codepoints like <Code className="text-[11px]">0x2122</Code> also work.
+                      </p>
+                    ) : (
+                      <p className="mt-1.5 max-w-[42rem] text-xs text-red-600">{check.error}</p>
+                    )
+                  })()}
                 </div>
               </div>
             </div>
