@@ -197,7 +197,7 @@ async function handleApi(
         return await handleStatusReconcile(request, url, env, corsHeaders);
 
       case '/api/catalog':
-        return handleCatalog(env, corsHeaders);
+        return handleCatalog(url, env, corsHeaders);
 
       case '/api/release/latest':
         return handleLatestRelease(env, corsHeaders);
@@ -4611,9 +4611,15 @@ async function fetchEscapeHatchX4ProForCatalog(env: Env): Promise<CatalogRelease
 }
 
 async function handleCatalog(
+  url: URL,
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
+  // Unlockers up to v0.2.38 hard-error on unknown device ids and drop the
+  // whole catalog, so `x4c` entries are only served to clients that opt in
+  // with ?schema=2 (Unlockers with X4C support, whose parser also skips
+  // unknown tokens). Default responses stay x4c-free for old clients.
+  const schema = Number(url.searchParams.get('schema')) || 1;
   const [stable, rcReleases, insider, insiderX4Pro, betas, escapeHatch, escapeHatchX4Pro] = await Promise.all([
     fetchStableForCatalog(env),
     fetchRcForCatalog(env),
@@ -4624,7 +4630,7 @@ async function handleCatalog(
     fetchEscapeHatchX4ProForCatalog(env),
   ]);
 
-  const releases: CatalogRelease[] = [];
+  let releases: CatalogRelease[] = [];
   releases.push(...stable);
   releases.push(...rcReleases);
   if (insider) releases.push(insider);
@@ -4633,8 +4639,17 @@ async function handleCatalog(
   if (escapeHatch) releases.push(escapeHatch);
   if (escapeHatchX4Pro) releases.push(escapeHatchX4Pro);
 
+  if (schema < 2) {
+    releases = releases
+      .map(r => ({
+        ...r,
+        supported_devices: r.supported_devices.filter(d => d !== 'x4c'),
+      }))
+      .filter(r => r.supported_devices.length > 0);
+  }
+
   return json({
-    schema_version: 1,
+    schema_version: schema >= 2 ? 2 : 1,
     generated_at: new Date().toISOString(),
     releases,
   }, 200, {

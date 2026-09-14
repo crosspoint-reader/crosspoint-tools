@@ -8,7 +8,13 @@ use tokio::io::AsyncWriteExt;
 /// `Source` and its `id` is namespaced as `{slug}:{original_id}` so IDs from
 /// different publishers can't collide.
 pub const CATALOG_SOURCES: &[(Source, &str)] = &[
-    (Source::Xteink, "https://crosspointreader.com/api/catalog"),
+    // `?schema=2` opts into x4c entries; the default response omits them
+    // because Unlockers up to v0.2.38 abort the whole catalog parse on
+    // unknown device ids.
+    (
+        Source::Xteink,
+        "https://crosspointreader.com/api/catalog?schema=2",
+    ),
     (
         Source::CrosspointKo,
         "https://crosspoint.idlerecord.com/catalog",
