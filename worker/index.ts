@@ -4147,6 +4147,7 @@ const ASSET_SUFFIX_DEVICES: Record<string, string[]> = {
   'x3-x4': ['x3', 'x4'],
   'x4-x3': ['x3', 'x4'],
   x4pro: ['x4pro'],
+  x4c: ['x4c'],
   sticky: ['sticky'],
   papermono: ['papermono'],
 };
@@ -4177,14 +4178,15 @@ function parseReleaseAsset(name: string): { devices: string[]; version: string |
   return { devices, version: devices.length ? stem.replace(/^[^-]+-/, '') || null : null };
 }
 
-// Catalog view of a stable asset's devices. The catalog schema (and the
-// deployed Unlocker, which hard-errors on unknown model ids) only knows
-// x3/x4/x4pro, so sticky/papermono assets are surfaced through the flasher's
-// /api/release endpoints instead of the catalog.
-function stableAssetDevices(name: string): ('x3' | 'x4' | 'x4pro')[] {
+// Catalog view of a stable asset's devices. The catalog schema only knows
+// the Xteink models (x3/x4/x4pro/x4c) — Unlockers since v0.2.17 skip unknown
+// device tokens, but sticky/papermono aren't Unlocker devices, so their
+// assets are surfaced through the flasher's /api/release endpoints instead
+// of the catalog.
+function stableAssetDevices(name: string): ('x3' | 'x4' | 'x4pro' | 'x4c')[] {
   return parseReleaseAsset(name).devices.filter(
-    (device): device is 'x3' | 'x4' | 'x4pro' =>
-      device === 'x3' || device === 'x4' || device === 'x4pro'
+    (device): device is 'x3' | 'x4' | 'x4pro' | 'x4c' =>
+      device === 'x3' || device === 'x4' || device === 'x4pro' || device === 'x4c'
   );
 }
 
@@ -4346,7 +4348,7 @@ interface CatalogRelease {
   firmware_url: string;
   firmware_sha256: string;
   size: number;
-  supported_devices: ('x3' | 'x4' | 'x4pro')[];
+  supported_devices: ('x3' | 'x4' | 'x4pro' | 'x4c')[];
 }
 
 const ORIGIN = 'https://crosspointreader.com';
@@ -4426,7 +4428,11 @@ async function fetchStableForCatalog(env: Env): Promise<CatalogRelease[]> {
         await env.BUILD_META.put(cacheKey, sha);
       }
 
-      const suffix = devices.includes('x4pro') ? '-x4pro' : '';
+      // Device-specific assets get a device suffix so ids stay unique; the
+      // shared x3/x4 asset keeps the bare tag id older Unlockers expect.
+      const suffix = devices.includes('x4pro') ? '-x4pro'
+        : devices.includes('x4c') ? '-x4c'
+        : '';
       out.push({
         id: `stable-${release.tag_name}${suffix}`,
         channel: 'stable',
@@ -4446,36 +4452,42 @@ async function fetchStableForCatalog(env: Env): Promise<CatalogRelease[]> {
   }
 }
 
-// Offer the latest GitHub RC directly to X4 Pro users while stable releases do
-// not yet carry an X4 Pro asset. The unlocker wraps this plain binary into XOTA.
-async function fetchRcX4ProForCatalog(env: Env): Promise<CatalogRelease | null> {
+// Offer the latest GitHub RC directly to the S3-class devices (X4 Pro, X4C)
+// while stable releases do not yet carry assets for them. The unlocker wraps
+// these plain binaries into XOTA.
+async function fetchRcForCatalog(env: Env): Promise<CatalogRelease[]> {
   const [settings, release] = await Promise.all([getRcSettings(env), fetchRcRelease(env)]);
-  if (!settings.enabled || !release) return null;
-  const asset = release.assets.find(a => a.devices.includes('x4pro'));
-  if (!asset) return null;
+  if (!settings.enabled || !release) return [];
 
-  // Keyed by updatedAt so a re-pushed RC binary invalidates the cached hash
-  // (same stale-sha failure mode the stable path had).
-  const cacheKey = `sha256:rc:${release.tag}:${asset.name}:${asset.updatedAt}`;
-  let sha = await env.BUILD_META.get(cacheKey);
-  if (!sha) {
-    const fwRes = await fetch(asset.downloadUrl, { headers: { 'User-Agent': 'crosspoint-tools' } });
-    if (!fwRes.ok) return null;
-    sha = await sha256Hex(await fwRes.arrayBuffer());
-    await env.BUILD_META.put(cacheKey, sha);
+  const out: CatalogRelease[] = [];
+  for (const device of ['x4pro', 'x4c'] as const) {
+    const asset = release.assets.find(a => a.devices.includes(device));
+    if (!asset) continue;
+
+    // Keyed by updatedAt so a re-pushed RC binary invalidates the cached hash
+    // (same stale-sha failure mode the stable path had).
+    const cacheKey = `sha256:rc:${release.tag}:${asset.name}:${asset.updatedAt}`;
+    let sha = await env.BUILD_META.get(cacheKey);
+    if (!sha) {
+      const fwRes = await fetch(asset.downloadUrl, { headers: { 'User-Agent': 'crosspoint-tools' } });
+      if (!fwRes.ok) continue;
+      sha = await sha256Hex(await fwRes.arrayBuffer());
+      await env.BUILD_META.put(cacheKey, sha);
+    }
+
+    out.push({
+      id: `rc-${release.tag}-${device}`,
+      channel: 'beta',
+      name: release.name,
+      version: release.version,
+      released_at: release.publishedAt,
+      firmware_url: `${ORIGIN}/api/rc/firmware?device=${device}`,
+      firmware_sha256: sha,
+      size: asset.size,
+      supported_devices: [device],
+    });
   }
-
-  return {
-    id: `rc-${release.tag}-x4pro`,
-    channel: 'beta',
-    name: release.name,
-    version: release.version,
-    released_at: release.publishedAt,
-    firmware_url: `${ORIGIN}/api/rc/firmware?device=x4pro`,
-    firmware_sha256: sha,
-    size: asset.size,
-    supported_devices: ['x4pro'],
-  };
+  return out;
 }
 
 async function fetchInsiderForCatalog(env: Env): Promise<CatalogRelease | null> {
@@ -4602,9 +4614,9 @@ async function handleCatalog(
   env: Env,
   headers: Record<string, string>
 ): Promise<Response> {
-  const [stable, rcX4Pro, insider, insiderX4Pro, betas, escapeHatch, escapeHatchX4Pro] = await Promise.all([
+  const [stable, rcReleases, insider, insiderX4Pro, betas, escapeHatch, escapeHatchX4Pro] = await Promise.all([
     fetchStableForCatalog(env),
-    fetchRcX4ProForCatalog(env),
+    fetchRcForCatalog(env),
     fetchInsiderForCatalog(env),
     fetchInsiderX4ProForCatalog(env),
     fetchBetasForCatalog(env),
@@ -4614,7 +4626,7 @@ async function handleCatalog(
 
   const releases: CatalogRelease[] = [];
   releases.push(...stable);
-  if (rcX4Pro) releases.push(rcX4Pro);
+  releases.push(...rcReleases);
   if (insider) releases.push(insider);
   if (insiderX4Pro) releases.push(insiderX4Pro);
   for (const b of betas) releases.push(b);
