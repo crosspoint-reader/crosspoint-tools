@@ -72,7 +72,10 @@ export default function DownloadModal({ open, onClose }) {
   useEffect(() => {
     if (!open || catalog) return
     let cancelled = false
-    fetch('/api/catalog')
+    // schema=2 opts into x4c catalog entries (the default response omits them
+    // for old Unlocker builds). The modal doesn't list S3 devices from the
+    // catalog today, but this keeps the site on the full catalog if that changes.
+    fetch('/api/catalog?schema=2')
       .then((res) => {
         if (!res.ok) throw new Error(`Catalog request failed: ${res.status}`)
         return res.json()
