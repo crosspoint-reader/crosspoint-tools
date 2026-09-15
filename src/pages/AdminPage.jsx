@@ -1339,12 +1339,14 @@ const RC_DEVICE_LABELS = {
   x4: 'X4',
   x3: 'X3',
   x4pro: 'X4 Pro',
+  x4c: 'X4C',
   sticky: 'Sticky',
   papermono: 'PaperMono',
 }
 
 function RcChannelCard({ secret, log }) {
   const [enabled, setEnabled] = useState(false)
+  const [hiddenDevices, setHiddenDevices] = useState([])
   const [release, setRelease] = useState(null)
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -1359,6 +1361,7 @@ function RcChannelCard({ secret, log }) {
         const data = await res.json()
         if (!cancelled) {
           setEnabled(!!data.enabled)
+          setHiddenDevices(data.hiddenDevices || [])
           setRelease(data.release || null)
           setLoaded(true)
         }
@@ -1371,7 +1374,8 @@ function RcChannelCard({ secret, log }) {
     }
   }, [log])
 
-  async function saveEnabled(next) {
+  // Partial update: the worker merges the patch over stored settings.
+  async function saveSettings(patch, okText) {
     setBusy(true)
     setResult(null)
     try {
@@ -1381,12 +1385,14 @@ function RcChannelCard({ secret, log }) {
           Authorization: 'Bearer ' + secret,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ enabled: next }),
+        body: JSON.stringify(patch),
       })
       if (res.ok) {
-        setEnabled(next)
-        setResult({ ok: true, text: next ? 'RC channel enabled' : 'RC channel disabled' })
-        log('RC channel ' + (next ? 'enabled' : 'disabled'))
+        const data = await res.json().catch(() => ({}))
+        setEnabled(!!data.enabled)
+        setHiddenDevices(data.hiddenDevices || [])
+        setResult({ ok: true, text: okText })
+        log(okText)
       } else {
         const data = await res.json().catch(() => ({}))
         setResult({ ok: false, text: data.error || 'Save failed' })
@@ -1395,6 +1401,20 @@ function RcChannelCard({ secret, log }) {
       setResult({ ok: false, text: 'Connection error' })
     }
     setBusy(false)
+  }
+
+  function saveEnabled(next) {
+    saveSettings({ enabled: next }, next ? 'RC channel enabled' : 'RC channel disabled')
+  }
+
+  function toggleDevice(id) {
+    const hidden = hiddenDevices.includes(id)
+    const next = hidden ? hiddenDevices.filter((d) => d !== id) : [...hiddenDevices, id]
+    const label = RC_DEVICE_LABELS[id] || id
+    saveSettings(
+      { hiddenDevices: next },
+      hidden ? `RC shown on ${label}` : `RC hidden on ${label}`
+    )
   }
 
   return (
@@ -1423,15 +1443,30 @@ function RcChannelCard({ secret, log }) {
             </a>
           </div>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {release.assets.flatMap((a) => a.devices).map((d) => (
-              <span
-                key={d}
-                className="rounded bg-stone-200 px-1.5 py-0.5 font-mono text-[11px] text-stone-600"
-              >
-                {RC_DEVICE_LABELS[d] || d}
-              </span>
-            ))}
+            {release.assets.flatMap((a) => a.devices).map((d) => {
+              const hidden = hiddenDevices.includes(d)
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  disabled={busy || !loaded}
+                  onClick={() => toggleDevice(d)}
+                  title={hidden ? 'Hidden — click to show' : 'Shown — click to hide'}
+                  className={`rounded px-1.5 py-0.5 font-mono text-[11px] transition-colors ${
+                    hidden
+                      ? 'bg-stone-100 text-stone-400 line-through'
+                      : 'bg-stone-200 text-stone-600 hover:bg-stone-300'
+                  }`}
+                >
+                  {RC_DEVICE_LABELS[d] || d}
+                </button>
+              )
+            })}
           </div>
+          <p className="mt-1 text-[11px] text-stone-400">
+            Click a device to hide or show the RC on it (applies to the flasher and the Unlocker
+            catalog).
+          </p>
         </div>
       ) : (
         <p className="mt-3 text-xs text-stone-400">

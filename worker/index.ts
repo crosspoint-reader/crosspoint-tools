@@ -4207,14 +4207,26 @@ interface RcRelease {
   assets: RcAsset[];
 }
 
-async function getRcSettings(env: Env): Promise<{ enabled: boolean }> {
+interface RcSettings {
+  enabled: boolean;
+  // Flasher device ids the RC is hidden on while the channel is enabled, so a
+  // known-bad build for one device can be pulled without disabling the rest.
+  hiddenDevices: string[];
+}
+
+async function getRcSettings(env: Env): Promise<RcSettings> {
   const raw = await env.BUILD_META.get(RC_SETTINGS_KEY);
-  if (!raw) return { enabled: false };
+  if (!raw) return { enabled: false, hiddenDevices: [] };
   try {
-    const parsed = JSON.parse(raw) as { enabled?: unknown };
-    return { enabled: parsed.enabled === true };
+    const parsed = JSON.parse(raw) as { enabled?: unknown; hiddenDevices?: unknown };
+    return {
+      enabled: parsed.enabled === true,
+      hiddenDevices: Array.isArray(parsed.hiddenDevices)
+        ? parsed.hiddenDevices.filter((d): d is string => typeof d === 'string')
+        : [],
+    };
   } catch {
-    return { enabled: false };
+    return { enabled: false, hiddenDevices: [] };
   }
 }
 
@@ -4283,10 +4295,16 @@ async function handleRcInfo(env: Env, headers: Record<string, string>): Promise<
     }),
   ]);
   // Clients download through the /api/rc/firmware proxy, not GitHub directly.
+  // The release is returned unfiltered (the admin panel needs every device to
+  // render its toggles); consumers hide devices via `hiddenDevices`.
   const publicRelease = release
     ? { ...release, assets: release.assets.map(({ downloadUrl: _omit, ...rest }) => rest) }
     : null;
-  return json({ enabled: settings.enabled, release: publicRelease }, 200, headers);
+  return json(
+    { enabled: settings.enabled, hiddenDevices: settings.hiddenDevices, release: publicRelease },
+    200,
+    headers
+  );
 }
 
 async function handleRcSettingsUpdate(
@@ -4297,12 +4315,30 @@ async function handleRcSettingsUpdate(
   if (!isAuthorizedWebhookRequest(request, env)) {
     return json({ error: 'Unauthorized' }, 401, headers);
   }
-  const body = await request.json().catch(() => null) as { enabled?: unknown } | null;
-  if (!body || typeof body.enabled !== 'boolean') {
-    return json({ error: '`enabled` boolean is required' }, 400, headers);
+  const body = await request.json().catch(() => null) as
+    | { enabled?: unknown; hiddenDevices?: unknown }
+    | null;
+  const hasEnabled = typeof body?.enabled === 'boolean';
+  const hasHidden = Array.isArray(body?.hiddenDevices);
+  if (!body || (!hasEnabled && !hasHidden)) {
+    return json(
+      { error: '`enabled` boolean and/or `hiddenDevices` string array is required' },
+      400,
+      headers
+    );
   }
-  await env.BUILD_META.put(RC_SETTINGS_KEY, JSON.stringify({ enabled: body.enabled }));
-  return json({ enabled: body.enabled }, 200, headers);
+  if (hasHidden && !(body.hiddenDevices as unknown[]).every(d => typeof d === 'string')) {
+    return json({ error: '`hiddenDevices` must be an array of device ids' }, 400, headers);
+  }
+  // Partial update: merge over the stored settings so toggling one field
+  // doesn't clobber the other.
+  const current = await getRcSettings(env);
+  const next: RcSettings = {
+    enabled: hasEnabled ? (body.enabled as boolean) : current.enabled,
+    hiddenDevices: hasHidden ? (body.hiddenDevices as string[]) : current.hiddenDevices,
+  };
+  await env.BUILD_META.put(RC_SETTINGS_KEY, JSON.stringify(next));
+  return json(next, 200, headers);
 }
 
 // Stream the RC asset for a device straight from GitHub. 404s while the
@@ -4315,7 +4351,7 @@ async function handleRcFirmware(
 ): Promise<Response> {
   const device = url.searchParams.get('device') || '';
   const settings = await getRcSettings(env);
-  if (!settings.enabled) {
+  if (!settings.enabled || settings.hiddenDevices.includes(device)) {
     return json({ error: 'RC channel is disabled' }, 404, headers);
   }
   const release = await fetchRcRelease(env).catch(() => null);
@@ -4461,6 +4497,7 @@ async function fetchRcForCatalog(env: Env): Promise<CatalogRelease[]> {
 
   const out: CatalogRelease[] = [];
   for (const device of ['x4pro', 'x4c'] as const) {
+    if (settings.hiddenDevices.includes(device)) continue;
     const asset = release.assets.find(a => a.devices.includes(device));
     if (!asset) continue;
 

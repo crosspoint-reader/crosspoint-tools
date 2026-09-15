@@ -839,11 +839,15 @@ export default function FlashTools() {
   const isReleaseHidden = (key) => (releaseVisibility.hidden?.[key] || []).includes(model)
 
   // RC asset covering the selected device, when the admin-gated RC channel is
-  // on. The worker maps prerelease assets to device ids by filename prefix.
+  // on and the device isn't individually hidden. The worker maps prerelease
+  // assets to device ids by filename prefix.
+  const rcHidden = (id) => (rc.hiddenDevices || []).includes(id)
   const rcCoversDevice = (id) =>
-    rc.enabled && rc.release ? rc.release.assets.some((a) => a.devices.includes(id)) : false
+    rc.enabled && rc.release && !rcHidden(id)
+      ? rc.release.assets.some((a) => a.devices.includes(id))
+      : false
   const rcAsset =
-    rc.enabled && rc.release
+    rc.enabled && rc.release && !rcHidden(model)
       ? rc.release.assets.find((a) => a.devices.includes(model)) || null
       : null
 
