@@ -1121,17 +1121,22 @@ export async function fetchReleaseVisibility() {
 }
 
 // Release-candidate channel: the latest GitHub prerelease, mapped to devices
-// by asset filename prefix in the worker and gated behind an admin toggle.
-// Returns { enabled, release } and falls back to "disabled" on any failure so
-// the flasher simply omits the RC option.
+// by asset filename prefix in the worker and gated behind an admin toggle
+// (global enable + per-device hiddenDevices). Returns { enabled,
+// hiddenDevices, release } and falls back to "disabled" on any failure so the
+// flasher simply omits the RC option.
 export async function fetchRcInfo() {
   try {
     const res = await fetch('/api/rc/info')
-    if (!res.ok) return { enabled: false, release: null }
+    if (!res.ok) return { enabled: false, hiddenDevices: [], release: null }
     const data = await res.json()
-    return { enabled: !!data.enabled, release: data.release || null }
+    return {
+      enabled: !!data.enabled,
+      hiddenDevices: Array.isArray(data.hiddenDevices) ? data.hiddenDevices : [],
+      release: data.release || null,
+    }
   } catch {
-    return { enabled: false, release: null }
+    return { enabled: false, hiddenDevices: [], release: null }
   }
 }
 
