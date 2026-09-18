@@ -12,7 +12,7 @@ export default function Partners() {
         <p className="text-center text-xs font-semibold tracking-[0.2em] text-stone-400 uppercase">
           Official partners of
         </p>
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-x-12 gap-y-6 sm:gap-x-16">
+        <div className="mt-7 grid grid-cols-[auto_auto] items-center justify-center justify-items-center gap-x-10 gap-y-7 lg:flex lg:-translate-x-7 lg:gap-x-16">
           {PARTNERS.map((p) => (
             <img
               key={p.name}
