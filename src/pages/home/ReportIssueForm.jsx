@@ -44,6 +44,7 @@ export default function ReportIssueForm() {
   const [email, setEmail] = useState('')
   const [type, setType] = useState('')
   const [device, setDevice] = useState('')
+  const [firmwareVersion, setFirmwareVersion] = useState('')
   const [topics, setTopics] = useState([])
   const [serialLog, setSerialLog] = useState('')
   const [serialFromDebug, setSerialFromDebug] = useState(false)
@@ -226,6 +227,10 @@ export default function ReportIssueForm() {
       setStatus({ ok: false, msg: 'Please choose your device.' })
       return
     }
+    if (!firmwareVersion.trim()) {
+      setStatus({ ok: false, msg: 'Please enter your installed firmware version.' })
+      return
+    }
     if (config?.siteKey && !tokenRef.current) {
       setStatus({ ok: false, msg: 'Please complete the bot check before submitting.' })
       return
@@ -242,6 +247,7 @@ export default function ReportIssueForm() {
           email,
           type,
           device,
+          firmwareVersion,
           topics,
           serialLog,
           website,
@@ -256,6 +262,7 @@ export default function ReportIssueForm() {
         setEmail('')
         setType('')
         setDevice('')
+        setFirmwareVersion('')
         setTopics([])
         setSerialLog('')
         setSerialFromDebug(false)
@@ -373,6 +380,21 @@ export default function ReportIssueForm() {
         </select>
       </div>
 
+      <div>
+        <label htmlFor="issue-firmware-version" className="text-sm font-medium text-stone-700">
+          What firmware version do you have installed? (required)
+        </label>
+        <input
+          id="issue-firmware-version"
+          type="text"
+          value={firmwareVersion}
+          onChange={(e) => setFirmwareVersion(e.target.value)}
+          required
+          maxLength={100}
+          className={`mt-2 ${inputCls}`}
+        />
+      </div>
+
       <input
         type="text"
         value={title}
@@ -386,7 +408,7 @@ export default function ReportIssueForm() {
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="What happened? Steps to reproduce, what you expected, your firmware version…"
+        placeholder="What happened? Steps to reproduce, what you expected…"
         required
         minLength={10}
         maxLength={8000}

@@ -5124,7 +5124,7 @@ async function handleCreateIssue(
 
   let body: {
     title?: string; body?: string; email?: string;
-    type?: string; device?: string; topics?: unknown; serialLog?: string;
+    type?: string; device?: string; firmwareVersion?: string; topics?: unknown; serialLog?: string;
     turnstileToken?: string; website?: string;
   };
   try {
@@ -5178,6 +5178,10 @@ async function handleCreateIssue(
   if (!deviceOpt) {
     return json({ error: 'Please choose a device.' }, 400, headers);
   }
+  const firmwareVersion = typeof body.firmwareVersion === 'string' ? body.firmwareVersion.trim() : '';
+  if (!firmwareVersion || firmwareVersion.length > 100) {
+    return json({ error: 'Please enter your installed firmware version (up to 100 characters).' }, 400, headers);
+  }
   // Optional topics: keep only known values, cap the count.
   const topicValues = Array.isArray(body.topics)
     ? body.topics.filter((t): t is string => typeof t === 'string')
@@ -5194,7 +5198,7 @@ async function handleCreateIssue(
   labels.push(...topicLabels);
 
   // Build the public body. Device/type context up top; email intentionally absent.
-  const footer = `\n\n---\n**Device:** ${deviceOpt.label}\n\n_Submitted anonymously via [crosspointreader.com](https://crosspointreader.com/report-issue) on behalf of a website visitor._`;
+  const footer = `\n\n---\n**Device:** ${deviceOpt.label}\n**Firmware version:** ${firmwareVersion}\n\n_Submitted anonymously via [crosspointreader.com](https://crosspointreader.com/report-issue) on behalf of a website visitor._`;
 
   // Optional serial log: embed collapsed + capped, sanitizing fences so a stray
   // ``` in the log can't break out of the code block.
