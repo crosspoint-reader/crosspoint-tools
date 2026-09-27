@@ -40,6 +40,11 @@ const RELEASES = [
     date: 'September 2026',
     blurb: 'X4 Pro and PaperMono support, Reading Night Mode, transparent sleep screens, and styled dictionary definitions.',
   },
+  {
+    version: '1.6.5',
+    date: 'September 2026',
+    blurb: 'A Library for every book on the card, TrueType fonts, the Cover Grid home theme, word and character spacing, and X4 Classic support.',
+  },
 ]
 
 // Live numbers come from /api/stats. These are the last known good values and
@@ -163,7 +168,10 @@ export default function Rhythm() {
           <p className="mt-4 font-serif text-xl/9 text-pretty text-stone-600">
             <LittleThing>Tilt the device</LittleThing> to turn the page.{' '}
             <LittleThing>Themes</LittleThing> that restyle the whole
-            interface. A <LittleThing>web file manager</LittleThing> for your library, right in the
+            interface, including a <LittleThing>cover grid</LittleThing> of your recent books.
+            A <LittleThing>clock</LittleThing> on the home screen that handles daylight saving
+            for you. <LittleThing>Tap and swipe gestures</LittleThing> you can set separately
+            for each direction on touch readers. A <LittleThing>web file manager</LittleThing> for your library, right in the
             browser. An <LittleThing>EPUB optimizer</LittleThing> that slims books down before
             they reach the device. A <LittleThing>hotspot mode</LittleThing> for loading books
             anywhere, no home network needed. Every one exists because someone in the community

@@ -282,7 +282,8 @@ export default function RoadmapPage() {
                 Phase 1 closed with the 1.6 release (September 5, 2026). CrossPoint now ships stable builds for
                 the Xteink X4 Pro and M5Stack PaperMono alongside the X3/X4 and Sticky, added X4 Classic board
                 support, and landed the SDK generalization work that made them possible — plus a 323&nbsp;KB
-                built-in font flash reduction.
+                built-in font flash reduction. The 1.6.5 follow-up (September 27, 2026) made the X4 Classic an
+                officially supported device and cut heap fragmentation across EPUB, font, and image handling.
               </p>
             </div>
           </li>
@@ -310,6 +311,7 @@ export default function RoadmapPage() {
                   'UI languages & localization',
                   'Themes → SD-loaded assets',
                   'SD-loaded plugins',
+                  'Hyphenation files → SD-loaded',
                 ]}
               />
 
@@ -317,6 +319,11 @@ export default function RoadmapPage() {
                 Already landed in 1.6: language-specific fonts with script grouping in the fonts manager,
                 on-device font downloads for Hebrew, Arabic, and Korean, Bulgarian and Persian UI languages,
                 additional keyboard layouts, and major CJK improvements.
+              </p>
+              <p className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-600 ring-1 ring-stone-200">
+                Landed in 1.6.5: TrueType and OpenType fonts loaded straight from the SD card on devices with
+                external RAM, Portuguese hyphenation, an Arabic keyboard layout, Korean justification that stretches
+                only the spaces between words, and a build option to choose which UI languages are compiled in.
               </p>
             </div>
           </li>
