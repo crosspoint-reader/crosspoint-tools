@@ -62,7 +62,7 @@ export default function Features() {
           title="Bring your own fonts."
           shot={<EinkShot src="/screenshots/feature-settings-font-selection.png" />}
         >
-          Choose the <Em>typeface, size, spacing, and margins</Em> that feel right. The
+          Choose the <Em>typeface, size, margins, and line, word, and letter spacing</Em> that feel right. The
           built-in library keeps growing because
           contributors keep adding to it: Noto Serif, Domitian, Libre Baskerville,
           OpenDyslexic, and more. And if the one font you can&rsquo;t read without
@@ -70,7 +70,8 @@ export default function Features() {
           <Link to="/fonts" className="font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700">
             font builder
           </Link>{' '}
-          converts any font you own.
+          converts any font you own. On readers with external RAM, just drop a{' '}
+          <Em>TrueType font</Em> onto the SD card and pick it from the menu.
         </Story>
 
         <Story
@@ -99,8 +100,10 @@ export default function Features() {
           shot={<EinkShot src="/screenshots/feature-bookmarks.png" />}
         >
           <Em>Quick Resume</Em> shows your page while the device sleeps, and waking drops you
-          straight back into the book. <Em>Bookmark</Em> any passage and flip back in a tap.
-          Finish a book, and CrossPoint <Em>suggests what to read next</Em> from your library.
+          straight back into the book. <Em>Bookmark</Em> any passage, give it a name, and flip back in a tap.
+          The <Em>Library</Em> shows every book on the card, sorted by recent, title, or author, with
+          search when you know what you want. Finish a book, and CrossPoint{' '}
+          <Em>suggests what to read next</Em>.
           If you read on more than one device, <Em>KOReader sync</Em> keeps them all on the
           same page.
         </Story>

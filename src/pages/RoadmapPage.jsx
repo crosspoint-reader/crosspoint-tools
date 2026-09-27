@@ -114,7 +114,7 @@ export default function RoadmapPage() {
                   2
                 </div>
                 <div className="mt-2 font-mono text-[11px] font-medium tracking-wide text-stone-500 uppercase">
-                  Languages
+                  Plugins
                 </div>
               </div>
             </div>
@@ -282,7 +282,8 @@ export default function RoadmapPage() {
                 Phase 1 closed with the 1.6 release (September 5, 2026). CrossPoint now ships stable builds for
                 the Xteink X4 Pro and M5Stack PaperMono alongside the X3/X4 and Sticky, added X4 Classic board
                 support, and landed the SDK generalization work that made them possible — plus a 323&nbsp;KB
-                built-in font flash reduction.
+                built-in font flash reduction. The 1.6.5 follow-up (September 27, 2026) made the X4 Classic an
+                officially supported device and cut heap fragmentation across EPUB, font, and image handling.
               </p>
             </div>
           </li>
@@ -295,21 +296,20 @@ export default function RoadmapPage() {
             <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.18)] sm:p-8">
               <PhaseBadges status="In progress" phase="Phase 2" live />
               <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
-                Languages, Fonts &amp; Themes
+                SD Plugins, SD Themes, Clippings &amp; CJK
               </h3>
               <p className="mt-2 text-stone-600">
                 <span className="font-semibold text-stone-900">Goal:</span> With the codebase smaller and portable,
-                make reading great in every language: multi-language support, better font support with custom fonts,
-                UI translations, and themes and plugins loaded from the SD card instead of consuming flash.
+                extend CrossPoint from the SD card instead of the firmware: plugins and themes loaded as SD assets so
+                they don't consume flash, clippings for saving passages from your books, and full CJK localization.
               </p>
 
               <FocusGrid
                 items={[
-                  'Multi-language reading support',
-                  'Better font support & custom fonts',
-                  'UI languages & localization',
-                  'Themes → SD-loaded assets',
                   'SD-loaded plugins',
+                  'SD-loaded themes',
+                  'Clippings',
+                  'CJK localization',
                 ]}
               />
 
@@ -317,6 +317,11 @@ export default function RoadmapPage() {
                 Already landed in 1.6: language-specific fonts with script grouping in the fonts manager,
                 on-device font downloads for Hebrew, Arabic, and Korean, Bulgarian and Persian UI languages,
                 additional keyboard layouts, and major CJK improvements.
+              </p>
+              <p className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-600 ring-1 ring-stone-200">
+                Landed in 1.6.5: TrueType and OpenType fonts loaded straight from the SD card on devices with
+                external RAM, Portuguese hyphenation, an Arabic keyboard layout, Korean justification that stretches
+                only the spaces between words, and a build option to choose which UI languages are compiled in.
               </p>
             </div>
           </li>
