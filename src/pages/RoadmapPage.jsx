@@ -114,7 +114,7 @@ export default function RoadmapPage() {
                   2
                 </div>
                 <div className="mt-2 font-mono text-[11px] font-medium tracking-wide text-stone-500 uppercase">
-                  Languages
+                  Plugins
                 </div>
               </div>
             </div>
@@ -296,22 +296,20 @@ export default function RoadmapPage() {
             <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.18)] sm:p-8">
               <PhaseBadges status="In progress" phase="Phase 2" live />
               <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
-                Languages, Fonts &amp; Themes
+                SD Plugins, SD Themes, Clippings &amp; CJK
               </h3>
               <p className="mt-2 text-stone-600">
                 <span className="font-semibold text-stone-900">Goal:</span> With the codebase smaller and portable,
-                make reading great in every language: multi-language support, better font support with custom fonts,
-                UI translations, and themes and plugins loaded from the SD card instead of consuming flash.
+                extend CrossPoint from the SD card instead of the firmware: plugins and themes loaded as SD assets so
+                they don't consume flash, clippings for saving passages from your books, and full CJK localization.
               </p>
 
               <FocusGrid
                 items={[
-                  'Multi-language reading support',
-                  'Better font support & custom fonts',
-                  'UI languages & localization',
-                  'Themes → SD-loaded assets',
                   'SD-loaded plugins',
-                  'Hyphenation files → SD-loaded',
+                  'SD-loaded themes',
+                  'Clippings',
+                  'CJK localization',
                 ]}
               />
 
