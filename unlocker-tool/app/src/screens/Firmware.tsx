@@ -78,6 +78,9 @@ const ESCAPE_HATCH_ID = "xteink:recovery-escape-hatch";
 // X4 Pro-specific recovery bridge (ESP32-S3). Served from the catalog like the
 // C3 hatch above, but supports only `x4pro`; surfaced from the X4 Pro view.
 const ESCAPE_HATCH_X4PRO_ID = "xteink:recovery-escape-hatch-x4pro";
+// X4C-specific recovery bridge (ESP32-S3). Distinct build/id from the X4 Pro
+// hatch (different board), catalog-gated to `x4c` behind schema=2.
+const ESCAPE_HATCH_X4C_ID = "xteink:recovery-escape-hatch-x4c";
 const isRecoveryRelease = (r: CrossPointRelease) =>
   r.id.includes(":recovery-") || r.id.startsWith("recovery-");
 
@@ -228,7 +231,11 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
   // supports this model. Surfaced only from the recovery panel below, never in
   // the channel cards (filtered out of `eligible` by `isRecoveryRelease`).
   const escapeHatchId =
-    model === "x4pro" ? ESCAPE_HATCH_X4PRO_ID : ESCAPE_HATCH_ID;
+    model === "x4pro"
+      ? ESCAPE_HATCH_X4PRO_ID
+      : model === "x4c"
+        ? ESCAPE_HATCH_X4C_ID
+        : ESCAPE_HATCH_ID;
   const escapeHatch =
     catalog.releases.find(
       (r) =>

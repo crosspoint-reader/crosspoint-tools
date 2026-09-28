@@ -342,6 +342,20 @@ mod tests {
         assert_eq!(&meta[94..101], b"SSD1677");
     }
 
+    /// The X4C differs from the X4 Pro only in the `device_type` string the OTA
+    /// validator strcmps against; a regression there silently breaks X4C flashing.
+    #[test]
+    fn x4c_metadata_carries_cla_device_type() {
+        let plain = [0xE9u8, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8];
+        let out = encrypt(Model::X4C, &plain, "V9.9.9", 0, Some([7u8; 16])).unwrap();
+        let key = derive_key(0).unwrap();
+        let mut whole = out.bytes[20..].to_vec();
+        Aes128Ctr::new((&key).into(), (&[7u8; 16]).into()).apply_keystream(&mut whole);
+        let meta = &whole[..META_LEN];
+        assert_eq!(&meta[70..84], b"ESP32S3_X4_CLA");
+        assert_eq!(&meta[94..101], b"SSD1677");
+    }
+
     /// CRC-32 sanity against the well-known "123456789" check value.
     #[test]
     fn crc32_check_value() {

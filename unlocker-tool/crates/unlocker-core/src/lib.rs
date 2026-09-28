@@ -1,6 +1,7 @@
 pub mod catalog;
 pub mod cert;
 pub mod dns;
+pub mod dns_intercept;
 pub mod helper;
 pub mod http;
 pub mod ntp;

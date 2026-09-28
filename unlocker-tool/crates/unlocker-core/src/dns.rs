@@ -170,9 +170,91 @@ fn is_spoofed(qname_norm: &str, spoofed_hosts: &[String]) -> bool {
             && (qname_norm.ends_with(".apple.com") || qname_norm.ends_with(".google.com")))
 }
 
+/// Build a spoof DNS answer for a raw query, or `None` if the query isn't one
+/// we spoof (caller should let it through untouched).
+///
+/// This is the packet-level core shared by two front-ends: the UDP DNS server
+/// above (which owns port 53 on the bridge and also *forwards* non-spoofed
+/// queries), and the Windows WinDivert interceptor (`ops/windows_dns.rs`), which
+/// captures queries a device sends straight to a hardcoded resolver (e.g.
+/// AliDNS 223.5.5.5) — bypassing the hotspot resolver entirely — and only needs
+/// to answer the spoofed names, leaving everything else to pass through to the
+/// real internet. Returning `None` means exactly that: "not ours, don't touch."
+pub fn build_spoof_response(
+    request: &[u8],
+    spoofed_hosts: &[String],
+    answer_with: Ipv4Addr,
+) -> Option<Vec<u8>> {
+    let request = Message::from_vec(request).ok()?;
+    if request.metadata.message_type != MessageType::Query {
+        return None;
+    }
+    let query = request.queries.first()?.clone();
+    if query.query_type() != RecordType::A {
+        return None;
+    }
+    let qname_norm = query
+        .name()
+        .to_string()
+        .trim_end_matches('.')
+        .to_lowercase();
+    if !is_spoofed(&qname_norm, spoofed_hosts) {
+        return None;
+    }
+
+    let mut response = Message::new(request.metadata.id, MessageType::Response, OpCode::Query);
+    response.metadata.recursion_desired = request.metadata.recursion_desired;
+    response.metadata.recursion_available = true;
+    response.queries.push(query.clone());
+    response.answers.push(Record::from_rdata(
+        query.name().clone(),
+        60,
+        RData::A(rdata::A(answer_with)),
+    ));
+    response.metadata.response_code = ResponseCode::NoError;
+    response.to_vec().ok()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::is_spoofed;
+    use super::{build_spoof_response, is_spoofed};
+    use hickory_proto::op::{Message, MessageType, OpCode};
+    use hickory_proto::rr::{Name, RData, RecordType};
+    use std::net::Ipv4Addr;
+    use std::str::FromStr;
+
+    fn query_bytes(name: &str, qtype: RecordType) -> Vec<u8> {
+        let mut m = Message::new(0x1234, MessageType::Query, OpCode::Query);
+        let mut q = hickory_proto::op::Query::new();
+        q.set_name(Name::from_str(name).unwrap()).set_query_type(qtype);
+        m.queries.push(q);
+        m.to_vec().unwrap()
+    }
+
+    #[test]
+    fn spoof_response_answers_spoofed_a_query_and_passes_others() {
+        let hosts = vec!["api-prod.xteink.cn".to_string()];
+        let bridge = Ipv4Addr::new(192, 168, 137, 1);
+
+        // Spoofed A query → an answer pointing at the bridge IP.
+        let resp = build_spoof_response(&query_bytes("api-prod.xteink.cn", RecordType::A), &hosts, bridge)
+            .expect("spoofed A query must get an answer");
+        let msg = Message::from_vec(&resp).unwrap();
+        assert_eq!(msg.metadata.id, 0x1234, "txn id must echo the query");
+        assert_eq!(msg.metadata.message_type, MessageType::Response);
+        // hickory exposes the record payload as a field, not a method.
+        match msg.answers.first().map(|r| &r.data) {
+            Some(RData::A(a)) => assert_eq!(a.0, bridge),
+            other => panic!("expected A={bridge}, got {other:?}"),
+        }
+
+        // Not in the spoof set → None (let it reach the real resolver).
+        assert!(build_spoof_response(&query_bytes("example.com", RecordType::A), &hosts, bridge).is_none());
+        // Spoofed host but non-A (e.g. AAAA) → None; we only redirect A.
+        assert!(build_spoof_response(&query_bytes("api-prod.xteink.cn", RecordType::AAAA), &hosts, bridge).is_none());
+        // Garbage / non-DNS bytes → None, never a panic.
+        assert!(build_spoof_response(&[0u8, 1, 2, 3], &hosts, bridge).is_none());
+    }
 
     #[test]
     fn spoofs_x4pro_factory_ntp_hosts() {
@@ -233,21 +315,21 @@ async fn handle_query(
         "dns query"
     );
 
+    // Spoofed A queries: reuse the shared packet-level builder (same core the
+    // Windows WinDivert interceptor uses) so there's one source of truth.
+    if let Some(spoof) = build_spoof_response(bytes, &cfg.spoofed_hosts, cfg.answer_with) {
+        tracing::info!(host = %qname_norm, "spoofing");
+        socket.send_to(&spoof, src).await?;
+        return Ok(());
+    }
+
+    // Everything else is forwarded to a real resolver.
     let mut response = Message::new(request.metadata.id, MessageType::Response, OpCode::Query);
     response.metadata.recursion_desired = request.metadata.recursion_desired;
     response.metadata.recursion_available = true;
     response.queries.push(query.clone());
 
-    if should_spoof && query.query_type() == RecordType::A {
-        tracing::info!(host = %qname_norm, "spoofing");
-        let rec = Record::from_rdata(
-            query.name().clone(),
-            60,
-            RData::A(rdata::A(cfg.answer_with)),
-        );
-        response.answers.push(rec);
-        response.metadata.response_code = ResponseCode::NoError;
-    } else {
+    {
         match resolver
             .lookup(query.name().clone(), query.query_type())
             .await

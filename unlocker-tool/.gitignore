@@ -8,8 +8,12 @@ app/src-tauri/gen/
 .env.local
 .env.*.local
 
-# TLS private key — never commit
+# TLS private key — never commit. Only fullchain.pem is tracked; the key and
+# the CA order artifacts (CSR + raw issued .crt files) stay local.
 crates/unlocker-helper/certs/privkey.pem
+crates/unlocker-helper/certs/*.key
+crates/unlocker-helper/certs/*.csr
+crates/unlocker-helper/certs/*.crt
 
 # Wrangler local CLI cache (contains Cloudflare account ID)
 .wrangler/

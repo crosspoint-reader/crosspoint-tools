@@ -29,6 +29,10 @@ pub struct ServerSet {
     dns: Option<DnsHandle>,
     ntp: Option<NtpHandle>,
     http: Option<ServerHandles>,
+    // Windows-only: WinDivert interceptor for devices that hardcode a public
+    // DNS resolver and bypass the hosts-file spoof (crosspoint-reader#3775).
+    #[cfg(windows)]
+    dns_interceptor: Option<crate::ops::windows_dns::DnsInterceptor>,
     pub on_manifest: Arc<Notify>,
     pub on_firmware: Arc<Notify>,
 }
@@ -57,6 +61,10 @@ impl ServerHolder {
             if let Some(d) = old.dns.take() {
                 d.shutdown().await;
             }
+            #[cfg(windows)]
+            if let Some(i) = old.dns_interceptor.take() {
+                i.stop();
+            }
         }
 
         let bridge_ip: Ipv4Addr = spec
@@ -83,6 +91,14 @@ impl ServerHolder {
         #[cfg(windows)]
         crate::ops::hosts_arm(&dns_cfg.spoofed_hosts, bridge_ip).await?;
 
+        // Windows: also capture queries devices send straight to a hardcoded
+        // public resolver (e.g. AliDNS 223.5.5.5), which the hosts-file spoof
+        // can't see. Fail-soft — None (driver missing) leaves the hosts path in
+        // place, matching prior behavior for resolver-respecting devices.
+        #[cfg(windows)]
+        let dns_interceptor =
+            crate::ops::windows_dns::start(dns_cfg.spoofed_hosts.clone(), bridge_ip);
+
         let on_manifest = Arc::new(Notify::new());
         let on_firmware = Arc::new(Notify::new());
 
@@ -108,6 +124,8 @@ impl ServerHolder {
             dns: Some(dns_handle),
             ntp: Some(ntp_handle),
             http: Some(http_handles),
+            #[cfg(windows)]
+            dns_interceptor,
             on_manifest,
             on_firmware,
         });
@@ -129,6 +147,9 @@ impl ServerHolder {
             }
             #[cfg(windows)]
             {
+                if let Some(i) = set.dns_interceptor.take() {
+                    i.stop();
+                }
                 let _ = crate::ops::hosts_disarm().await;
             }
             tracing::info!("spoofing servers disarmed");

@@ -211,6 +211,9 @@ async function handleApi(
       case '/api/recovery/escape-hatch-x4pro/firmware':
         return handleEscapeHatchX4ProFirmware(env, corsHeaders);
 
+      case '/api/recovery/escape-hatch-x4c/firmware':
+        return handleEscapeHatchX4CFirmware(env, corsHeaders);
+
       case '/api/firmware/stock':
         return handleStockFirmware(url, env, corsHeaders);
 
@@ -981,6 +984,14 @@ const ESCAPE_HATCH_R2_KEY = 'recovery/escape-hatch/firmware.bin';
 //     --file=/path/to/escape-hatch/.pio/build/x4pro/firmware.bin
 const ESCAPE_HATCH_X4PRO_R2_KEY = 'recovery/escape-hatch-x4pro/firmware.bin';
 
+// X4C (ESP32-S3) escape-hatch bridge. Its own build + R2 key alongside the
+// X4 Pro hatch above — same chip family but a distinct board (X4_CLA panel /
+// touch), so a separate image. The Unlocker wraps this plain .bin into an
+// encrypted `.xota` before serving it over the spoofed X4C OTA. Upload with:
+//   wrangler r2 object put crosspoint-firmware/recovery/escape-hatch-x4c/firmware.bin \
+//     --file=/path/to/escape-hatch/.pio/build/x4c/firmware.bin
+const ESCAPE_HATCH_X4C_R2_KEY = 'recovery/escape-hatch-x4c/firmware.bin';
+
 async function serveEscapeHatch(
   env: Env,
   headers: Record<string, string>,
@@ -1012,6 +1023,13 @@ function handleEscapeHatchX4ProFirmware(
   headers: Record<string, string>
 ): Promise<Response> {
   return serveEscapeHatch(env, headers, ESCAPE_HATCH_X4PRO_R2_KEY);
+}
+
+function handleEscapeHatchX4CFirmware(
+  env: Env,
+  headers: Record<string, string>
+): Promise<Response> {
+  return serveEscapeHatch(env, headers, ESCAPE_HATCH_X4C_R2_KEY);
 }
 
 // --- Stock Firmware (Official Xteink) ---
@@ -4647,6 +4665,26 @@ async function fetchEscapeHatchX4ProForCatalog(env: Env): Promise<CatalogRelease
   };
 }
 
+// X4C escape-hatch bridge, catalog release. Mirrors the X4 Pro entry above;
+// `supported_devices: ['x4c']` so it's schema=2-gated and surfaces only for the
+// X4C. The Unlocker encrypts this plain .bin into a `.xota` before serving.
+// Returns null until the .bin is uploaded to R2.
+async function fetchEscapeHatchX4CForCatalog(env: Env): Promise<CatalogRelease | null> {
+  const result = await computeR2Sha(env, ESCAPE_HATCH_X4C_R2_KEY);
+  if (!result) return null;
+  return {
+    id: 'recovery-escape-hatch-x4c',
+    channel: 'stable',
+    name: 'Escape Hatch (X4C recovery)',
+    version: 'escape-hatch-x4c',
+    released_at: '2026-09-28T00:00:00Z',
+    firmware_url: `${ORIGIN}/api/recovery/escape-hatch-x4c/firmware`,
+    firmware_sha256: result.sha,
+    size: result.size,
+    supported_devices: ['x4c'],
+  };
+}
+
 async function handleCatalog(
   url: URL,
   env: Env,
@@ -4657,7 +4695,7 @@ async function handleCatalog(
   // with ?schema=2 (Unlockers with X4C support, whose parser also skips
   // unknown tokens). Default responses stay x4c-free for old clients.
   const schema = Number(url.searchParams.get('schema')) || 1;
-  const [stable, rcReleases, insider, insiderX4Pro, betas, escapeHatch, escapeHatchX4Pro] = await Promise.all([
+  const [stable, rcReleases, insider, insiderX4Pro, betas, escapeHatch, escapeHatchX4Pro, escapeHatchX4C] = await Promise.all([
     fetchStableForCatalog(env),
     fetchRcForCatalog(env),
     fetchInsiderForCatalog(env),
@@ -4665,6 +4703,7 @@ async function handleCatalog(
     fetchBetasForCatalog(env),
     fetchEscapeHatchForCatalog(env),
     fetchEscapeHatchX4ProForCatalog(env),
+    fetchEscapeHatchX4CForCatalog(env),
   ]);
 
   let releases: CatalogRelease[] = [];
@@ -4675,6 +4714,7 @@ async function handleCatalog(
   for (const b of betas) releases.push(b);
   if (escapeHatch) releases.push(escapeHatch);
   if (escapeHatchX4Pro) releases.push(escapeHatchX4Pro);
+  if (escapeHatchX4C) releases.push(escapeHatchX4C);
 
   if (schema < 2) {
     releases = releases
