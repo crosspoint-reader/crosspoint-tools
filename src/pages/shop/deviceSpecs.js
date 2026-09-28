@@ -49,7 +49,7 @@ const SPECS = {
   // BOOX Picco
   'acc-muknw3sl': {
     screen: 3.97, resolution: [480, 800], ppi: 235, frontlight: 'warm-cool',
-    touch: true, frontButtons: false, sideButtons: true, homeButton: true, gyro: true, rtc: true,
+    touch: true, frontButtons: false, sideButtons: true, homeButton: false, gyro: true, rtc: true,
     connectors: ['usb-c'], mcu: 'ESP32-S3', psram: 8,
     battery: 920, weight: 58, price: 99.99,
   },
