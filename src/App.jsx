@@ -19,6 +19,7 @@ const AccessoriesPage = lazy(() => import('./pages/AccessoriesPage.jsx'))
 const DevicesPage = lazy(() => import('./pages/DevicesPage.jsx'))
 const BlogPage = lazy(() => import('./pages/BlogPage.jsx'))
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage.jsx'))
+const BrandPage = lazy(() => import('./pages/BrandPage.jsx'))
 
 // Old static-site URLs that must keep working.
 const HTML_REDIRECTS = {
@@ -93,6 +94,7 @@ export default function App() {
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
+          <Route path="/brand" element={<BrandPage />} />
           {Object.entries(HTML_REDIRECTS).map(([from, to]) => (
             <Route key={from} path={from} element={<Navigate to={to} replace />} />
           ))}
