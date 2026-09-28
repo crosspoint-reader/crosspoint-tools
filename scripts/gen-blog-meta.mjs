@@ -12,8 +12,9 @@
 // here at build time and emit two artifacts (both gitignored, regenerated each
 // build):
 //
-//   src/pages/blog/meta.generated.json  — { slug: { date, author } }, read by
-//                                          the client and merged with the posts
+//   src/pages/blog/meta.generated.json  — { slug: { title, summary, date, author } }, read by
+//                                          the client (merged with the posts) and the
+//                                          worker (per-post <head> meta for link previews)
 //   public/blog/rss.xml                 — RSS 2.0 feed, served as a static asset
 //
 // Run before `vite build` / `vite` (see package.json scripts).
@@ -146,7 +147,7 @@ function writeFile(path, contents) {
 const posts = collectPosts()
 
 const meta = {}
-for (const p of posts) meta[p.slug] = { date: p.date, author: p.author }
+for (const p of posts) meta[p.slug] = { title: p.title, summary: p.summary, date: p.date, author: p.author }
 
 writeFile(metaOut, JSON.stringify(meta, null, 2) + '\n')
 writeFile(rssOut, buildRss(posts))

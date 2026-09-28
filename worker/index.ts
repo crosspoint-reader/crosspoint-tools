@@ -1,5 +1,6 @@
 import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, Accessory, FirmwareDevice, ReleaseVisibility } from './types';
 import { betaDevices, normalizeBetaBuildList } from './betas';
+import { pageMeta, SITE } from '../src/lib/seo';
 import { getPrebuiltFontAssetUrl, getPrebuiltFontManifest } from './prebuilt-fonts';
 import {
   discardPendingBetaNotification,
@@ -100,7 +101,7 @@ export default {
     }
 
     // Let static assets handle everything else (SPA fallback serves index.html)
-    return env.ASSETS.fetch(request);
+    return withPageMeta(url, await env.ASSETS.fetch(request));
   },
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
@@ -142,6 +143,42 @@ export default {
     );
   },
 };
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// Swap index.html's default title/description/OG tags for the route's own, so
+// link previews and crawlers (which don't run the SPA) see per-page metadata.
+// og:image stays the site-wide card.
+function withPageMeta(url: URL, res: Response): Response {
+  if (!res.headers.get('Content-Type')?.includes('text/html')) return res;
+  const meta = pageMeta(url.pathname);
+  const canonical = SITE + (url.pathname === '/' ? '' : url.pathname.replace(/\/+$/, ''));
+  const t = escapeHtml(meta.title);
+  const d = escapeHtml(meta.description);
+  const ogT = escapeHtml(meta.ogTitle || meta.title);
+  const ogD = escapeHtml(meta.ogDescription || meta.description);
+  const tags = [
+    `<title>${t}</title>`,
+    `<meta name="description" content="${d}" />`,
+    `<link rel="canonical" href="${canonical}" />`,
+    `<meta property="og:type" content="${meta.type || 'website'}" />`,
+    `<meta property="og:url" content="${canonical}" />`,
+    `<meta property="og:title" content="${ogT}" />`,
+    `<meta property="og:description" content="${ogD}" />`,
+    `<meta name="twitter:title" content="${ogT}" />`,
+    `<meta name="twitter:description" content="${ogD}" />`,
+    meta.published ? `<meta property="article:published_time" content="${escapeHtml(meta.published)}" />` : '',
+    meta.noindex ? '<meta name="robots" content="noindex" />' : '',
+  ].join('');
+  const remove = { element: (el: Element) => { el.remove(); } };
+  return new HTMLRewriter()
+    .on('title', remove)
+    .on('meta[name="description"], meta[name="twitter:title"], meta[name="twitter:description"]', remove)
+    .on('meta[property="og:type"], meta[property="og:url"], meta[property="og:title"], meta[property="og:description"]', remove)
+    .on('head', { element: (el) => { el.append(tags, { html: true }); } })
+    .transform(res);
+}
 
 const LEGACY_HTML_ROUTES: Record<string, string> = {
   '/index.html': '/',
@@ -1316,7 +1353,7 @@ async function handleInsiderAccess(request: Request, url: URL, env: Env): Promis
   }
 
   // Paywall temporarily disabled - serve insider page to everyone
-  return env.ASSETS.fetch(request);
+  return withPageMeta(url, await env.ASSETS.fetch(request));
 
   /*
   // Check for royalty_key in URL (new purchase or magic link callback)

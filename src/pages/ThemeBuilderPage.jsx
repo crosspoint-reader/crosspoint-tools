@@ -17,7 +17,6 @@ function Code({ children }) {
 
 export default function ThemeBuilderPage() {
   useEffect(() => {
-    document.title = 'Theme Builder - CrossPoint Reader'
     // Engine guards against double init (React StrictMode runs effects twice).
     initThemeBuilder()
   }, [])

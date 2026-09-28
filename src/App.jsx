@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { lazy, Suspense, useEffect } from 'react'
 import HomePage from './pages/HomePage.jsx'
+import { pageMeta } from './lib/seo.ts'
 
 const DocsPage = lazy(() => import('./pages/DocsPage.jsx'))
 const RoadmapPage = lazy(() => import('./pages/RoadmapPage.jsx'))
@@ -49,6 +50,12 @@ const HASH_REDIRECTS = {
 function ScrollManager() {
   const { pathname, hash } = useLocation()
   const navigate = useNavigate()
+  useEffect(() => {
+    // Same per-route metadata the worker injects on first load.
+    const meta = pageMeta(pathname)
+    document.title = meta.title
+    document.querySelector('meta[name="description"]')?.setAttribute('content', meta.description)
+  }, [pathname])
   useEffect(() => {
     if (hash) {
       const to = HASH_REDIRECTS[hash]

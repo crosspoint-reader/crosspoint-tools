@@ -113,9 +113,6 @@ export default function ShopGridPage({
   const [items, setItems] = useState(null) // null = loading
   const [query, setQuery] = useState('')
 
-  useEffect(() => {
-    document.title = title + ' - CrossPoint Reader'
-  }, [title])
 
   useEffect(() => {
     let cancelled = false

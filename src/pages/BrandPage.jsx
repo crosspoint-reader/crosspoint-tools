@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import Layout from '../components/Layout.jsx'
 import { Button, Eyebrow } from '../components/ui.jsx'
 
@@ -31,9 +30,6 @@ const COLORS = [
 ]
 
 export default function BrandPage() {
-  useEffect(() => {
-    document.title = 'Brand Kit - CrossPoint Reader'
-  }, [])
 
   return (
     <Layout>

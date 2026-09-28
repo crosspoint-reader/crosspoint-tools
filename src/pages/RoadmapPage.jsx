@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import Layout from '../components/Layout.jsx'
 import { Eyebrow } from '../components/ui.jsx'
 
@@ -62,9 +61,6 @@ function NumberChip({ n, dark = false }) {
 // ---- Page ----------------------------------------------------------------
 
 export default function RoadmapPage() {
-  useEffect(() => {
-    document.title = 'Roadmap & Scope - CrossPoint Reader'
-  }, [])
 
   return (
     <Layout>
