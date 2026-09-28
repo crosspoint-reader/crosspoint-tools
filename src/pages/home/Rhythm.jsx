@@ -43,7 +43,7 @@ const RELEASES = [
   {
     version: '1.6.5',
     date: 'September 2026',
-    blurb: 'A Library for every book on the card, TrueType fonts, the Cover Grid home theme, word and character spacing, and X4 Classic support.',
+    blurb: 'A Library for every book on the SD card, TrueType fonts, the Cover Grid home theme, word and character spacing, and X4 Classic support.',
   },
 ]
 
@@ -164,7 +164,7 @@ export default function Rhythm() {
 
         {/* The little things, as prose rather than a grid */}
         <div className="mt-16 max-w-3xl border-t border-stone-200 pt-10">
-          <h3 className="font-display text-lg font-semibold text-stone-900">And there&rsquo;s more where that came from.</h3>
+          <h3 className="font-display text-lg font-semibold text-stone-900">There&rsquo;s more where that came from.</h3>
           <p className="mt-4 font-serif text-xl/9 text-pretty text-stone-600">
             <LittleThing>Tilt the device</LittleThing> to turn the page.{' '}
             <LittleThing>Themes</LittleThing> that restyle the whole

@@ -3,7 +3,6 @@ import Hero from './home/Hero.jsx'
 import Partners from './home/Partners.jsx'
 import PressQuotes from './home/PressQuotes.jsx'
 import Features from './home/Features.jsx'
-import EveryLanguage from './home/EveryLanguage.jsx'
 import Rhythm from './home/Rhythm.jsx'
 import FlashTools from './home/FlashTools.jsx'
 import Community from './home/Community.jsx'
@@ -16,7 +15,6 @@ export default function HomePage() {
       <Partners />
       <PressQuotes />
       <Features />
-      <EveryLanguage />
       <Rhythm />
       <FlashTools />
       <Community />
