@@ -32,7 +32,7 @@ function SearchIcon() {
   )
 }
 
-function ProductCard({ item, ctaLabel }) {
+export function ProductCard({ item, ctaLabel, children }) {
   const imgUrl = accessoryImageUrl(item)
   const clickable = !!item.link
   const comingSoon = !!item.comingSoon || !item.link
@@ -67,6 +67,7 @@ function ProductCard({ item, ctaLabel }) {
         {item.description && (
           <p className="mt-1 text-xs/5 text-stone-500">{item.description}</p>
         )}
+        {children}
         <span
           className={`mt-auto pt-3 text-xs font-medium ${clickable ? 'text-brand-600' : 'text-stone-400'}`}
         >
@@ -100,20 +101,9 @@ function ProductCard({ item, ctaLabel }) {
   )
 }
 
-// Amazon-style product grid with optional search, shared by /devices and /accessories.
-export default function ShopGridPage({
-  category,
-  eyebrow,
-  title,
-  intro,
-  emptyText,
-  showSearch = true,
-  ctaLabel = 'Buy Now',
-}) {
-  const [items, setItems] = useState(null) // null = loading
-  const [query, setQuery] = useState('')
-
-
+// Shop items for one category, in admin order; null while loading.
+export function useShopItems(category) {
+  const [items, setItems] = useState(null)
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -131,6 +121,21 @@ export default function ShopGridPage({
       cancelled = true
     }
   }, [category])
+  return items
+}
+
+// Amazon-style product grid with optional search, shared by /devices and /accessories.
+export default function ShopGridPage({
+  category,
+  eyebrow,
+  title,
+  intro,
+  emptyText,
+  showSearch = true,
+  ctaLabel = 'Buy Now',
+}) {
+  const items = useShopItems(category)
+  const [query, setQuery] = useState('')
 
   const filtered = useMemo(() => {
     if (!items) return []
