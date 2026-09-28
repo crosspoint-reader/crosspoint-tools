@@ -89,7 +89,7 @@ export default function Features() {
           title="Reads your language."
           shot={
             // Stacked frames: Focus Reading behind, RTL (Hebrew) in front
-            <div className="relative" style={{ width: 'min(100%,360px)', height: '520px' }}>
+            <div className="relative" style={{ width: '360px', maxWidth: '100%', height: '520px' }}>
               <div className="eink eink-s-50 absolute top-1 left-0" style={{ transform: 'rotate(-5deg)' }}>
                 <div className="eink-device">
                   <div className="eink-screen">
