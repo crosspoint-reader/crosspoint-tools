@@ -14,7 +14,7 @@ const SPECS = {
   // Xteink X4 Pro. RTC from SDK xteink-x4pro-support.md.
   'acc-mrtxq1dy': {
     screen: 4.3, resolution: [480, 800], ppi: 219, frontlight: 'warm-cool',
-    touch: true, frontButtons: false, sideButtons: true, homeButton: true, gyro: null, rtc: true,
+    touch: true, frontButtons: false, sideButtons: true, homeButton: true, gyro: false, rtc: true,
     connectors: ['pogo'], mcu: 'ESP32-S3', psram: 8,
     battery: 1100, weight: 72, price: 99,
   },
@@ -42,32 +42,34 @@ const SPECS = {
   // M5Stack M5PaperMono. SDK's M5Pm1.h says 1250 mAh; sheet (manufacturer) wins.
   'acc-mt2l0zec': {
     screen: 3.97, resolution: [480, 800], ppi: 235, frontlight: 'white',
-    touch: true, frontButtons: null, sideButtons: true, homeButton: null, gyro: true, rtc: true,
+    touch: true, frontButtons: false, sideButtons: true, homeButton: false, gyro: true, rtc: true,
     connectors: ['usb-c'], mcu: 'ESP32-S3', psram: 8,
     battery: 1150, weight: 74.7, price: 65,
   },
   // BOOX Picco
   'acc-muknw3sl': {
     screen: 3.97, resolution: [480, 800], ppi: 235, frontlight: 'warm-cool',
-    touch: true, frontButtons: null, sideButtons: true, homeButton: true, gyro: true, rtc: true,
+    touch: true, frontButtons: false, sideButtons: true, homeButton: true, gyro: true, rtc: true,
     connectors: ['usb-c'], mcu: 'ESP32-S3', psram: 8,
     battery: 920, weight: 58, price: 99.99,
   },
-  // LilyGo T5 E-Paper S3 Pro Lite. Sheet column is the full T5 S3 Pro; PPI computed.
+  // LilyGo T5 E-Paper S3 Pro Lite. Same board as the full Pro minus GPS/LoRa
+  // (github.com/Xinyuan-LilyGO/T5S3-4.7-e-paper-PRO); no IMU on the I2C bus.
+  // Price from lilygo.cc; PPI computed.
   'acc-mrtxg29l': {
     screen: 4.7, resolution: [540, 960], ppi: 234, frontlight: 'white',
-    touch: true, frontButtons: null, sideButtons: null, homeButton: true, gyro: null, rtc: true,
+    touch: true, frontButtons: false, sideButtons: false, homeButton: true, gyro: false, rtc: true,
     connectors: ['usb-c'], mcu: 'ESP32-S3', psram: 8,
-    battery: 1500, weight: null, price: 84.21,
+    battery: 1500, weight: null, price: 71.31,
   },
-  // M5Stack M5Paper v1.1. Not in the sheet; SDK BoardConfig.h only, which
-  // doesn't cover battery, connector, RTC or IMU. Classic ESP32, but the board
-  // carries 8 MB PSRAM (BoardConfig.h:329).
+  // M5Stack M5Paper v1.1. Not in the sheet: docs.m5stack.com/en/core/m5paper_v1.1
+  // and the M5Stack shop (side dial wheel, BM8563 RTC, no IMU). Classic ESP32,
+  // but the board carries 8 MB PSRAM (SDK BoardConfig.h:329).
   'acc-mrty1g0m': {
     screen: 4.7, resolution: [540, 960], ppi: 234, frontlight: 'none',
-    touch: true, frontButtons: null, sideButtons: null, homeButton: null, gyro: null, rtc: null,
-    connectors: null, mcu: 'ESP32', psram: 8,
-    battery: null, weight: null, price: null,
+    touch: true, frontButtons: false, sideButtons: true, homeButton: false, gyro: false, rtc: true,
+    connectors: ['usb-c'], mcu: 'ESP32', psram: 8,
+    battery: 1150, weight: 81.6, price: 85,
   },
 }
 

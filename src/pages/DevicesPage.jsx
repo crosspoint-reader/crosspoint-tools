@@ -148,7 +148,7 @@ const COLUMNS = [
   ['Connector', (s) => s.connectors?.map((c) => (c === 'usb-c' ? 'USB-C' : 'Pogo')).join(' + ') || '?'],
   ['Battery', (s) => (s.battery ? `${s.battery.toLocaleString()} mAh` : '?')],
   ['Weight', (s) => (s.weight ? `${s.weight} g` : '?')],
-  ['Price', (s) => (s.price ? `$${s.price}` : '?')],
+  ['Price', (s) => (s.price ? `$${Math.round(s.price)}` : '?')],
   ['Chip', (s) => s.mcu ?? '?'],
   ['PSRAM', (s) => (s.psram == null ? '?' : s.psram ? `${s.psram} MB` : '—')],
 ]
