@@ -19,7 +19,7 @@ pub const CATALOG_SOURCES: &[(Source, &str)] = &[
         Source::CrosspointKo,
         "https://crosspoint.idlerecord.com/catalog",
     ),
-    (Source::Crossink, "https://crossink.uxj.io/catalog"),
+    (Source::Crossink, "https://crossink.dev/catalog"),
 ];
 
 pub fn cache_dir() -> Result<PathBuf> {
