@@ -9,7 +9,7 @@
 // Fields: screen (in), resolution [w, h] portrait px, ppi, frontlight
 // ('none' | 'white' | 'warm-cool'), touch, frontButtons, sideButtons,
 // homeButton, gyro, rtc,
-// connectors ['usb-c' | 'pogo'], mcu, psram (MB external), battery (mAh), weight (g), price (USD snapshot).
+// connectors ['usb-c' | 'pogo'], mcu, psram (MB external), battery (mAh), weight (g, or a string like '100+' when only a floor is known), price (USD snapshot).
 const SPECS = {
   // Xteink X4 Pro. RTC from SDK xteink-x4pro-support.md.
   'acc-mrtxq1dy': {
@@ -60,7 +60,7 @@ const SPECS = {
     screen: 4.7, resolution: [540, 960], ppi: 234, frontlight: 'white',
     touch: true, frontButtons: false, sideButtons: false, homeButton: true, gyro: false, rtc: true,
     connectors: ['usb-c'], mcu: 'ESP32-S3', psram: 8,
-    battery: 1500, weight: null, price: 71.31,
+    battery: 1500, weight: '100+', price: 71.31,
   },
   // M5Stack M5Paper v1.1. Not in the sheet: docs.m5stack.com/en/core/m5paper_v1.1
   // and the M5Stack shop (side dial wheel, BM8563 RTC, no IMU). Classic ESP32,

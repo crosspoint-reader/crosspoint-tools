@@ -57,7 +57,7 @@ const SORTS = [
   { value: 'ppi', label: 'Sharpest (PPI)', key: (s) => -(s.ppi ?? -Infinity) },
   { value: 'battery', label: 'Biggest Battery', key: (s) => -(s.battery ?? -Infinity) },
   { value: 'price', label: 'Price: Low to High', key: (s) => s.price ?? Infinity },
-  { value: 'weight', label: 'Lightest', key: (s) => s.weight ?? Infinity },
+  { value: 'weight', label: 'Lightest', key: (s) => parseFloat(s.weight) || Infinity },
   { value: 'name', label: 'Name A–Z' },
 ]
 
