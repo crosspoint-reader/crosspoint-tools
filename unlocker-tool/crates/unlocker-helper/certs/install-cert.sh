@@ -70,8 +70,18 @@ if [[ $fail -ne 0 ]]; then echo "VALIDATION FAILED -- not installing."; exit 1; 
 echo "OK: chain validates to $EXPECTED_ROOT."
 
 if [[ "$mode" == "--install" ]]; then
-  # fullchain.pem = leaf THEN intermediate(s), never the root.
-  cat "$leaf" "$inter" > "$DIR/fullchain.pem"
+  # fullchain.pem = leaf THEN intermediate(s), never the root. Use `awk 1`
+  # rather than `cat`: it guarantees a newline after each file's last line, so
+  # a source .crt without a trailing newline can't glue `-----END-----` onto the
+  # next `-----BEGIN-----` and corrupt the PEM.
+  awk 1 "$leaf" "$inter" > "$DIR/fullchain.pem"
   cp "$key" "$DIR/privkey.pem"
-  echo "Installed fullchain.pem + privkey.pem. Now rebuild: cargo build --workspace"
+  # Sanity-check the assembled file actually parses as the two certs we expect.
+  n=$(openssl crl2pkcs7 -nocrl -certfile "$DIR/fullchain.pem" 2>/dev/null \
+      | openssl pkcs7 -print_certs -noout 2>/dev/null | grep -c "subject=")
+  if [[ "$n" -ne 2 ]]; then
+    bad "assembled fullchain.pem parsed to $n certs, expected 2 (leaf + intermediate)"
+    echo "VALIDATION FAILED after write."; exit 1
+  fi
+  echo "Installed fullchain.pem + privkey.pem ($n certs). Now rebuild: cargo build --workspace"
 fi
