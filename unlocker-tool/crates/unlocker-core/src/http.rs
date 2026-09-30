@@ -1380,71 +1380,16 @@ pub async fn start(cfg: Arc<ServerConfig>, cert: &SelfSignedCert) -> anyhow::Res
     let http_addr = SocketAddr::new(cfg.bind_ip, 80);
     let https_addr = SocketAddr::new(cfg.bind_ip, 443);
 
-    // HTTPS listener. Force HTTP/1.1 only — ESP32's esp_http_client
-    // doesn't support HTTP/2, and ALPN negotiation can cause issues.
-    let certs =
-        rustls_pemfile::certs(&mut cert.cert_pem.as_bytes()).collect::<Result<Vec<_>, _>>()?;
-    let key = rustls_pemfile::private_key(&mut cert.key_pem.as_bytes())?
-        .ok_or_else(|| anyhow::anyhow!("no private key found in PEM"))?;
-
-    // Log the leaf cert's subject + SANs so we can confirm the cert we present
-    // covers the hostnames the device will request. esp_https_ota verifies the
-    // server hostname against the cert SAN list after the handshake — if our
-    // cert only covers some of the spoofed hostnames, the device will tear
-    // down the connection right after handshake with no visible logs on our
-    // side. Logging once at boot makes that misconfiguration obvious.
-    if let Some(leaf) = certs.first() {
-        match x509_parser::parse_x509_certificate(leaf.as_ref()) {
-            Ok((_, parsed)) => {
-                let subject = parsed.subject().to_string();
-                let sans: Vec<String> = parsed
-                    .extensions()
-                    .iter()
-                    .filter_map(|ext| match ext.parsed_extension() {
-                        x509_parser::extensions::ParsedExtension::SubjectAlternativeName(san) => {
-                            Some(
-                                san.general_names
-                                    .iter()
-                                    .map(|n| format!("{n:?}"))
-                                    .collect::<Vec<_>>()
-                                    .join(", "),
-                            )
-                        }
-                        _ => None,
-                    })
-                    .collect();
-                let not_before = parsed.validity().not_before.to_string();
-                let not_after = parsed.validity().not_after.to_string();
-                tracing::info!(%subject, sans = ?sans, %not_before, %not_after, "tls cert loaded");
-            }
-            Err(e) => tracing::warn!(error = %e, "failed to parse leaf cert for SAN logging"),
-        }
-    }
-
-    let mut server_config = rustls::ServerConfig::builder()
-        .with_no_client_auth()
-        .with_single_cert(certs, key)?;
-    server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
-    let tls = RustlsConfig::from_config(std::sync::Arc::new(server_config));
-
-    // Bind both privileged sockets synchronously. Returning from this function
-    // now proves that both listeners exist; the UI must not report "armed" on
-    // the strength of spawned tasks that have not attempted their binds yet.
-    let http_listener = bind_server_listener(http_addr, "HTTP")?;
-    let https_listener = bind_server_listener(https_addr, "HTTPS")?;
-
     let http_handle = axum_server::Handle::new();
     let https_handle = axum_server::Handle::new();
     let shutdown_requested = Arc::new(AtomicBool::new(false));
 
-    // Emit HTTP/1.1 response header names in Title-Case (`Content-Length`, not
-    // hyper's default lowercase `content-length`). The X4 Pro's OTA download
-    // driver parses `Content-Length` case-sensitively — with the lowercase name
-    // it reads the length as 0 and rejects the transfer with -104 ("content
-    // length invalid"). Real Xteink servers (AliyunOSS) send Title-Case, so this
-    // matches them. `preserve_header_case` keeps any names we set explicitly.
-
-    // Plain HTTP listener.
+    // Plain HTTP listener (port 80), bound synchronously so returning proves it
+    // exists. Title-Case response header names (`Content-Length`, not hyper's
+    // lowercase): the X4 Pro's OTA download driver parses `Content-Length`
+    // case-sensitively — lowercase makes it read 0 and reject with -104. Real
+    // Xteink servers (AliyunOSS) send Title-Case, so this matches them.
+    let http_listener = bind_server_listener(http_addr, "HTTP")?;
     let app_http = app.clone();
     let h1 = http_handle.clone();
     let mut http_server = axum_server::from_tcp(http_listener)?;
@@ -1453,36 +1398,87 @@ pub async fn start(cfg: Arc<ServerConfig>, cert: &SelfSignedCert) -> anyhow::Res
         .http1()
         .title_case_headers(true)
         .preserve_header_case(true);
-    // Log the verbatim response-head bytes we put on the wire (see
-    // ResponseHeadLogStream) so we can see exactly what Content-Length the X4
-    // Pro's OTA client actually receives.
     let http_server = http_server.acceptor(HttpHeadLoggingAcceptor).handle(h1);
-
-    let app_https = app.clone();
-    let h2 = https_handle.clone();
-    let https_acceptor = LoggingTlsAcceptor::new(tls);
-    let mut https_server = axum_server::from_tcp(https_listener)?;
-    https_server
-        .http_builder()
-        .http1()
-        .title_case_headers(true)
-        .preserve_header_case(true);
-    let https_server = https_server.acceptor(https_acceptor).handle(h2);
-
     let http_shutdown = shutdown_requested.clone();
     let http = tokio::spawn(supervise_server(
         "HTTP",
         http_shutdown,
         http_server.serve(app_http.into_make_service()),
     ));
-    let https_shutdown = shutdown_requested.clone();
-    let https = tokio::spawn(supervise_server(
-        "HTTPS",
-        https_shutdown,
-        https_server.serve(app_https.into_make_service()),
-    ));
 
-    tracing::info!(%http_addr, %https_addr, "manifest servers ready; both sockets bound");
+    // HTTPS listener (port 443). In force-HTTP mode (`crosspet_http`) we skip it
+    // entirely — 443 is never bound, so a stock device that tries HTTPS-first
+    // gets a connection refused and falls back to the plain-HTTP check-update on
+    // port 80. This is the only path for firmware whose pinned TLS we can't
+    // spoof (e.g. X4 Pro Licorice V7.6.x) but whose update check still works
+    // over HTTP. Force-HTTP mode also serves every firmware download over HTTP
+    // (see `build_release`), so nothing else needs the 443 listener either.
+    let https = if cfg.crosspet_http {
+        tracing::warn!("force-HTTP mode: HTTPS listener disabled; 443 not bound");
+        tokio::spawn(async { Ok::<(), std::io::Error>(()) })
+    } else {
+        // Force HTTP/1.1 only — ESP32's esp_http_client doesn't support HTTP/2.
+        let certs =
+            rustls_pemfile::certs(&mut cert.cert_pem.as_bytes()).collect::<Result<Vec<_>, _>>()?;
+        let key = rustls_pemfile::private_key(&mut cert.key_pem.as_bytes())?
+            .ok_or_else(|| anyhow::anyhow!("no private key found in PEM"))?;
+
+        // Log the leaf cert's subject + SANs so a hostname/SAN misconfig (which
+        // makes the device tear down right after handshake) is obvious at boot.
+        if let Some(leaf) = certs.first() {
+            match x509_parser::parse_x509_certificate(leaf.as_ref()) {
+                Ok((_, parsed)) => {
+                    let subject = parsed.subject().to_string();
+                    let sans: Vec<String> = parsed
+                        .extensions()
+                        .iter()
+                        .filter_map(|ext| match ext.parsed_extension() {
+                            x509_parser::extensions::ParsedExtension::SubjectAlternativeName(san) => {
+                                Some(
+                                    san.general_names
+                                        .iter()
+                                        .map(|n| format!("{n:?}"))
+                                        .collect::<Vec<_>>()
+                                        .join(", "),
+                                )
+                            }
+                            _ => None,
+                        })
+                        .collect();
+                    let not_before = parsed.validity().not_before.to_string();
+                    let not_after = parsed.validity().not_after.to_string();
+                    tracing::info!(%subject, sans = ?sans, %not_before, %not_after, "tls cert loaded");
+                }
+                Err(e) => tracing::warn!(error = %e, "failed to parse leaf cert for SAN logging"),
+            }
+        }
+
+        let mut server_config = rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(certs, key)?;
+        server_config.alpn_protocols = vec![b"http/1.1".to_vec()];
+        let tls = RustlsConfig::from_config(std::sync::Arc::new(server_config));
+
+        let https_listener = bind_server_listener(https_addr, "HTTPS")?;
+        let app_https = app.clone();
+        let h2 = https_handle.clone();
+        let https_acceptor = LoggingTlsAcceptor::new(tls);
+        let mut https_server = axum_server::from_tcp(https_listener)?;
+        https_server
+            .http_builder()
+            .http1()
+            .title_case_headers(true)
+            .preserve_header_case(true);
+        let https_server = https_server.acceptor(https_acceptor).handle(h2);
+        let https_shutdown = shutdown_requested.clone();
+        tokio::spawn(supervise_server(
+            "HTTPS",
+            https_shutdown,
+            https_server.serve(app_https.into_make_service()),
+        ))
+    };
+
+    tracing::info!(%http_addr, force_http = cfg.crosspet_http, "manifest servers ready");
 
     Ok(ServerHandles {
         http,

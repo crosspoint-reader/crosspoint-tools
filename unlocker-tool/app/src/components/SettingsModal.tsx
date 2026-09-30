@@ -243,13 +243,14 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             />
             <span>
               <span className="block font-medium text-stone-900">
-                Serve crosspet firmware over HTTP
+                Force HTTP (disable HTTPS listener)
               </span>
               <span className="block text-stone-600">
-                For devices currently running crosspet firmware: download the
-                replacement firmware over plain HTTP instead of HTTPS. Leave off
-                unless an install repeatedly stalls or drops partway — some
-                crosspet devices can't complete the encrypted download.
+                Serves everything over plain HTTP and does not open port 443, so
+                a device that tries HTTPS first falls back to HTTP. Needed for
+                stock firmware whose update check uses pinned TLS we can't spoof
+                (e.g. X4 Pro "Licorice" V7.6.x), and for crosspet devices that
+                can't complete an encrypted download. Leave off otherwise.
               </span>
             </span>
           </label>
