@@ -197,7 +197,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
 
         <CollapsibleSection
           title="Advanced firmware options"
-          subtitle="Betas, custom .bin, crosspet HTTP"
+          subtitle="Betas, custom .bin, force HTTP"
           open={openSection === "firmware"}
           onToggle={() => toggle("firmware")}
         >
