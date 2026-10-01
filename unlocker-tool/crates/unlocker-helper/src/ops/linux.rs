@@ -203,6 +203,67 @@ async fn remove_stale_hotspot(conn: &zbus::Connection) {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+/// NM's `method=shared` shells out to dnsmasq for the hotspot's DHCP/DNS. On
+/// minimal distros (notably SteamOS) dnsmasq isn't installed and NM fails to
+/// bring the hotspot up with a cryptic "Could not find dnsmasq binary". Check up
+/// front and give an actionable error instead.
+async fn ensure_dnsmasq() -> Result<()> {
+    let on_path = ["/usr/bin/dnsmasq", "/usr/sbin/dnsmasq", "/bin/dnsmasq", "/sbin/dnsmasq"]
+        .iter()
+        .any(|p| std::path::Path::new(p).exists())
+        || sh("sh", &["-c", "command -v dnsmasq"]).await.is_ok();
+    if !on_path {
+        bail!(
+            "dnsmasq is not installed, but NetworkManager's shared hotspot requires it. \
+             Install it and try again (e.g. `sudo pacman -S dnsmasq`, \
+             `sudo apt install dnsmasq`, or `sudo dnf install dnsmasq`)."
+        );
+    }
+    Ok(())
+}
+
+/// firewalld (default on Fedora/SteamOS) places the shared connection in the
+/// `nm-shared` zone, which blocks the ports our spoof servers use — the device
+/// resolves the spoofed hosts but can't reach NTP (123/udp) or HTTP(S)
+/// (80,443/tcp). Open them at runtime (no `--permanent`, so a reload/reboot
+/// reverts them). Best-effort: silently skip when firewalld isn't present.
+const NM_SHARED_PORTS: &[&str] = &["123/udp", "80/tcp", "443/tcp"];
+
+async fn firewalld_set_ports(add: bool) {
+    // `firewall-cmd --state` errors (or the binary is absent) when firewalld
+    // isn't running — nothing to do in that case.
+    if sh("firewall-cmd", &["--state"]).await.is_err() {
+        return;
+    }
+    let flag = if add { "--add-port" } else { "--remove-port" };
+    for port in NM_SHARED_PORTS {
+        let arg = format!("{flag}={port}");
+        let _ = sh("firewall-cmd", &["--zone=nm-shared", arg.as_str()]).await;
+    }
+    tracing::info!(opened = add, "adjusted nm-shared firewalld ports (123/udp, 80,443/tcp)");
+}
+
+/// NM with the `iwd` Wi-Fi backend has been observed not to let the device
+/// associate with the hotspot (wpa_supplicant works). We don't rewrite the
+/// user's NM config (invasive, needs a daemon restart) — just warn so the fix
+/// is discoverable if association fails.
+async fn warn_if_iwd_backend() {
+    if let Ok(out) = sh(
+        "sh",
+        &["-c", "grep -rhi 'wifi.backend' /etc/NetworkManager/conf.d/ /etc/NetworkManager/NetworkManager.conf 2>/dev/null"],
+    )
+    .await
+    {
+        if out.to_lowercase().contains("iwd") {
+            tracing::warn!(
+                "NetworkManager is using the iwd Wi-Fi backend, which may prevent the device \
+                 from associating. If it won't join the hotspot, set wifi.backend=wpa_supplicant \
+                 in a NetworkManager conf.d file and restart NetworkManager."
+            );
+        }
+    }
+}
+
 pub async fn is_enable(ssid: &str, psk: &str) -> Result<()> {
     if ssid.is_empty() {
         bail!("ssid is empty");
@@ -210,6 +271,10 @@ pub async fn is_enable(ssid: &str, psk: &str) -> Result<()> {
     if psk.len() < 8 {
         bail!("psk must be ≥ 8 characters (WPA-PSK requirement)");
     }
+
+    // The hotspot can't come up without dnsmasq; fail early with a clear message.
+    ensure_dnsmasq().await?;
+    warn_if_iwd_backend().await;
 
     let dbus = system_bus().await?;
 
@@ -255,11 +320,17 @@ pub async fn is_enable(ssid: &str, psk: &str) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("NM.ActivateConnection: {e:#}"))?;
 
     state::mutate(|s| s.internet_sharing_active = true).await?;
+
+    // NM just created the `nm-shared` firewalld zone (if firewalld is in use);
+    // open the ports our spoof servers need so the device can actually reach them.
+    firewalld_set_ports(true).await;
+
     tracing::info!(%ssid, "Wi-Fi hotspot activated via NetworkManager");
     Ok(())
 }
 
 pub async fn is_disable() -> Result<()> {
+    firewalld_set_ports(false).await;
     let dbus = system_bus().await?;
     remove_stale_hotspot(&dbus).await;
     state::mutate(|s| s.internet_sharing_active = false).await?;
