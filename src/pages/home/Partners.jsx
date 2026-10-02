@@ -3,6 +3,7 @@ const PARTNERS = [
   { name: 'Seeed Studio', src: '/brands/seeed.svg', className: 'h-4 sm:h-5' },
   { name: 'M5Stack', src: '/brands/m5stack.svg', className: 'h-6 sm:h-7' },
   { name: 'BOOX', src: '/brands/boox.svg', className: 'h-5 sm:h-6' },
+  { name: 'CLOUD ZAO', src: '/brands/cloudzao.svg', className: 'h-9 sm:h-10 brightness-0' },
 ]
 
 export default function Partners() {

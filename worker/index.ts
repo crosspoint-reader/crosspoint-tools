@@ -3834,7 +3834,7 @@ interface DeviceBuildConfig {
   defaultName: string;
   filename: string;
   label: string;
-  statusDevice: 'x4pro' | 'x4c' | 'sticky' | 'm5paper' | 'm5papers3' | 'lilygo' | 'papermono';
+  statusDevice: 'x4pro' | 'x4c' | 'sticky' | 'm5paper' | 'm5papers3' | 'lilygo' | 'papermono' | 'metalio';
 }
 
 const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
@@ -3893,6 +3893,14 @@ const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
     filename: 'papermono-firmware.bin',
     label: 'M5PaperMono',
     statusDevice: 'papermono',
+  },
+  metalio: {
+    r2Key: 'builds/metalio/firmware.bin',
+    metaKey: 'metalio-build',
+    defaultName: 'Metalio E-INK4 Beta',
+    filename: 'metalio-firmware.bin',
+    label: 'Metalio E-INK4',
+    statusDevice: 'metalio',
   },
 };
 

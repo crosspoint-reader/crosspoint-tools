@@ -5,6 +5,7 @@ const DEVICE_LABELS = {
   m5paper: 'M5Paper v1.1',
   papermono: 'M5PaperMono',
   lilygo: 'LilyGo T5',
+  metalio: 'Metalio E-INK4',
 }
 
 function cleanLabel(value) {

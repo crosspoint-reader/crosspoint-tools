@@ -2161,6 +2161,16 @@ export default function AdminPage() {
               baseUrl="/api/device-build/lilygo"
               description="Upload the LilyGo T5 build offered in the homepage web flasher. Each upload is added alongside the existing builds."
             />
+            <DeviceBuildCard
+              secret={secret}
+              log={log}
+              label="Metalio E-INK4"
+              namePlaceholder="Build name (e.g. Metalio E-INK4 Beta v1)"
+              infoUrl="/api/device-build/metalio/info"
+              uploadUrl="/api/device-build/metalio/upload"
+              baseUrl="/api/device-build/metalio"
+              description="Upload the Metalio E-INK4 build offered in the homepage web flasher. Each upload is added alongside the existing builds."
+            />
             <IssueSubmissionsCard secret={secret} log={log} />
             <LogCard entries={entries} />
           </div>

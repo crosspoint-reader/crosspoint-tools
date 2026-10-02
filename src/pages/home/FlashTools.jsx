@@ -165,6 +165,7 @@ const MODELS = [
   { id: 'm5papers3', name: 'M5Paper S3', res: '540 × 960' },
   { id: 'papermono', name: 'M5PaperMono', res: '480 × 800' },
   { id: 'lilygo', name: 'LilyGo T5', res: '540 × 960' },
+  { id: 'metalio', name: 'Metalio E-INK4', res: '480 × 800' },
 ]
 
 // Vendor favicon shown next to each device name in the picker, grouped by
@@ -179,6 +180,7 @@ const MODEL_BRANDS = {
   m5papers3: '/brands/m5stack.png',
   papermono: '/brands/m5stack.png',
   lilygo: '/brands/lilygo.png',
+  metalio: '/brands/cloudzao.png',
 }
 
 // esptool chip identity each device must report before we write anything.
@@ -196,6 +198,7 @@ const MODEL_CHIPS = {
   m5papers3: 'ESP32-S3',
   papermono: 'ESP32-S3',
   lilygo: 'ESP32-S3',
+  metalio: 'ESP32-S3',
 }
 
 // The debug repair flow has known bootloader and partition layouts for these
@@ -263,6 +266,15 @@ const DEVICE_INSTALLS = {
     bootloaderOffset: 0x0,
     baudrate: 921600,
     after: 'The device restarts on its own. If the screen stays blank, unplug and replug the USB cable.',
+  },
+  metalio: {
+    name: 'Metalio E-INK4',
+    // Generic S3 bootloader (same as papermono/sticky); standard 16MB layout.
+    bootloader: '/firmware/metalio-bootloader.bin',
+    bootloaderOffset: 0x0,
+    baudrate: 921600,
+    after: 'Press the power button to boot the device.',
+    note: 'NOTE: You must use a USB-A cable to flash',
   },
 }
 
@@ -1301,6 +1313,9 @@ export default function FlashTools() {
                         <BoltIcon />
                         Flash {selectedDeviceBuild.name}
                       </button>
+                      {DEVICE_INSTALLS[model]?.note && (
+                        <p className="mt-3 text-sm font-semibold text-amber-700">{DEVICE_INSTALLS[model].note}</p>
+                      )}
                       <p className="mt-2 text-xs text-stone-400">
                         Beta build for the {MODELS.find((m) => m.id === model)?.name}.{' '}
                         {DEVICE_INSTALLS[model]
