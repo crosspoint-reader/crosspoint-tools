@@ -19,7 +19,7 @@ export default function Partners() {
               key={p.name}
               src={p.src}
               alt={p.name}
-              className={`${p.className} w-auto opacity-45`}
+              className={`${p.className} w-auto opacity-45 last:col-span-2`}
               loading="lazy"
             />
           ))}
