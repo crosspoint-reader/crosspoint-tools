@@ -120,6 +120,9 @@ test('full reconciliation lists components once instead of fetching each compone
     ['sticky-beta', 'Beta', 'sticky-group'],
     ['m5paper-beta', 'Beta', 'm5paper-group'],
     ['lilygo-beta', 'Beta', 'lilygo-group'],
+    ['x4pro-stable', 'Stable', 'x4pro-group'],
+    ['x4-stock-en', 'Stock English', 'x4-group'],
+    ['x4pro-stock-en', 'Stock English', 'x4pro-group'],
   ]
   const components = definitions.map(([id, name, group]) => ({
     id, name, group, status: 'OPERATIONAL', showUptime: false, order: 0, archived: false,
@@ -183,10 +186,15 @@ test('full reconciliation lists components once instead of fetching each compone
       put: async () => {},
     },
   }
-  const stable = { name: 'v1.5.0', version: 'v1.5.0', fingerprint: 'stable-sha' }
+  const stable = { name: 'v1.5.0', version: 'v1.5.0', fingerprint: 'stable-sha', devices: ['x3', 'x4', 'x4pro', 'm5papers3'] }
+  const stock = [
+    { device: 'x4', name: 'Stock English', version: 'V6.3.27' },
+    { device: 'x4pro', name: 'Stock English', version: 'V7.6.8' },
+  ]
   const insider = { name: 'master-abc1234', version: '1.5.1-dev+abc1234', fingerprint: 'insider-sha' }
   await reconcileReleaseStatusSnapshot(env, {
     stable,
+    stock,
     insider,
     betas: [],
     deviceBuilds: {
@@ -198,11 +206,22 @@ test('full reconciliation lists components once instead of fetching each compone
   })
 
   assert.equal(listRequests, 1)
-  assert.equal(updates, 10)
+  // +3: x4pro Stable, x4 and x4pro Stock English; m5papers3 has no group so is skipped.
+  assert.equal(updates, 13)
   assert.equal(deletes, 2)
+  assert.equal(components.find(c => c.id === 'x4pro-stable').description, 'v1.5.0')
+  assert.equal(
+    components.find(c => c.id === 'x4-stock-en').description,
+    'Current version: V6.3.27. Official English stock firmware for the Xteink X4.'
+  )
+  assert.equal(
+    components.find(c => c.id === 'x4pro-stock-en').description,
+    'Current version: V7.6.8. Official English stock firmware for the Xteink X4 Pro.'
+  )
 
   await reconcileReleaseStatusSnapshot(env, {
     stable,
+    stock,
     insider,
     betas: [],
     deviceBuilds: {
@@ -213,7 +232,7 @@ test('full reconciliation lists components once instead of fetching each compone
     },
   })
   assert.equal(listRequests, 2)
-  assert.equal(updates, 10)
+  assert.equal(updates, 13)
   assert.equal(deletes, 2)
 })
 

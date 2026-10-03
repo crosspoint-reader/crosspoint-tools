@@ -20,8 +20,19 @@ export type PublishedBuildStatus = {
   notes?: string;
 };
 
+// Official Xteink firmware, shown as "Stock English"/"Stock Chinese" components
+// in each Xteink device group.
+export type StockStatus = {
+  device: FirmwareDevice | 'x4pro' | 'x4c';
+  name: string;
+  version: string;
+};
+
 export type ReleaseStatusSnapshot = {
-  stable: PublishedBuildStatus | null;
+  // `devices` lists every device the stable release ships an asset for; each
+  // one with a configured group gets its own "Stable" component.
+  stable: (PublishedBuildStatus & { devices: string[] }) | null;
+  stock: StockStatus[];
   insider: PublishedBuildStatus | null;
   betas: BetaBuild[];
   deviceBuilds: Partial<Record<DeviceBuildStatusDevice, PublishedBuildStatus[]>>;
@@ -546,10 +557,20 @@ export async function reconcileReleaseStatusSnapshot(
 
   if (snapshot.stable) {
     const build = snapshot.stable;
-    const ids = await Promise.all((['x3', 'x4'] as const).map(device =>
-      updateComponent(config, stableTarget(env, device), build.version, components)
-    ));
+    const targets = deviceBuildTargets(env);
+    const otherDevices = build.devices.filter(
+      (device): device is DeviceBuildStatusDevice => device in targets && !!targets[device as DeviceBuildStatusDevice].groupId
+    );
+    const ids = await Promise.all([
+      ...(['x3', 'x4'] as const).map(device =>
+        updateComponent(config, stableTarget(env, device), build.version, components)
+      ),
+      ...otherDevices.map(device =>
+        updateComponent(config, { name: 'Stable', groupId: targets[device].groupId, order: 0 }, build.version, components)
+      ),
+    ]);
     if (options.notifyStable) {
+      const labels = ['Xteink X3', 'Xteink X4', ...otherDevices.map(device => DEVICE_BUILD_LABELS[device])];
       await publishNotificationOnce(
         env,
         config,
@@ -557,10 +578,25 @@ export async function reconcileReleaseStatusSnapshot(
         build.fingerprint,
         ids,
         `New stable release: ${build.version}`,
-        `CrossPoint ${build.version} is now available for Xteink X3 and X4.\n\nRelease notes: https://github.com/crosspoint-reader/crosspoint-reader/releases/latest\n\nFlash it at https://crosspointreader.com/#flash-tools`
+        `CrossPoint ${build.version} is now available for ${labels.join(', ')}.\n\nRelease notes: https://github.com/crosspoint-reader/crosspoint-reader/releases/latest\n\nFlash it at https://crosspointreader.com/#flash-tools`
       );
     }
   }
+
+  await Promise.all(snapshot.stock.map(stock => {
+    const groupId = stock.device === 'x3' || stock.device === 'x4'
+      ? stableTarget(env, stock.device).groupId
+      : deviceBuildTargets(env)[stock.device].groupId;
+    const model = stock.device === 'x3' || stock.device === 'x4'
+      ? stock.device.toUpperCase()
+      : DEVICE_BUILD_LABELS[stock.device];
+    return groupId && updateComponent(
+      config,
+      { name: stock.name, groupId, order: 3 },
+      `Current version: ${stock.version}. Official ${stock.name.replace('Stock ', '')} stock firmware for the Xteink ${model}.`,
+      components
+    );
+  }));
 
   if (snapshot.insider) {
     const build = snapshot.insider;

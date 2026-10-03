@@ -4780,6 +4780,18 @@ async function handleCatalog(
   });
 }
 
+// Every device the latest stable release ships an asset for, including the
+// non-Xteink ones (sticky, papermono) that the catalog leaves out.
+async function fetchStableAssetDevices(env: Env): Promise<string[]> {
+  const res = await fetch(
+    'https://api.github.com/repos/crosspoint-reader/crosspoint-reader/releases/latest',
+    { headers: ghFetchHeaders(env), cf: { cacheTtl: 300, cacheEverything: true } as RequestInitCfProperties }
+  );
+  if (!res.ok) return [];
+  const release = await res.json() as { assets: Array<{ name: string }> };
+  return [...new Set(release.assets.flatMap(asset => parseReleaseAsset(asset.name).devices))];
+}
+
 type StatusReconcileOptions = {
   notifyStable?: boolean;
 };
@@ -4789,7 +4801,17 @@ async function reconcileAllReleaseStatus(
   options: StatusReconcileOptions = {}
 ): Promise<{ stable: string | null; insider: string | null; betas: number; deviceBuilds: number }> {
   const deviceConfigs = Object.values(DEVICE_BUILDS);
-  const [stable, insider, betas, ...deviceBuilds] = await Promise.all([
+  const stockSources = [
+    { device: 'x3', lang: 'en', name: 'Stock English' },
+    { device: 'x3', lang: 'ch', name: 'Stock Chinese' },
+    { device: 'x4', lang: 'en', name: 'Stock English' },
+    { device: 'x4', lang: 'ch', name: 'Stock Chinese' },
+    { device: 'x4pro', lang: 'en', name: 'Stock English' },
+    { device: 'x4c', lang: 'en', name: 'Stock English' },
+  ] as const;
+  const [stableDevices, stockResults, stable, insider, betas, ...deviceBuilds] = await Promise.all([
+    fetchStableAssetDevices(env),
+    Promise.all(stockSources.map(source => fetchStockFirmwareInfo(source.device, source.lang))),
     fetchStableForCatalog(env),
     fetchInsiderForCatalog(env),
     getBetaList(env),
@@ -4807,7 +4829,13 @@ async function reconcileAllReleaseStatus(
       name: primaryStable.name,
       version: primaryStable.version,
       fingerprint: primaryStable.firmware_sha256 || primaryStable.id,
+      devices: stableDevices,
     } : null,
+    // An unreachable upstream leaves the component's last known version alone.
+    stock: stockSources.flatMap((source, index) => {
+      const result = stockResults[index];
+      return result.ok ? [{ device: source.device, name: source.name, version: result.data.version }] : [];
+    }),
     insider: insider ? {
       name: insider.name,
       version: insider.version,

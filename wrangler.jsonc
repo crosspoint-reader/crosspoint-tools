@@ -81,6 +81,10 @@
     "INSTATUS_X3_GROUP_ID": "cmsi0ypoc04830rpb7tby0uz7",
     "INSTATUS_X4_GROUP_ID": "cmsi0rjlo044h0rn3nouqubtu",
     "INSTATUS_X4_PRO_GROUP_ID": "cmsi0yxrf04850rpbhwr9fe6r",
+    "INSTATUS_X4C_GROUP_ID": "cmurt46ck00uu1btdf8ywab2q",
+    "INSTATUS_PAPERMONO_GROUP_ID": "cmurt4m7p00n81brwh5qczy8d",
+    "INSTATUS_METALIO_GROUP_ID": "cmurt53xx03md1ao0ppupsqu9",
+    "INSTATUS_M5PAPERS3_GROUP_ID": "cmurtjz7x03p71mo00cyrrtyh",
     "INSTATUS_STICKY_GROUP_ID": "cmsi12gb204av0ypb5vlu04t2",
     "INSTATUS_M5PAPER_GROUP_ID": "cmsi0znil048d0rpbcrac71tr",
     "INSTATUS_LILYGO_GROUP_ID": "cmsi0zali048t0rn36cgypbpe",
@@ -93,6 +97,7 @@
     "INSTATUS_X4_PRO_BETA_COMPONENT_ID": "cmshzjqi6046n0yn3vcs6la7v",
     "INSTATUS_STICKY_BETA_COMPONENT_ID": "cmshzjqrp03qr0kpbtorjjc8h",
     "INSTATUS_M5PAPER_BETA_COMPONENT_ID": "cmshzjr2e03rp1bpb4q1d4j6b",
-    "INSTATUS_LILYGO_BETA_COMPONENT_ID": "cmshzjr99046o0yn3sf8w7n1g"
+    "INSTATUS_LILYGO_BETA_COMPONENT_ID": "cmshzjr99046o0yn3sf8w7n1g",
+    "INSTATUS_M5PAPERS3_BETA_COMPONENT_ID": "cmurtk69700ri1brw5z30pc9j"
   }
 }
