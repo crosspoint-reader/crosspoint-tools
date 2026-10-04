@@ -50,10 +50,10 @@ const RELEASES = [
 // Live numbers come from /api/stats. These are the last known good values and
 // stand in until the fetch resolves — and stay put if it never does.
 const FALLBACK_STATS = {
-  contributors: 225,
-  forks: 1642,
+  contributors: 242,
+  forks: 1947,
   changes: 126,
-  downloads: 110327,
+  downloads: 198781,
 }
 
 const STAT_LABELS = [

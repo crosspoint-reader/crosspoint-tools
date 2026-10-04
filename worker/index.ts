@@ -1651,8 +1651,8 @@ async function getSubscriberEmail(request: Request): Promise<string | null> {
 // Community stats (front page)
 // ---------------------------------------------------------------------------
 
-const STATS_CACHE_KEY = 'community-stats:v3';
-const STATS_LAST_GOOD_KEY = 'community-stats:last:v3';
+const STATS_CACHE_KEY = 'community-stats:v4';
+const STATS_LAST_GOOD_KEY = 'community-stats:last:v4';
 const STATS_TTL = 6 * 60 * 60; // 6 hours
 
 // Lifetime count of web-flasher flashes that GitHub's release download_count
@@ -1771,13 +1771,16 @@ async function computeCommunityStats(env: Env): Promise<CommunityStats> {
   const releases = allReleases.filter(r => !r.draft && !r.prerelease);
   if (releases.length === 0) throw new Error('no published releases');
 
-  // Downloads of the biggest release, not the lifetime total: users re-download
-  // the firmware on every update, so summing counts the same person many times.
+  // Downloads of the last three stable releases, not the lifetime total: users
+  // re-download the firmware on every update, so summing everything counts the
+  // same person many times. A single release (the old metric) froze once
+  // monthly releases stopped any one of them from out-growing 1.4.1.
   // Web flashes that bypass GitHub assets (nightly/beta/RC/device/custom) are
   // tracked in our own counter and added on top.
-  const downloads = Math.max(
-    ...releases.map(r => r.assets.reduce((sum, a) => sum + a.download_count, 0))
-  ) + await getWebFlashCount(env);
+  const downloads = releases
+    .slice(0, 3)
+    .reduce((total, r) => total + r.assets.reduce((sum, a) => sum + a.download_count, 0), 0)
+    + await getWebFlashCount(env);
 
   return {
     contributors,
