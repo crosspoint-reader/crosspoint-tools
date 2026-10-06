@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import { Eyebrow } from '../components/ui.jsx'
 import { ProductCard, useShopItems } from './shop/ShopGridPage.jsx'
@@ -271,6 +271,9 @@ export default function DevicesPage() {
             E-readers that run CrossPoint. Filter by the hardware you care about, compare specs, and
             flash the latest firmware from your browser.
           </p>
+          <Link to="/device-comparison" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-700">
+            Read our hands-on device comparison <span aria-hidden="true">&rarr;</span>
+          </Link>
         </div>
 
         <div className="mt-10 lg:grid lg:grid-cols-[14rem_1fr] lg:gap-10">

@@ -18,6 +18,7 @@ const UnlockPage = lazy(() => import('./pages/UnlockPage.jsx'))
 const ReportIssuePage = lazy(() => import('./pages/ReportIssuePage.jsx'))
 const AccessoriesPage = lazy(() => import('./pages/AccessoriesPage.jsx'))
 const DevicesPage = lazy(() => import('./pages/DevicesPage.jsx'))
+const DeviceComparisonPage = lazy(() => import('./pages/DeviceComparisonPage.jsx'))
 const BlogPage = lazy(() => import('./pages/BlogPage.jsx'))
 const BlogPostPage = lazy(() => import('./pages/BlogPostPage.jsx'))
 const BrandPage = lazy(() => import('./pages/BrandPage.jsx'))
@@ -99,6 +100,7 @@ export default function App() {
           <Route path="/report-issue" element={<ReportIssuePage />} />
           <Route path="/accessories" element={<AccessoriesPage />} />
           <Route path="/devices" element={<DevicesPage />} />
+          <Route path="/device-comparison" element={<DeviceComparisonPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
           <Route path="/brand" element={<BrandPage />} />

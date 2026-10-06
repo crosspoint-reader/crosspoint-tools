@@ -25,6 +25,7 @@ const COLUMNS = [
     title: 'Shop',
     links: [
       { name: 'Devices', href: '/devices', route: true },
+      { name: 'Device Comparison', href: '/device-comparison', route: true },
       { name: 'Accessories', href: '/accessories', route: true },
     ],
   },

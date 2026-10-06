@@ -84,6 +84,10 @@ const PAGES: Record<string, PageMeta> = {
     title: 'Devices',
     description: 'E-readers that run CrossPoint. Pick one up and flash the latest firmware from your browser.',
   },
+  '/device-comparison': {
+    title: 'Device Comparison',
+    description: 'A hands-on comparison of CrossPoint e-readers: screens, buttons, touch, frontlights, and everyday reading with Xteink, Seeed, M5Stack, and EEGORead devices.',
+  },
   '/blog': {
     title: 'Blog',
     description: 'Updates and announcements from the CrossPoint Reader project.',

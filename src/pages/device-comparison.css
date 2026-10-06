@@ -1,0 +1,21 @@
+.comparison-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0 2rem;
+}
+
+.comparison-gallery figure { margin: 0; }
+
+.docs-prose .comparison-gallery img {
+  display: block;
+  width: 100%;
+  margin: 0;
+}
+
+.comparison-gallery figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  text-align: center;
+  color: #78716c;
+}

@@ -11,6 +11,7 @@ const NAV = [
     items: [
       { name: 'Blog', href: '/blog', route: true },
       { name: 'Docs', href: '/docs', route: true },
+      { name: 'Device Comparison', href: '/device-comparison', route: true },
       { name: 'Roadmap', href: '/roadmap', route: true },
     ],
   },
