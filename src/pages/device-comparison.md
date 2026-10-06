@@ -13,13 +13,11 @@ Devices purchased directly from Xteink’s official website come with the global
     <a href="/device-comparison/x4_1.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of Xteink X4, front view">
       <img src="/device-comparison/x4_1.webp" alt="Xteink X4, front view" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Front view</figcaption>
   </figure>
   <figure>
     <a href="/device-comparison/x4_2.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of Xteink X4, side angle">
       <img src="/device-comparison/x4_2.webp" alt="Xteink X4, side angle" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Side angle</figcaption>
   </figure>
 </div>
 
@@ -38,13 +36,11 @@ Unfortunately, Xteink has discontinued the X4, so it is no longer available from
     <a href="/device-comparison/x3_1.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of Xteink X3, front view">
       <img src="/device-comparison/x3_1.webp" alt="Xteink X3, front view" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Front view</figcaption>
   </figure>
   <figure>
     <a href="/device-comparison/x3_2.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of Xteink X3, side angle">
       <img src="/device-comparison/x3_2.webp" alt="Xteink X3, side angle" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Side angle</figcaption>
   </figure>
 </div>
 
@@ -63,13 +59,11 @@ Personally, I didn’t like the button placement.
     <a href="/device-comparison/x4pro_1.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of Xteink X4 Pro, front view">
       <img src="/device-comparison/x4pro_1.webp" alt="Xteink X4 Pro, front view" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Front view</figcaption>
   </figure>
   <figure>
     <a href="/device-comparison/x4pro_2.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of Xteink X4 Pro, side angle">
       <img src="/device-comparison/x4pro_2.webp" alt="Xteink X4 Pro, side angle" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Side angle</figcaption>
   </figure>
 </div>
 
@@ -86,13 +80,11 @@ One downside is that some users feel the touchscreen and frontlight layers sligh
     <a href="/device-comparison/x4c_1.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of Xteink X4 Classic, front view">
       <img src="/device-comparison/x4c_1.webp" alt="Xteink X4 Classic, front view" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Front view</figcaption>
   </figure>
   <figure>
     <a href="/device-comparison/x4c_2.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of Xteink X4 Classic, side angle">
       <img src="/device-comparison/x4c_2.webp" alt="Xteink X4 Classic, side angle" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Side angle</figcaption>
   </figure>
 </div>
 
@@ -113,13 +105,11 @@ If you liked the philosophy of the original X4 and don’t need touch or a front
     <a href="/device-comparison/sticky_1.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of Seeed reTerminal Sticky, front view">
       <img src="/device-comparison/sticky_1.webp" alt="Seeed reTerminal Sticky, front view" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Front view</figcaption>
   </figure>
   <figure>
     <a href="/device-comparison/sticky_2.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of Seeed reTerminal Sticky, side angle">
       <img src="/device-comparison/sticky_2.webp" alt="Seeed reTerminal Sticky, side angle" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Side angle</figcaption>
   </figure>
 </div>
 
@@ -158,13 +148,11 @@ TBW
     <a href="/device-comparison/papermono_1.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of M5PaperMono, front view">
       <img src="/device-comparison/papermono_1.webp" alt="M5PaperMono, front view" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Front view</figcaption>
   </figure>
   <figure>
     <a href="/device-comparison/papermono_2.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of M5PaperMono, side angle">
       <img src="/device-comparison/papermono_2.webp" alt="M5PaperMono, side angle" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Side angle</figcaption>
   </figure>
 </div>
 
@@ -189,13 +177,11 @@ TBW
     <a href="/device-comparison/eego_a4_1.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of EEGO A4, front view">
       <img src="/device-comparison/eego_a4_1.webp" alt="EEGO A4, front view" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Front view</figcaption>
   </figure>
   <figure>
     <a href="/device-comparison/eego_a4_2.webp" target="_blank" rel="noopener noreferrer" aria-label="View larger photo of EEGO A4, side angle">
       <img src="/device-comparison/eego_a4_2.webp" alt="EEGO A4, side angle" width="1000" height="1250" loading="lazy" decoding="async">
     </a>
-    <figcaption>Side angle</figcaption>
   </figure>
 </div>
 
