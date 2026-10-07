@@ -49,6 +49,8 @@ struct SessionInfo {
     release_id: Option<String>,
     firmware_path: Option<String>,
     bridge_ip: Option<String>,
+    upstream_service: Option<String>,
+    upstream_adhoc: bool,
     ssid: Option<String>,
     psk: Option<String>,
     device_ip: Option<String>,
@@ -63,6 +65,8 @@ async fn get_session(state: State<'_, AppState>) -> Result<SessionInfo, String> 
         release_id: d.selection.as_ref().map(|s| s.release_id.clone()),
         firmware_path: d.firmware_path,
         bridge_ip: d.bridge_ip,
+        upstream_service: d.upstream_service,
+        upstream_adhoc: d.upstream_adhoc,
         ssid: d.ssid,
         psk: d.psk,
         device_ip: d.device_ip,
@@ -997,25 +1001,19 @@ async fn run_prepared_install(
     };
     log.push("info", format!("configuring {hotspot_label}"), None)
         .await;
-    if let Err(e) = runtime.prepare_hotspot(&helper, &ssid, &psk).await {
-        log.push(
-            "error",
-            format!("{hotspot_label} setup failed: {e:#}"),
-            None,
-        )
-        .await;
-        return Err(e.into());
-    }
-    if cfg!(target_os = "windows") {
-        log.push("info", "Mobile Hotspot up", None).await;
-    } else {
-        log.push(
-            "info",
-            "ready — enable Internet Sharing in System Settings",
-            None,
-        )
-        .await;
-    }
+    let setup = match runtime.prepare_hotspot(&helper, &ssid, &psk).await {
+        Ok(setup) => setup,
+        Err(e) => {
+            log.push(
+                "error",
+                format!("{hotspot_label} setup failed: {e:#}"),
+                None,
+            )
+            .await;
+            return Err(e);
+        }
+    };
+    log_hotspot_prepared(&orch, &log, setup).await;
 
     // Wait for the user to enable Internet Sharing in System Settings.
     orch.transition(OrchState::WaitingForInternetSharing, None)
@@ -1160,7 +1158,8 @@ async fn run_capture(
         None,
     )
     .await;
-    runtime.prepare_hotspot(&helper, &ssid, &psk).await?;
+    let setup = runtime.prepare_hotspot(&helper, &ssid, &psk).await?;
+    log_hotspot_prepared(&orch, &log, setup).await;
 
     orch.transition(OrchState::WaitingForInternetSharing, None)
         .await;
@@ -1239,6 +1238,34 @@ async fn run_capture(
     .await;
 
     Ok(())
+}
+
+/// Record the upstream `prepare_hotspot` picked and log it. On macOS this is
+/// the user's cue for what to select in System Settings.
+async fn log_hotspot_prepared(
+    orch: &Orchestrator,
+    log: &SessionLog,
+    setup: unlocker_core::types::HotspotSetup,
+) {
+    let msg = if cfg!(target_os = "windows") {
+        "Mobile Hotspot up".to_string()
+    } else if cfg!(target_os = "linux") {
+        "Wi-Fi hotspot up".to_string()
+    } else {
+        match (&setup.upstream_service, setup.upstream_adhoc) {
+            (Some(svc), false) => format!(
+                "ready — enable Internet Sharing in System Settings, sharing from \"{svc}\" ({})",
+                setup.upstream_device.as_deref().unwrap_or("?")
+            ),
+            (Some(svc), true) => format!(
+                "ready — no internet interface found; enable Internet Sharing in System Settings, sharing from the temporary \"{svc}\" service"
+            ),
+            (None, _) => "ready — enable Internet Sharing in System Settings".to_string(),
+        }
+    };
+    log.push("info", msg, None).await;
+    orch.set_upstream(setup.upstream_service, setup.upstream_adhoc)
+        .await;
 }
 
 fn render_changelog(release: &CrossPointRelease) -> String {

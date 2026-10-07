@@ -12,7 +12,7 @@ This document covers what your firmware and your catalog have to do for that to 
 
 When the user runs Unlocker:
 
-1. The Mac comes up as a Wi-Fi hotspot via `feth` + Internet Sharing.
+1. The Mac comes up as a Wi-Fi hotspot via Internet Sharing (upstream and bridge interfaces are discovered at runtime, see the README).
 2. A spoofed DNS resolver answers the locale's Xteink API host (`api-prod.xteink.cc` or `api-prod.xteink.cn`) with the bridge IP.
 3. An HTTPS server on the bridge IP answers `GET /api/v1/check-update` with a manifest pointing at a firmware URL Unlocker also serves.
 4. The device fetches the firmware over plain HTTP from the bridge IP and installs via its built-in `esp_https_ota` flow.
