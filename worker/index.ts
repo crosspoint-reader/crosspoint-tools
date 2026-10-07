@@ -690,7 +690,7 @@ async function handleBuildSummary(
 // Devices with their own nightly PlatformIO env (`<device>-gh_release`
 // upstream). The shared `gh_release` image covers x3/x4 and stays at the
 // legacy `builds/latest/firmware.bin` key; these get a per-device suffix.
-const NIGHTLY_DEVICE_BUILDS = new Set(['x4pro', 'sticky', 'papermono']);
+const NIGHTLY_DEVICE_BUILDS = new Set(['x4pro', 'sticky', 'papermono', 'eego_a4']);
 
 function nightlyR2Key(device: string | null, prefix = 'builds/latest'): string {
   return device && NIGHTLY_DEVICE_BUILDS.has(device)
@@ -850,7 +850,7 @@ async function handleBuildUpload(
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
-  // Per-device nightly uploads (?device=x4pro|sticky|papermono) land next to
+  // Per-device nightly uploads (?device=x4pro|sticky|papermono|eego_a4) land next to
   // the shared image under a device-suffixed key. No device param = the
   // legacy shared x3/x4 image.
   const device = url.searchParams.get('device');

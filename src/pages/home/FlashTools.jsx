@@ -166,6 +166,7 @@ const MODELS = [
   { id: 'papermono', name: 'M5PaperMono', res: '480 × 800' },
   { id: 'lilygo', name: 'LilyGo T5', res: '540 × 960' },
   { id: 'metalio', name: 'Metalio E-INK4', res: '480 × 800' },
+  { id: 'eego_a4', name: 'EEGO Reader A4', res: '552 × 768' },
 ]
 
 // Vendor favicon shown next to each device name in the picker, grouped by
@@ -181,6 +182,7 @@ const MODEL_BRANDS = {
   papermono: '/brands/m5stack.png',
   lilygo: '/brands/lilygo.png',
   metalio: '/brands/cloudzao.png',
+  eego_a4: '/brands/eego.png',
 }
 
 // esptool chip identity each device must report before we write anything.
@@ -199,6 +201,7 @@ const MODEL_CHIPS = {
   papermono: 'ESP32-S3',
   lilygo: 'ESP32-S3',
   metalio: 'ESP32-S3',
+  eego_a4: 'ESP32-S3',
 }
 
 // The debug repair flow has known bootloader and partition layouts for these
@@ -276,6 +279,15 @@ const DEVICE_INSTALLS = {
     after: 'Press the power button to boot the device.',
     note: 'NOTE: You must use a USB-A cable to flash',
   },
+  eego_a4: {
+    name: 'EEGO Reader A4',
+    // Same esp32-s3-devkitc1-n16r8 board and base 16MB layout as papermono;
+    // its bootloader is already DIO/16MB/80m, matching the eego_a4 env.
+    bootloader: '/firmware/papermono-bootloader.bin',
+    bootloaderOffset: 0x0,
+    baudrate: 921600,
+    after: 'Press the power button to boot the device.',
+  },
 }
 
 // Xteink-class ESP32-S3 devices (X4 Pro, X4C). Both flash through the
@@ -350,6 +362,21 @@ export default function FlashTools() {
         if (cancelled || !meta) return
         setReleaseMeta(meta)
         if (meta.publishedAt) setReleaseDate(meta.publishedAt)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Devices the latest successful nightly built for (buildMeta.devices).
+  const [nightlyDevices, setNightlyDevices] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchBuildMeta()
+      .then((m) => {
+        if (!cancelled && m?.status === 'success') setNightlyDevices(m.devices || [])
       })
       .catch(() => {})
     return () => {
@@ -913,7 +940,8 @@ export default function FlashTools() {
                   !DEVICE_BUILD_MODELS.includes(m.id) ||
                   deviceAvailability[m.id] ||
                   rcCoversDevice(m.id) ||
-                  stableCoversDevice(m.id)
+                  stableCoversDevice(m.id) ||
+                  nightlyDevices.includes(m.id)
               ).map((m) => (
                 <button
                   key={m.id}
@@ -923,7 +951,7 @@ export default function FlashTools() {
                   style={running ? { pointerEvents: 'none' } : undefined}
                 >
                   <div className="flex items-center gap-1.5">
-                    <img src={MODEL_BRANDS[m.id]} alt="" aria-hidden="true" className="h-4 w-4 shrink-0 rounded-sm object-contain" />
+                    <img src={MODEL_BRANDS[m.id]} alt="" aria-hidden="true" className="h-4 w-auto shrink-0 rounded-sm object-contain" />
                     <div className="text-sm font-semibold text-stone-900">{m.name}</div>
                   </div>
                   <div className="mt-0.5 font-mono text-xs text-stone-400">

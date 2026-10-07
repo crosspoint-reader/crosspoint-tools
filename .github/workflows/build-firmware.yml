@@ -109,7 +109,7 @@ jobs:
         if: steps.check.outputs.skip == 'false'
         run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
 
-      # Four envs build in this job now (shared + sticky + x4pro + papermono);
+      # Five envs build in this job now (shared + sticky + x4pro + papermono + eego_a4);
       # cache the toolchains/frameworks like the upstream release workflow does.
       - name: Cache PlatformIO packages
         if: steps.check.outputs.skip == 'false'
@@ -129,10 +129,11 @@ jobs:
 
       # Every device family with its own release env gets a nightly. The
       # shared gh_release image covers X3/X4; the device-suffixed envs match
-      # the upstream release workflow (sticky/x4pro/papermono).
+      # the upstream release workflow (sticky/x4pro/papermono); eego_a4 is
+      # nightly-only for now (not in upstream release.yml yet).
       - name: Build CrossPoint
         if: steps.check.outputs.skip == 'false'
-        run: pio run -e gh_release -e sticky-gh_release -e x4pro-gh_release -e papermono-gh_release -j1
+        run: pio run -e gh_release -e sticky-gh_release -e x4pro-gh_release -e papermono-gh_release -e eego_a4-gh_release -j1
 
       - name: Get version and changelog
         if: steps.check.outputs.skip == 'false'
@@ -161,7 +162,7 @@ jobs:
             -H "X-Build-Version: ${{ steps.info.outputs.version }}" \
             --data-binary @".pio/build/gh_release/firmware.bin"
 
-          for device in sticky x4pro papermono; do
+          for device in sticky x4pro papermono eego_a4; do
             curl -sf -X PUT "${WEBHOOK_BASE_URL}/api/build/upload?device=${device}" \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
               -H "Content-Type: application/octet-stream" \
@@ -190,7 +191,7 @@ jobs:
             --arg version "$VERSION" \
             --argjson firmwareSize "$SIZE" \
             --argjson changelog "$CHANGELOG" \
-            --argjson devices '["x3","x4","sticky","x4pro","papermono"]' \
+            --argjson devices '["x3","x4","sticky","x4pro","papermono","eego_a4"]' \
             '{status:$status, commit:$commit, commitShort:$commitShort, commitMessage:$commitMessage, version:$version, firmwareSize:$firmwareSize, changelog:$changelog, devices:$devices, error:null, buildLog:null}' \
           | curl -s -X POST "${WEBHOOK_BASE_URL}/api/build/status" \
               -H "Authorization: Bearer ${{ secrets.WEBHOOK_SECRET }}" \
