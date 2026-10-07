@@ -61,6 +61,7 @@ impl Runtime {
             change_log: cfg.change_log,
             dns_internal_port: DNS_INTERNAL_PORT,
             crosspet_http: cfg.crosspet_http,
+            dns_intercept: cfg.dns_intercept,
             capture_only: cfg.capture_only,
             xota_variants: cfg.xota_variants,
         };
@@ -96,6 +97,9 @@ pub struct ArmConfig {
     pub change_log: String,
     /// Serve crosspet devices a plain-HTTP firmware URL instead of HTTPS.
     pub crosspet_http: bool,
+    /// Windows only: intercept DNS aimed at a hardcoded resolver (loads the
+    /// WinDivert driver). Ignored on other platforms.
+    pub dns_intercept: bool,
     /// Capture-only: arm + log requests but never offer an update.
     pub capture_only: bool,
     /// Channel-specific X4 Pro encrypted packages; empty for plain firmware.

@@ -95,6 +95,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   const setCrosspetHttpOta = useSettingsStore(
     (state) => state.setCrosspetHttpOta,
   );
+  const dnsIntercept = useSettingsStore((state) => state.dnsIntercept);
+  const setDnsIntercept = useSettingsStore((state) => state.setDnsIntercept);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -120,7 +122,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
   async function onStartCapture() {
     setCapturing(true);
     try {
-      await api.startCapture(captureRegion);
+      await api.startCapture(captureRegion, "x4", dnsIntercept);
       // Hand off to the main window, which drives the hotspot / Internet
       // Sharing steps and shows the live log while capture is armed.
       onClose();
@@ -255,6 +257,47 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             </span>
           </label>
         </CollapsibleSection>
+
+        {isWindows() && (
+        <CollapsibleSection
+          title="Intercept hardcoded DNS"
+          subtitle="For devices that ignore the hotspot's DNS server"
+          open={openSection === "dns-intercept"}
+          onToggle={() => toggle("dns-intercept")}
+        >
+          <p className="text-sm text-stone-600">
+            Most devices ask the hotspot where to find Xteink's servers, and
+            Unlocker answers. A few firmwares ignore that and query a fixed
+            public resolver instead (e.g. AliDNS 223.5.5.5 on X4 Pro XTOS
+            V7.6.10), so they never see our answer and the update check reaches
+            the real Xteink servers. Turning this on captures those queries too.
+          </p>
+          <p className="text-sm text-stone-600">
+            This loads <span className="font-medium">WinDivert</span>, a
+            packet-capture kernel driver bundled with Unlocker. The driver is
+            only installed and started the first time you use this option, and
+            it is signed by its third-party publisher, not by us. Leave it off
+            unless your device's update check isn't being intercepted.
+          </p>
+          <label className="flex items-start gap-3 text-sm text-stone-700">
+            <input
+              type="checkbox"
+              checked={dnsIntercept}
+              onChange={(e) => setDnsIntercept(e.target.checked)}
+              className="mt-0.5 size-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span>
+              <span className="block font-medium text-stone-900">
+                Capture DNS sent to hardcoded resolvers
+              </span>
+              <span className="block text-stone-600">
+                Takes effect on the next unlock or traffic capture. If the
+                driver can't load, Unlocker carries on without it.
+              </span>
+            </span>
+          </label>
+        </CollapsibleSection>
+        )}
 
         <CollapsibleSection
           title="Capture device traffic (diagnostics)"

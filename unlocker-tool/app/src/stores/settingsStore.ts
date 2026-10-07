@@ -6,12 +6,14 @@ type PersistedSettings = {
   showCustomFirmwareOption: boolean;
   showPrereleaseFirmware: boolean;
   crosspetHttpOta: boolean;
+  dnsIntercept: boolean;
 };
 
 type SettingsState = PersistedSettings & {
   setShowCustomFirmwareOption: (value: boolean) => void;
   setShowPrereleaseFirmware: (value: boolean) => void;
   setCrosspetHttpOta: (value: boolean) => void;
+  setDnsIntercept: (value: boolean) => void;
 };
 
 function loadSettings(): PersistedSettings {
@@ -19,6 +21,7 @@ function loadSettings(): PersistedSettings {
     showCustomFirmwareOption: false,
     showPrereleaseFirmware: false,
     crosspetHttpOta: false,
+    dnsIntercept: false,
   };
 
   if (typeof window === "undefined") return defaults;
@@ -31,6 +34,7 @@ function loadSettings(): PersistedSettings {
       showCustomFirmwareOption: parsed.showCustomFirmwareOption === true,
       showPrereleaseFirmware: parsed.showPrereleaseFirmware === true,
       crosspetHttpOta: parsed.crosspetHttpOta === true,
+      dnsIntercept: parsed.dnsIntercept === true,
     };
   } catch {
     return defaults;
@@ -42,12 +46,17 @@ function saveSettings(settings: PersistedSettings) {
 }
 
 function persistCurrent(get: () => SettingsState) {
-  const { showCustomFirmwareOption, showPrereleaseFirmware, crosspetHttpOta } =
-    get();
+  const {
+    showCustomFirmwareOption,
+    showPrereleaseFirmware,
+    crosspetHttpOta,
+    dnsIntercept,
+  } = get();
   saveSettings({
     showCustomFirmwareOption,
     showPrereleaseFirmware,
     crosspetHttpOta,
+    dnsIntercept,
   });
 }
 
@@ -63,6 +72,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
   setCrosspetHttpOta: (crosspetHttpOta) => {
     set({ crosspetHttpOta });
+    persistCurrent(get);
+  },
+  setDnsIntercept: (dnsIntercept) => {
+    set({ dnsIntercept });
     persistCurrent(get);
   },
 }));

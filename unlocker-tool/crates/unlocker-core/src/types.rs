@@ -217,6 +217,14 @@ pub struct ArmServerSpec {
     /// to false (HTTPS) until HTTP OTA support is confirmed on the hardware.
     #[serde(default)]
     pub crosspet_http: bool,
+    /// Windows only: capture UDP/53 the device sends straight to a hardcoded
+    /// public resolver, which the hosts-file spoof can't see. Off by default
+    /// because it loads WinDivert's kernel driver (third-party signed) — the
+    /// driver service is only created the first time this is true, so leaving
+    /// it off keeps the driver entirely out of the picture. User-controlled via
+    /// a Settings toggle; devices that respect the DHCP resolver don't need it.
+    #[serde(default)]
+    pub dns_intercept: bool,
     /// Capture-only mode: arm DNS + HTTP + HTTPS and log every request the
     /// device makes, but never offer an update. All update-check endpoints
     /// answer "no update available", so the device checks in (revealing its

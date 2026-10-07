@@ -32,17 +32,27 @@ export const api = {
     locale: Locale,
     releaseId: string,
     crosspetHttp: boolean,
+    dnsIntercept: boolean,
   ) =>
     invoke<void>("select_firmware", {
       selection: { model, locale, release_id: releaseId },
       crosspetHttp,
+      dnsIntercept,
     }),
   selectLocalFirmware: (
     model: Model,
     locale: Locale,
     path: string,
     crosspetHttp: boolean,
-  ) => invoke<void>("select_local_firmware", { model, locale, path, crosspetHttp }),
+    dnsIntercept: boolean,
+  ) =>
+    invoke<void>("select_local_firmware", {
+      model,
+      locale,
+      path,
+      crosspetHttp,
+      dnsIntercept,
+    }),
   // Download a catalog firmware and write it to `dest` on this computer, so the
   // user can copy it to the device's SD card and flash it from Escape Hatch.
   exportFirmware: (releaseId: string, dest: string) =>
@@ -55,8 +65,11 @@ export const api = {
   // Capture-only mode: arm the hotspot + DNS/HTTP/HTTPS servers and log every
   // request the device makes, without offering or flashing any firmware.
   // `locale` picks which Xteink API host is DNS-spoofed (english → .cc).
-  startCapture: (locale: Locale = "english", model: Model = "x4") =>
-    invoke<void>("start_capture", { locale, model }),
+  startCapture: (
+    locale: Locale = "english",
+    model: Model = "x4",
+    dnsIntercept = false,
+  ) => invoke<void>("start_capture", { locale, model, dnsIntercept }),
   cancel: () => invoke<void>("cancel"),
   getLogs: () => invoke<LogEntry[]>("get_logs"),
   getHelperLogTail: (lines = 200) =>

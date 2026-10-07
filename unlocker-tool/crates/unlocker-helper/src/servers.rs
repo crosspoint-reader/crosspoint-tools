@@ -91,13 +91,23 @@ impl ServerHolder {
         #[cfg(windows)]
         crate::ops::hosts_arm(&dns_cfg.spoofed_hosts, bridge_ip).await?;
 
-        // Windows: also capture queries devices send straight to a hardcoded
-        // public resolver (e.g. AliDNS 223.5.5.5), which the hosts-file spoof
-        // can't see. Fail-soft — None (driver missing) leaves the hosts path in
-        // place, matching prior behavior for resolver-respecting devices.
+        // Windows: optionally also capture queries devices send straight to a
+        // hardcoded public resolver (e.g. AliDNS 223.5.5.5), which the
+        // hosts-file spoof can't see. Opt-in (Settings toggle) because opening
+        // the WinDivert handle is what installs and starts its kernel driver
+        // service; with the toggle off we never touch it. Fail-soft — None
+        // (driver won't open) leaves the hosts path in place, matching prior
+        // behavior for resolver-respecting devices.
         #[cfg(windows)]
-        let dns_interceptor =
-            crate::ops::windows_dns::start(dns_cfg.spoofed_hosts.clone(), bridge_ip);
+        let dns_interceptor = if spec.dns_intercept {
+            crate::ops::windows_dns::start(dns_cfg.spoofed_hosts.clone(), bridge_ip)
+        } else {
+            tracing::info!(
+                "DNS interception disabled in settings; hosts-file spoof only. \
+                 Devices that hardcode a public resolver won't be captured."
+            );
+            None
+        };
 
         let on_manifest = Arc::new(Notify::new());
         let on_firmware = Arc::new(Notify::new());

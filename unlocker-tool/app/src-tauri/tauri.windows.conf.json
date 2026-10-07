@@ -3,7 +3,10 @@
   "bundle": {
     "targets": ["nsis", "msi"],
     "resources": {
-      "../../target/release/unlocker-helper.exe": "unlocker-helper.exe"
+      "../../target/release/unlocker-helper.exe": "unlocker-helper.exe",
+      "../../vendor/windivert/x64/WinDivert.dll": "WinDivert.dll",
+      "../../vendor/windivert/x64/WinDivert64.sys": "WinDivert64.sys",
+      "../../vendor/windivert/LICENSE": "WinDivert-LICENSE.txt"
     },
     "windows": {
       "webviewInstallMode": {

@@ -46,7 +46,7 @@ export function App() {
     setLocale(pending.locale);
 
     (async () => {
-      const { crosspetHttpOta } = useSettingsStore.getState();
+      const { crosspetHttpOta, dnsIntercept } = useSettingsStore.getState();
       await api.acceptConsent(true, true);
       await api.selectDevice(pending.model, pending.locale);
       if (pending.kind === "catalog") {
@@ -55,6 +55,7 @@ export function App() {
           pending.locale,
           pending.releaseId,
           crosspetHttpOta,
+          dnsIntercept,
         );
       } else {
         await api.selectLocalFirmware(
@@ -62,6 +63,7 @@ export function App() {
           pending.locale,
           pending.path,
           crosspetHttpOta,
+          dnsIntercept,
         );
       }
     })().catch((e) => {

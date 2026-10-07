@@ -18,20 +18,23 @@
 //! it can't open, we log and return `None` — the caller keeps the hosts-file
 //! path, matching today's behavior for resolver-respecting devices.
 //!
-//! !!! UNTESTED ON WINDOWS !!! The packet parse/rewrite/checksum core lives in
-//! `unlocker_core::dns_intercept` and is unit-tested cross-platform. The lines
-//! below marked `VERIFY:` are the WinDivert-crate glue that must be checked
-//! against the installed crate version during a Windows build.
+//! The packet parse/rewrite/checksum core lives in
+//! `unlocker_core::dns_intercept` and is unit-tested cross-platform. The
+//! WinDivert-crate glue below is checked against windivert 0.6 / windivert-sys
+//! 0.10; building it needs `WINDIVERT_PATH` pointing at the SDK libs (see
+//! `vendor/windivert/`). Not yet exercised against a device that hardcodes a
+//! resolver — the capture path is unverified on real traffic.
 
 #![cfg(windows)]
 
-use anyhow::Result;
+use std::borrow::Cow;
 use std::net::Ipv4Addr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use unlocker_core::dns_intercept::spoof_forwarded_dns;
+use windivert::layer;
 use windivert::prelude::*;
 
 /// Capture UDP/53 that the hotspot subnet sends to any resolver, and answer the
@@ -49,7 +52,6 @@ pub struct DnsInterceptor {
 /// Start the interceptor. Returns `None` (fail-soft) if WinDivert can't open,
 /// so the caller falls back to hosts-file-only spoofing.
 pub fn start(spoofed_hosts: Vec<String>, bridge_ip: Ipv4Addr) -> Option<DnsInterceptor> {
-    // VERIFY: forward-layer handle constructor + flags for the crate version.
     let handle = match WinDivert::<layer::ForwardLayer>::forward(
         WINDIVERT_FILTER,
         0,
@@ -77,13 +79,13 @@ pub fn start(spoofed_hosts: Vec<String>, bridge_ip: Ipv4Addr) -> Option<DnsInter
 impl DnsInterceptor {
     pub fn stop(mut self) {
         self.stop.store(true, Ordering::SeqCst);
-        // recv() blocks; the thread rechecks `stop` after each packet. A quiet
-        // hotspot may leave it parked in recv until the next stray packet — for
-        // a clean, immediate unblock, VERIFY the crate's shutdown/close call and
-        // invoke it here (e.g. handle.shutdown(WinDivertShutdownMode::Both)).
-        if let Some(t) = self.thread.take() {
-            let _ = t.join();
-        }
+        // recv() blocks and the thread only rechecks `stop` after each packet,
+        // so a quiet hotspot can leave it parked until the next UDP/53 from the
+        // subnet. We deliberately don't join: disarming must not hang on device
+        // traffic. windivert 0.6 exposes shutdown() as `&mut self` on the handle
+        // the thread owns, with no way to signal it from here, so the thread is
+        // left to notice the flag and drop its handle on the next packet.
+        self.thread.take();
     }
 }
 
@@ -95,7 +97,6 @@ fn run_loop(
 ) {
     let mut buf = vec![0u8; 65535];
     while !stop.load(Ordering::SeqCst) {
-        // VERIFY: recv signature/return shape (packet.data: Cow<[u8]>, packet.address).
         let packet = match handle.recv(Some(&mut buf)) {
             Ok(p) => p,
             Err(e) => {
@@ -110,17 +111,19 @@ fn run_loop(
         match spoof_forwarded_dns(&packet.data, spoofed_hosts, bridge_ip) {
             Some(reply) => {
                 // Ours: inject the crafted reply back toward the device and drop
-                // the original query (don't forward it upstream).
-                // VERIFY: constructing an injectable packet + its address. The
-                // reply is resolver->device; reuse the received address (same
-                // interface) since the device is directly connected on the
-                // hotspot subnet. Checksums are already correct (built in
-                // dns_intercept), so no recalc is needed.
-                let mut out = packet.address.clone().into_packet(reply);
+                // the original query (don't forward it upstream). windivert 0.6
+                // has no address->packet helper, so build the packet from its
+                // public fields: reuse the received forward-layer address (same
+                // interface — the device is directly connected on the hotspot
+                // subnet) with our owned payload. Checksums are already correct
+                // (built in dns_intercept), so no recalc is needed.
+                let out = WinDivertPacket::<layer::ForwardLayer> {
+                    address: packet.address.clone(),
+                    data: Cow::Owned(reply),
+                };
                 if let Err(e) = handle.send(&out) {
                     tracing::debug!(error = %e, "WinDivert send (spoofed reply) failed");
                 }
-                let _ = &mut out;
             }
             None => {
                 // Not a spoofed name (or not a DNS query): forward unchanged so

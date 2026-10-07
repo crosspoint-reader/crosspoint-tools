@@ -645,6 +645,7 @@ async fn select_firmware(
     state: State<'_, AppState>,
     selection: Selection,
     crosspet_http: bool,
+    dns_intercept: bool,
 ) -> Result<(), String> {
     state.orch.set_selection(selection.clone()).await;
     state
@@ -659,8 +660,17 @@ async fn select_firmware(
     let helper = state.helper.clone();
 
     tokio::spawn(async move {
-        if let Err(e) =
-            run_install(orch.clone(), log, http, runtime, helper, selection, crosspet_http).await
+        if let Err(e) = run_install(
+            orch.clone(),
+            log,
+            http,
+            runtime,
+            helper,
+            selection,
+            crosspet_http,
+            dns_intercept,
+        )
+        .await
         {
             orch.fail(format!("{e:#}")).await;
         }
@@ -676,6 +686,7 @@ async fn select_local_firmware(
     locale: Locale,
     path: String,
     crosspet_http: bool,
+    dns_intercept: bool,
 ) -> Result<(), String> {
     let path = std::path::PathBuf::from(path);
     if !path.is_file() {
@@ -709,8 +720,16 @@ async fn select_local_firmware(
     let helper = state.helper.clone();
 
     tokio::spawn(async move {
-        if let Err(e) =
-            run_local_install(orch.clone(), log, runtime, helper, path, crosspet_http).await
+        if let Err(e) = run_local_install(
+            orch.clone(),
+            log,
+            runtime,
+            helper,
+            path,
+            crosspet_http,
+            dns_intercept,
+        )
+        .await
         {
             orch.fail(format!("{e:#}")).await;
         }
@@ -788,6 +807,7 @@ async fn run_install(
     helper: Arc<Helper>,
     selection: Selection,
     crosspet_http: bool,
+    dns_intercept: bool,
 ) -> anyhow::Result<()> {
     // ── Locate + cache + download firmware ──
     let cat = catalog::fetch_catalog(&http)
@@ -811,7 +831,16 @@ async fn run_install(
         change_log: render_changelog(&release),
     };
 
-    run_prepared_install(orch, log, runtime, helper, firmware, crosspet_http).await
+    run_prepared_install(
+        orch,
+        log,
+        runtime,
+        helper,
+        firmware,
+        crosspet_http,
+        dns_intercept,
+    )
+    .await
 }
 
 async fn run_local_install(
@@ -821,6 +850,7 @@ async fn run_local_install(
     helper: Arc<Helper>,
     path: std::path::PathBuf,
     crosspet_http: bool,
+    dns_intercept: bool,
 ) -> anyhow::Result<()> {
     let sha = catalog::hash_file(&path)?;
     let size = std::fs::metadata(&path)?.len();
@@ -877,7 +907,16 @@ async fn run_local_install(
         change_log: format!("Installing local firmware file: {display_name}"),
     };
 
-    run_prepared_install(orch, log, runtime, helper, firmware, crosspet_http).await
+    run_prepared_install(
+        orch,
+        log,
+        runtime,
+        helper,
+        firmware,
+        crosspet_http,
+        dns_intercept,
+    )
+    .await
 }
 
 /// Wrap a prepared plain image into an ESP32-S3 `encrypted_v1` `.xota` (X4 Pro
@@ -978,6 +1017,7 @@ async fn run_prepared_install(
     helper: Arc<Helper>,
     firmware: PreparedFirmware,
     crosspet_http: bool,
+    dns_intercept: bool,
 ) -> anyhow::Result<()> {
     orch.set_firmware(firmware.path.to_string_lossy().into(), firmware.sha.clone())
         .await;
@@ -1063,6 +1103,7 @@ async fn run_prepared_install(
         crosspoint_version: firmware.version,
         change_log: firmware.change_log,
         crosspet_http,
+        dns_intercept,
         capture_only: false,
         xota_variants,
     };
@@ -1142,6 +1183,7 @@ async fn run_capture(
     helper: Arc<Helper>,
     model: Model,
     locale: Locale,
+    dns_intercept: bool,
 ) -> anyhow::Result<()> {
     orch.set_device(model, locale).await;
 
@@ -1187,6 +1229,7 @@ async fn run_capture(
         crosspoint_version: "capture".into(),
         change_log: String::new(),
         crosspet_http: false,
+        dns_intercept,
         capture_only: true,
         xota_variants: Vec::new(),
     };
@@ -1260,9 +1303,11 @@ async fn start_capture(
     state: State<'_, AppState>,
     model: Option<Model>,
     locale: Option<Locale>,
+    dns_intercept: Option<bool>,
 ) -> Result<(), String> {
     let model = model.unwrap_or(Model::X4);
     let locale = locale.unwrap_or(Locale::English);
+    let dns_intercept = dns_intercept.unwrap_or(false);
 
     let orch = state.orch.clone();
     let log = state.log.clone();
@@ -1270,7 +1315,9 @@ async fn start_capture(
     let helper = state.helper.clone();
 
     tokio::spawn(async move {
-        if let Err(e) = run_capture(orch.clone(), log, runtime, helper, model, locale).await {
+        if let Err(e) =
+            run_capture(orch.clone(), log, runtime, helper, model, locale, dns_intercept).await
+        {
             orch.fail(format!("{e:#}")).await;
         }
     });
