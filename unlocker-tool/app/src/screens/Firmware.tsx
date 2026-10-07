@@ -110,10 +110,10 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
 
   const bySource = useMemo(() => {
     if (!catalog) return null;
-    const supportsModel = (r: CrossPointRelease) => {
-      if (!r.supported_devices || r.supported_devices.length === 0) return true;
-      return r.supported_devices.includes(model);
-    };
+    // No device list (or only ids this build doesn't know, which the parser
+    // drops) means hidden: offering a wrong-device image is worse than none.
+    const supportsModel = (r: CrossPointRelease) =>
+      r.supported_devices?.includes(model) ?? false;
     const isHidden = (r: CrossPointRelease) =>
       (HIDDEN_RELEASES[r.id] ?? []).includes(model);
     const isHiddenChannel = (r: CrossPointRelease) =>
@@ -239,10 +239,7 @@ export function Firmware({ model, locale }: { model: Model; locale: Locale }) {
   const escapeHatch =
     catalog.releases.find(
       (r) =>
-        r.id === escapeHatchId &&
-        (!r.supported_devices ||
-          r.supported_devices.length === 0 ||
-          r.supported_devices.includes(model)),
+        r.id === escapeHatchId && (r.supported_devices?.includes(model) ?? false),
     ) ?? null;
 
   return (

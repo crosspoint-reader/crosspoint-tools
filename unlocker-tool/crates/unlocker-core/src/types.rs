@@ -165,7 +165,7 @@ where
                 // Devices this Unlocker build doesn't know (e.g. a new device
                 // added to the catalog later). Skip the token instead of
                 // failing the whole catalog parse — a release supporting only
-                // unknown devices ends up with no models and is filtered out.
+                // unknown devices ends up with no models and the UI hides it.
                 _ => continue,
             };
             if !out.contains(&model) {
