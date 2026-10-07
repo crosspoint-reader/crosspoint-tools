@@ -5601,6 +5601,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "unlocker-divert"
+version = "0.2.41"
+dependencies = [
+ "tracing",
+ "tracing-subscriber",
+ "unlocker-core",
+ "windivert",
+]
+
+[[package]]
 name = "unlocker-helper"
 version = "0.2.41"
 dependencies = [
@@ -5614,7 +5624,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "unlocker-core",
- "windivert",
  "zbus",
 ]
 

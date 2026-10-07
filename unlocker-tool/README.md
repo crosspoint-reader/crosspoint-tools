@@ -101,6 +101,8 @@ Beyond check-update, the Pro also talks to an account-bound layer: it GETs `/api
 crates/
   unlocker-core/    library: orchestrator, runtime, manifest server, DNS, certs, catalog, helper RPC client
   unlocker-helper/  privileged helper binary (runs as root via osascript admin prompt)
+  unlocker-divert/  Windows-only DNS interception sidecar (opt-in; isolates WinDivert
+                    from the helper so a missing/blocked DLL can't stop it starting)
 app/
   src/              React + Tailwind frontend
   src-tauri/        Tauri 2 shell
@@ -160,6 +162,20 @@ Requirements:
 - Windows 10 1607 or newer (Windows 11 recommended).
 - A Wi-Fi adapter that supports Mobile Hotspot.
 - An active internet connection — Windows' tethering API requires a profile to share. (macOS bypasses this with a fake `lo0` upstream; Windows doesn't allow it.)
+
+### DNS interception (opt-in)
+
+DNS spoofing on Windows goes through the `hosts` file, because ICS owns port 53 on the bridge IP. That only reaches devices that use the resolver ICS hands out over DHCP; a firmware that queries a fixed public resolver instead (X4 Pro XTOS V7.6.10 asks AliDNS `223.5.5.5` directly) has its query NAT'd upstream and never sees our answer. macOS and Linux don't have this problem — their pf/iptables rule redirects all outbound UDP/53 regardless of destination.
+
+The **Intercept hardcoded DNS** setting (Settings → off by default) covers that case by capturing forwarded UDP/53 with [WinDivert](https://reqrypt.org/windivert.html) on its FORWARD layer and answering the spoofed names directly. It runs alongside the hosts-file spoof, which still handles queries aimed at the ICS resolver.
+
+It's opt-in because it loads a kernel driver. `WinDivert64.sys` is Authenticode-signed by a third-party publisher rather than by the WinDivert project (that's what the upstream `-A` builds are) — and opening the WinDivert handle is what installs and starts the driver service, so with the toggle off the bundled driver stays inert on disk and is never loaded.
+
+Build and packaging notes:
+- `windivert-sys` links `WinDivert.dll` at build time, so `WINDIVERT_PATH` must point at the SDK libs. `scripts/build-windows.ps1` sets it to the vendored copy in `vendor/windivert/x64/` (WinDivert 2.2.2, x64).
+- The capture loop is a **separate process** (`unlocker-divert.exe`), not part of the helper. `WinDivert.dll` is a plain import of whatever links it, so a missing or AV-quarantined DLL stops that binary from starting at all. Keeping it out of `unlocker-helper.exe` means every WinDivert failure mode degrades to "the sidecar isn't running" and the helper carries on with hosts-file spoofing. `unlocker-helper.exe` must stay free of WinDivert imports — `dumpbin /imports` is the check.
+- The installer ships `unlocker-divert.exe`, `WinDivert.dll` and `WinDivert64.sys` next to `unlocker-helper.exe`; the sidecar is resolved relative to the helper binary (override with `UNLOCKER_DIVERT_PATH` in dev).
+- Status: the packet parse/rewrite/checksum core is unit-tested (`unlocker_core::dns_intercept`), but the capture path has not been verified against a device that hardcodes a resolver.
 
 ## Debugging
 

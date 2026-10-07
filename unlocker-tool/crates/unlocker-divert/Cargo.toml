@@ -1,0 +1,21 @@
+[package]
+name = "unlocker-divert"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "unlocker-divert"
+path = "src/main.rs"
+
+# Deliberately its own process. WinDivert.dll is a plain import, so anything
+# that links it won't start when the DLL is missing or quarantined — keeping it
+# out of unlocker-helper means a broken/absent WinDivert can only stop this
+# sidecar from launching, never the helper itself. No elevation manifest: the
+# helper that spawns it is already elevated and the child inherits that token,
+# so this can never raise a UAC prompt of its own.
+[target.'cfg(windows)'.dependencies]
+unlocker-core = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+windivert = "0.6"

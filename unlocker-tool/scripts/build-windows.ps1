@@ -98,11 +98,11 @@ if ($cert) {
 
 # ── WinDivert SDK ───────────────────────────────────────────────────────────
 # windivert-sys links WinDivert.dll at build time and needs WINDIVERT_PATH to
-# find WinDivert.lib. The .dll is a plain import of the helper exe, so it must
-# also sit next to it at runtime or the helper won't start at all (only the
-# missing .sys driver is fail-soft). bundle.resources ships both into the
-# install dir alongside unlocker-helper.exe; the copy below covers running
-# target\release\unlocker-helper.exe directly during dev.
+# find WinDivert.lib. The .dll is a plain import, so it must also sit next to
+# the binary that links it — the unlocker-divert sidecar, never the helper
+# itself. bundle.resources ships the dll + driver into the install dir
+# alongside both exes; the copy below covers running them straight out of
+# target\release during dev.
 $windivertDir = Join-Path $RepoRoot "vendor\windivert\x64"
 if (-not (Test-Path "$windivertDir\WinDivert.lib")) {
     Write-Error "WinDivert SDK missing at $windivertDir (need WinDivert.lib, WinDivert.dll, WinDivert64.sys from https://reqrypt.org/windivert.html)"
@@ -111,11 +111,16 @@ if (-not (Test-Path "$windivertDir\WinDivert.lib")) {
 $env:WINDIVERT_PATH = $windivertDir
 Write-Host "WINDIVERT_PATH: $windivertDir"
 
-# ── Build helper exe first so bundle.resources can pick it up ───────────────
+# ── Build helper + sidecar first so bundle.resources can pick them up ───────
 Write-Host ""
 Write-Host "Building privileged helper..."
 cargo build --release -p unlocker-helper
 if ($LASTEXITCODE -ne 0) { Write-Error "helper build failed"; exit 1 }
+
+Write-Host ""
+Write-Host "Building DNS interceptor sidecar..."
+cargo build --release -p unlocker-divert
+if ($LASTEXITCODE -ne 0) { Write-Error "unlocker-divert build failed"; exit 1 }
 
 Copy-Item "$windivertDir\WinDivert.dll","$windivertDir\WinDivert64.sys" `
     (Join-Path $RepoRoot "target\release") -Force

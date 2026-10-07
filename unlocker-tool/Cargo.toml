@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/unlocker-core",
     "crates/unlocker-helper",
+    "crates/unlocker-divert",
     "app/src-tauri",
 ]
 

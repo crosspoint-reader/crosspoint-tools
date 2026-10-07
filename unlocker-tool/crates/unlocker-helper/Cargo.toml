@@ -24,12 +24,12 @@ plist = "1.7"
 [target.'cfg(windows)'.build-dependencies]
 embed-manifest = "1.4"
 
-[target.'cfg(windows)'.dependencies]
-# Userspace packet capture/inject (ships a signed WinDivert64.sys driver) —
-# used to intercept UDP/53 that devices send to a hardcoded resolver, which the
-# hosts-file spoof can't see (crosspoint-reader#3775). The installer must bundle
-# WinDivert.dll + WinDivert64.sys alongside the helper .exe.
-windivert = "0.6"
+# No windivert dependency here on purpose: linking it makes WinDivert.dll a
+# hard import, and a missing or AV-quarantined DLL would stop the helper from
+# starting at all. UDP/53 aimed at a hardcoded resolver
+# (crosspoint-reader#3775) is intercepted by the `unlocker-divert` sidecar
+# instead, which the installer ships next to this exe along with
+# WinDivert.dll + WinDivert64.sys. See ops/windows_dns.rs.
 
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "5", default-features = false, features = ["tokio"] }

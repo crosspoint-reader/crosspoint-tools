@@ -1,138 +1,169 @@
-//! Windows DNS interception for firmwares that hardcode a public resolver.
+//! Supervises the `unlocker-divert` sidecar, which intercepts DNS that a device
+//! sends straight to a hardcoded public resolver (see that crate's docs for the
+//! why and the packet details).
 //!
-//! Background: the normal Windows path spoofs DNS via the `hosts` file, which
-//! only works when the device uses the resolver ICS hands out over DHCP. X4 Pro
-//! XTOS V7.6.10 (CN) ignores that and queries AliDNS `223.5.5.5` directly, so
-//! ICS NAT forwards it upstream and our spoof never participates
-//! (crosspoint-reader#3775). macOS/Linux don't have this problem because their
-//! pf/iptables rule redirects *all* outbound UDP/53 regardless of destination;
-//! Windows ICS exposes no equivalent, so we capture the forwarded query with
-//! WinDivert and answer it ourselves.
-//!
-//! This runs *alongside* the hosts-file spoof, not instead of it: WinDivert's
-//! FORWARD layer only sees packets ICS routes through the host (device -> public
-//! resolver), while queries aimed at the ICS resolver stay local and are still
-//! handled by hosts. Together they cover both behaviors.
-//!
-//! Fail-soft: WinDivert needs its signed driver (`WinDivert64.sys`) present. If
-//! it can't open, we log and return `None` — the caller keeps the hosts-file
-//! path, matching today's behavior for resolver-respecting devices.
-//!
-//! The packet parse/rewrite/checksum core lives in
-//! `unlocker_core::dns_intercept` and is unit-tested cross-platform. The
-//! WinDivert-crate glue below is checked against windivert 0.6 / windivert-sys
-//! 0.10; building it needs `WINDIVERT_PATH` pointing at the SDK libs (see
-//! `vendor/windivert/`). Not yet exercised against a device that hardcodes a
-//! resolver — the capture path is unverified on real traffic.
+//! Nothing here links WinDivert on purpose: `WinDivert.dll` is a plain import,
+//! so a binary that links it won't start when the DLL is missing or
+//! AV-quarantined. The helper must always start, so the capture loop lives in a
+//! separate process and every WinDivert failure mode — absent DLL, corrupt DLL,
+//! driver refusing to load, sidecar crash — degrades to "the sidecar isn't
+//! running" and leaves hosts-file spoofing in place.
 
 #![cfg(windows)]
 
-use std::borrow::Cow;
+use std::io::{BufRead, BufReader};
 use std::net::Ipv4Addr;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::thread::JoinHandle;
+use std::process::{Child, Command, Stdio};
+use std::sync::{Arc, Mutex};
 
-use unlocker_core::dns_intercept::spoof_forwarded_dns;
-use windivert::layer;
-use windivert::prelude::*;
-
-/// Capture UDP/53 that the hotspot subnet sends to any resolver, and answer the
-/// spoofed names locally. Non-spoofed queries are re-injected unchanged so real
-/// DNS keeps working. `192.168.137.0/24` is the fixed Windows Mobile Hotspot
-/// subnet; the filter also spares the bridge IP's own upstream lookups.
-const WINDIVERT_FILTER: &str =
-    "udp.DstPort == 53 and ip.SrcAddr >= 192.168.137.1 and ip.SrcAddr <= 192.168.137.254";
-
-pub struct DnsInterceptor {
-    stop: Arc<AtomicBool>,
-    thread: Option<JoinHandle<()>>,
+// kernel32 is always linked on Windows. A process whose DLL import is missing
+// or corrupt makes the loader show a modal "WinDivert.dll was not found" hard
+// error and wait for someone to click OK — the sidecar would hang there
+// instead of exiting. Child processes inherit the error mode, so setting
+// SEM_FAILCRITICALERRORS before spawning turns that into a silent non-zero
+// exit. This helper runs unattended with admin rights and must never put UI on
+// screen, so suppressing critical-error dialogs process-wide is what we want.
+const SEM_FAILCRITICALERRORS: u32 = 0x0001;
+extern "system" {
+    fn SetErrorMode(mode: u32) -> u32;
 }
 
-/// Start the interceptor. Returns `None` (fail-soft) if WinDivert can't open,
-/// so the caller falls back to hosts-file-only spoofing.
+/// Dev override, mirroring `UNLOCKER_HELPER_PATH` in the app: point at a
+/// freshly built `target\release\unlocker-divert.exe` when running a helper
+/// that isn't installed next to its sidecar.
+const PATH_OVERRIDE_VAR: &str = "UNLOCKER_DIVERT_PATH";
+
+pub struct DnsInterceptor {
+    child: Arc<Mutex<Child>>,
+}
+
+/// Spawn the interceptor. Returns `None` (fail-soft) if the sidecar is missing
+/// or won't start, so the caller keeps hosts-file-only spoofing.
 pub fn start(spoofed_hosts: Vec<String>, bridge_ip: Ipv4Addr) -> Option<DnsInterceptor> {
-    let handle = match WinDivert::<layer::ForwardLayer>::forward(
-        WINDIVERT_FILTER,
-        0,
-        WinDivertFlags::new(),
-    ) {
-        Ok(h) => h,
+    if spoofed_hosts.is_empty() {
+        return None;
+    }
+
+    let exe = sidecar_path()?;
+
+    // The sidecar imports WinDivert.dll, which the installer ships next to it.
+    // Check first: if an AV has quarantined it, spawning would only produce a
+    // process that dies in the loader, and the log line below is far more
+    // useful than a bare 0xC0000135 exit code.
+    let dll = exe.with_file_name("WinDivert.dll");
+    if !dll.is_file() {
+        tracing::warn!(path = %dll.display(),
+            "WinDivert.dll missing (removed or quarantined?); DNS interception unavailable, \
+             falling back to hosts-file spoof only");
+        return None;
+    }
+    let driver = exe.with_file_name("WinDivert64.sys");
+    if !driver.is_file() {
+        tracing::warn!(path = %driver.display(),
+            "WinDivert64.sys missing; the sidecar will start but the driver won't load");
+    }
+
+    // Children inherit this, so a corrupt DLL fails silently instead of
+    // parking on a modal loader dialog.
+    unsafe {
+        let prev = SetErrorMode(0);
+        SetErrorMode(prev | SEM_FAILCRITICALERRORS);
+    }
+
+    let mut child = match Command::new(&exe)
+        .arg("--bridge-ip")
+        .arg(bridge_ip.to_string())
+        .arg("--hosts")
+        .arg(spoofed_hosts.join(","))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
         Err(e) => {
-            tracing::warn!(error = %e,
-                "WinDivert DNS interceptor unavailable (driver missing?); \
-                 falling back to hosts-file spoof only. Devices that hardcode a \
-                 public resolver (e.g. X4 Pro XTOS V7.6.10) will not be captured.");
+            tracing::warn!(error = %e, path = %exe.display(),
+                "DNS interceptor sidecar failed to start; falling back to hosts-file spoof only");
             return None;
         }
     };
 
-    let stop = Arc::new(AtomicBool::new(false));
-    let stop_thread = stop.clone();
-    let thread = std::thread::spawn(move || {
-        run_loop(handle, &stop_thread, &spoofed_hosts, bridge_ip);
-    });
-    tracing::info!(%bridge_ip, "WinDivert DNS interceptor armed");
-    Some(DnsInterceptor { stop, thread: Some(thread) })
+    let pid = child.id();
+    let stderr = child.stderr.take();
+    let child = Arc::new(Mutex::new(child));
+
+    // Forward the sidecar's diagnostics into our own log. It exits non-zero
+    // when WinDivert can't open, and that line is the only clue the user gets,
+    // so it must not be swallowed. Once the pipe closes the sidecar is gone:
+    // report how it went, which is also how a death inside the loader (no
+    // output at all) becomes visible.
+    if let Some(stderr) = stderr {
+        let child = child.clone();
+        std::thread::spawn(move || {
+            for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                tracing::info!(target: "unlocker_divert", "{line}");
+            }
+            if let Ok(mut c) = child.lock() {
+                match c.try_wait() {
+                    Ok(Some(status)) => tracing::warn!(pid, ?status,
+                        "DNS interceptor sidecar exited; hosts-file spoof continues"),
+                    // Still running with its stderr closed, or already reaped
+                    // by stop() — neither is worth a line.
+                    Ok(None) | Err(_) => {}
+                }
+            }
+        });
+    }
+
+    tracing::info!(pid, %bridge_ip, "DNS interceptor sidecar spawned");
+    Some(DnsInterceptor { child })
 }
 
 impl DnsInterceptor {
-    pub fn stop(mut self) {
-        self.stop.store(true, Ordering::SeqCst);
-        // recv() blocks and the thread only rechecks `stop` after each packet,
-        // so a quiet hotspot can leave it parked until the next UDP/53 from the
-        // subnet. We deliberately don't join: disarming must not hang on device
-        // traffic. windivert 0.6 exposes shutdown() as `&mut self` on the handle
-        // the thread owns, with no way to signal it from here, so the thread is
-        // left to notice the flag and drop its handle on the next packet.
-        self.thread.take();
+    pub fn stop(self) {
+        // Kill rather than signal: the sidecar parks in a blocking recv() and
+        // Windows has no cheap way to interrupt it. Process exit closes the
+        // WinDivert handle, so teardown can't hang on a quiet hotspot.
+        let Ok(mut child) = self.child.lock() else {
+            tracing::warn!("DNS interceptor state poisoned; leaving sidecar to exit on its own");
+            return;
+        };
+        let pid = child.id();
+        match child.kill() {
+            // kill() on an already-exited child is Ok, so this covers the
+            // sidecar having died on its own (e.g. driver refused to load).
+            Ok(()) => {
+                let _ = child.wait();
+                tracing::info!(pid, "DNS interceptor sidecar stopped");
+            }
+            Err(e) => tracing::warn!(pid, error = %e, "could not stop DNS interceptor sidecar"),
+        }
     }
 }
 
-fn run_loop(
-    handle: WinDivert<layer::ForwardLayer>,
-    stop: &AtomicBool,
-    spoofed_hosts: &[String],
-    bridge_ip: Ipv4Addr,
-) {
-    let mut buf = vec![0u8; 65535];
-    while !stop.load(Ordering::SeqCst) {
-        let packet = match handle.recv(Some(&mut buf)) {
-            Ok(p) => p,
-            Err(e) => {
-                if stop.load(Ordering::SeqCst) {
-                    break;
-                }
-                tracing::debug!(error = %e, "WinDivert recv error");
-                continue;
-            }
-        };
-
-        match spoof_forwarded_dns(&packet.data, spoofed_hosts, bridge_ip) {
-            Some(reply) => {
-                // Ours: inject the crafted reply back toward the device and drop
-                // the original query (don't forward it upstream). windivert 0.6
-                // has no address->packet helper, so build the packet from its
-                // public fields: reuse the received forward-layer address (same
-                // interface — the device is directly connected on the hotspot
-                // subnet) with our owned payload. Checksums are already correct
-                // (built in dns_intercept), so no recalc is needed.
-                let out = WinDivertPacket::<layer::ForwardLayer> {
-                    address: packet.address.clone(),
-                    data: Cow::Owned(reply),
-                };
-                if let Err(e) = handle.send(&out) {
-                    tracing::debug!(error = %e, "WinDivert send (spoofed reply) failed");
-                }
-            }
-            None => {
-                // Not a spoofed name (or not a DNS query): forward unchanged so
-                // normal internet resolution keeps working.
-                if let Err(e) = handle.send(&packet) {
-                    tracing::debug!(error = %e, "WinDivert send (pass-through) failed");
-                }
-            }
+/// The installer ships `unlocker-divert.exe` next to `unlocker-helper.exe`, so
+/// resolve it relative to our own binary.
+fn sidecar_path() -> Option<std::path::PathBuf> {
+    if let Some(p) = std::env::var_os(PATH_OVERRIDE_VAR) {
+        let p = std::path::PathBuf::from(p);
+        if p.is_file() {
+            return Some(p);
         }
+        tracing::warn!(path = %p.display(), "{PATH_OVERRIDE_VAR} set but not a file; ignoring");
     }
-    tracing::info!("WinDivert DNS interceptor stopped");
+
+    let exe = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(e) => {
+            tracing::warn!(error = %e, "can't resolve helper path; DNS interception unavailable");
+            return None;
+        }
+    };
+    let sidecar = exe.with_file_name("unlocker-divert.exe");
+    if sidecar.is_file() {
+        return Some(sidecar);
+    }
+    tracing::warn!(path = %sidecar.display(),
+        "DNS interceptor sidecar not found; falling back to hosts-file spoof only");
+    None
 }
