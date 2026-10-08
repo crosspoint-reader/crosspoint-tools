@@ -100,9 +100,13 @@ if ($cert) {
 # windivert-sys links WinDivert.dll at build time and needs WINDIVERT_PATH to
 # find WinDivert.lib. The .dll is a plain import, so it must also sit next to
 # the binary that links it — the unlocker-divert sidecar, never the helper
-# itself. bundle.resources ships the dll + driver into the install dir
-# alongside both exes; the copy below covers running them straight out of
-# target\release during dev.
+# itself.
+#
+# vendor\windivert holds verbatim upstream files, so nothing may write there:
+# Tauri Authenticode-signs every path listed in bundle.resources *in place*,
+# which would mutate the vendored copies. The staging copy below is what
+# bundle.resources points at, so signing lands on target\release instead. It
+# also covers running the sidecar straight out of target\release during dev.
 $windivertDir = Join-Path $RepoRoot "vendor\windivert\x64"
 if (-not (Test-Path "$windivertDir\WinDivert.lib")) {
     Write-Error "WinDivert SDK missing at $windivertDir (need WinDivert.lib, WinDivert.dll, WinDivert64.sys from https://reqrypt.org/windivert.html)"
@@ -122,8 +126,14 @@ Write-Host "Building DNS interceptor sidecar..."
 cargo build --release -p unlocker-divert
 if ($LASTEXITCODE -ne 0) { Write-Error "unlocker-divert build failed"; exit 1 }
 
-Copy-Item "$windivertDir\WinDivert.dll","$windivertDir\WinDivert64.sys" `
-    (Join-Path $RepoRoot "target\release") -Force
+# Stage the WinDivert files bundle.resources ships. Tauri names each installed
+# resource after its *source* file, ignoring the target name in the map, so the
+# license is staged under the name it must have on disk — otherwise WinDivert's
+# LGPL text installs as a bare "LICENSE" and reads as if it were ours.
+$stage = Join-Path $RepoRoot "target\release"
+Copy-Item "$windivertDir\WinDivert.dll","$windivertDir\WinDivert64.sys" $stage -Force
+Copy-Item (Join-Path $RepoRoot "vendor\windivert\LICENSE") `
+    (Join-Path $stage "WinDivert-LICENSE.txt") -Force
 
 # ── Build Tauri app ─────────────────────────────────────────────────────────
 Write-Host ""

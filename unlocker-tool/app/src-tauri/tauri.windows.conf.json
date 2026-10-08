@@ -5,9 +5,9 @@
     "resources": {
       "../../target/release/unlocker-helper.exe": "unlocker-helper.exe",
       "../../target/release/unlocker-divert.exe": "unlocker-divert.exe",
-      "../../vendor/windivert/x64/WinDivert.dll": "WinDivert.dll",
-      "../../vendor/windivert/x64/WinDivert64.sys": "WinDivert64.sys",
-      "../../vendor/windivert/LICENSE": "WinDivert-LICENSE.txt"
+      "../../target/release/WinDivert.dll": "WinDivert.dll",
+      "../../target/release/WinDivert64.sys": "WinDivert64.sys",
+      "../../target/release/WinDivert-LICENSE.txt": "WinDivert-LICENSE.txt"
     },
     "windows": {
       "webviewInstallMode": {
