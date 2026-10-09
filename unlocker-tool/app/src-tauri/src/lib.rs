@@ -1456,6 +1456,16 @@ fn restart_after_update(_app: AppHandle, _state: State<'_, AppState>) -> Result<
 }
 
 pub fn run() {
+    // WebKitGTK's DMABUF renderer aborts the web process on many Linux
+    // GPU/driver/compositor combos (Fedora / NVIDIA / Wayland-KDE) with
+    // "Could not create default EGL display: EGL_BAD_PARAMETER", leaving an
+    // empty grey window. Disable it before the webview spawns so the app
+    // renders everywhere; honor an explicit user override if one is set.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
