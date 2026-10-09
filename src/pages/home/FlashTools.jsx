@@ -471,7 +471,7 @@ export default function FlashTools() {
         })
         .catch(() => {})
       // Stable release info for the devices the 1.6.0+ releases cover
-      // (x4pro/sticky/papermono ship their own release asset).
+      // (x4pro/x4c/sticky/papermono/metalio/eego_a4 ship their own release asset).
       setCrosspoint({ text: 'Loading...', enabled: false, tag: null, notesUrl: null })
       fetchReleaseMeta()
         .then((meta) => {
