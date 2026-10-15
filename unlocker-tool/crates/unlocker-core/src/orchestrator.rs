@@ -43,6 +43,10 @@ pub struct SessionData {
     pub firmware_path: Option<String>,
     pub firmware_sha256: Option<String>,
     pub bridge_ip: Option<String>,
+    /// macOS: the "Share your connection from" service the user must pick.
+    pub upstream_service: Option<String>,
+    /// macOS: true when that service is the temporary loopback-backed one.
+    pub upstream_adhoc: bool,
     pub ssid: Option<String>,
     pub psk: Option<String>,
     pub device_ip: Option<String>,
@@ -83,6 +87,8 @@ impl Orchestrator {
             firmware_path: d.firmware_path.clone(),
             firmware_sha256: d.firmware_sha256.clone(),
             bridge_ip: d.bridge_ip.clone(),
+            upstream_service: d.upstream_service.clone(),
+            upstream_adhoc: d.upstream_adhoc,
             ssid: d.ssid.clone(),
             psk: d.psk.clone(),
             device_ip: d.device_ip.clone(),
@@ -130,6 +136,14 @@ impl Orchestrator {
         let mut d = self.data.write().await;
         d.firmware_path = Some(path);
         d.firmware_sha256 = Some(sha256);
+    }
+
+    /// Record the upstream the helper picked, before the bridge exists, so
+    /// the "turn on Internet Sharing" screen can name it.
+    pub async fn set_upstream(&self, service: Option<String>, adhoc: bool) {
+        let mut d = self.data.write().await;
+        d.upstream_service = service;
+        d.upstream_adhoc = adhoc;
     }
 
     pub async fn set_hotspot(&self, ssid: String, psk: String, bridge_ip: String) {

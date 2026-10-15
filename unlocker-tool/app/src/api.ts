@@ -14,6 +14,10 @@ export interface SessionInfo {
   release_id: string | null;
   firmware_path: string | null;
   bridge_ip: string | null;
+  /** macOS: network service to pick under "Share your connection from". */
+  upstream_service: string | null;
+  /** macOS: true when that service is the temporary loopback-backed one. */
+  upstream_adhoc: boolean;
   ssid: string | null;
   psk: string | null;
   device_ip: string | null;
