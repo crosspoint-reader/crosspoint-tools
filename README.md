@@ -172,3 +172,29 @@ The SD-card font builder uses the vendored generator in `scripts/font-builder/`,
 ## License
 
 MIT
+
+## Background USB firmware updates
+
+The main firmware picker supports a **CrossPoint USB update (DFU)** connection
+for X3, X4 and X4 Pro readers already running compatible firmware. Wake the
+reader, connect a data cable, choose the model and connection, then select
+firmware as usual. Chrome or Edge on desktop must expose WebUSB. Keep the
+reader connected through verification; a disconnect before final confirmation
+is reported as a failure, not successful installation.
+
+USB serial remains the default for first installation and recovery. DFU sends
+application images only and leaves the partition table and bootloader alone.
+The device verifies the inactive OTA slot before selecting it. X4 Pro DFU
+requires an ESP32-S3 image carrying the `x4pro` CrossPoint board tag; use the
+serial path for stock images that lack it. Installing firmware without DFU
+support removes the DFU update path.
+
+The paired firmware change is required before users can select this path.
+The current development USB ID is `1209:0001`, with device version `0700` for
+shared X3/X4 and `0800` for X4 Pro. A production ID must be coordinated with
+the firmware maintainers. Device/OS permission and driver compatibility,
+including Windows, still require hardware testing.
+
+Run `npm run test:flasher` for serial-layout and mocked DFU protocol tests, and
+`npm run build` for the production bundle. Tests use synthetic images rather
+than bundled private firmware.

@@ -18,6 +18,8 @@ import {
   fetchDeviceBuildFirmware,
   fetchFlashAsset,
 } from '../../lib/flasher.js'
+import { DfuClient } from '../../lib/dfu.js'
+import { matchingDfuDevices, shouldUseDfu, chooseReaderConnection } from '../../lib/dfu-discovery.js'
 import { createMarkdownRenderer } from '../../lib/markdown-full.js'
 
 // Release/beta/device notes are authored in full markdown (headings, lists,
@@ -131,7 +133,9 @@ function StepsList({ steps, states, percent }) {
         const spin = st === 'running' ? 'animate-spin' : ''
         const showBar =
           st === 'running' &&
-          (name.includes('Flash') || name.includes('Read flash') || name.includes('Write'))
+          (name.includes('Flash') || name.includes('Read flash') || name.includes('Write') || name === 'Transfer firmware')
+        const showPercent = showBar || (name === 'Transfer firmware' && st === 'done')
+        const displayPercent = st === 'done' ? 100 : Math.floor(Math.max(0, Math.min(100, percent)))
         return (
           <li key={name} className={`flex items-center gap-3 py-3 text-sm/5 ${FLASH_STEP_COLORS[st]}`}>
             <span className={`flex size-5 shrink-0 items-center justify-center ${spin}`} aria-hidden="true">
@@ -142,10 +146,11 @@ function StepsList({ steps, states, percent }) {
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-stone-200">
                 <div
                   className="h-full rounded-full bg-brand-500 transition-all duration-200"
-                  style={{ width: `${percent.toFixed(1)}%` }}
+                  style={{ width: `${displayPercent}%` }}
                 />
               </div>
             )}
+            {showPercent && <span className="shrink-0 tabular-nums font-medium">{displayPercent}%</span>}
           </li>
         )
       })}
@@ -319,9 +324,54 @@ export default function FlashTools() {
   const serialSupported = useMemo(() => typeof navigator !== 'undefined' && 'serial' in navigator, [])
 
   const [model, setModel] = useState(null)
+  const [transport, setTransport] = useState('auto')
+  const [authorizedUsb, setAuthorizedUsb] = useState([])
+  const [connectionNotice, setConnectionNotice] = useState('')
+  const [pendingSerialAction, setPendingSerialAction] = useState(null)
+  const dfuSupported = typeof navigator !== 'undefined' && 'usb' in navigator
+  const detectedDfu = matchingDfuDevices(authorizedUsb, model)
+  const useDfu = shouldUseDfu(model, transport, dfuSupported)
+  const connectionSupported = useDfu ? dfuSupported : serialSupported
   const [fw, setFw] = useState(null)
   const [running, setRunning] = useState(false)
   const [customFile, setCustomFile] = useState(null)
+
+  useEffect(() => {
+    if (!dfuSupported) return
+    let active = true
+    const refresh = () => navigator.usb.getDevices()
+      .then(devices => { if (active) setAuthorizedUsb(devices) })
+      .catch(() => { if (active) setAuthorizedUsb([]) })
+    refresh()
+    navigator.usb.addEventListener('connect', refresh)
+    navigator.usb.addEventListener('disconnect', refresh)
+    return () => {
+      active = false
+      navigator.usb.removeEventListener('connect', refresh)
+      navigator.usb.removeEventListener('disconnect', refresh)
+    }
+  }, [dfuSupported])
+
+  useEffect(() => {
+    setTransport('auto')
+    setConnectionNotice('')
+    setPendingSerialAction(null)
+  }, [model, fw, customFile])
+
+  async function pairUsbReader() {
+    try {
+      const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x1209, productId: 1 }] })
+      if (!matchingDfuDevices([device], model).length) {
+        setConnectionNotice('This reader does not match the selected model or supported USB updater.')
+        return
+      }
+      setAuthorizedUsb(devices => [...devices.filter(d => d !== device), device])
+      setTransport('auto')
+      setConnectionNotice('Reader connected. Choose firmware below to continue.')
+    } catch (error) {
+      if (error.name !== 'NotFoundError') setConnectionNotice(error.message)
+    }
+  }
 
   // Firmware version info (per selected device model)
   const [crosspoint, setCrosspoint] = useState({ text: 'Loading...', enabled: false, tag: null, notesUrl: null })
@@ -628,24 +678,48 @@ export default function FlashTools() {
   }
 
   // --- Flash actions ---
-  async function runFlash(action) {
+  async function runFlash(action, forceSerial = false) {
     if (running) return
+    if (!connectionSupported) {
+      alert('Use Chrome or Edge on desktop with USB access enabled.')
+      return
+    }
 
     const install = DEVICE_INSTALLS[model]
     const activeDeviceBuild = action.startsWith('device-')
       ? deviceBuilds.find((b) => `device-${b.id}` === action)
       : null
 
-    // Request the serial port FIRST, while we still have the user gesture.
-    // Any await before this (file reads, fetches) consumes the gesture and
-    // requestPort() will throw "Must be handling a user gesture".
-    let serialPort
+    // Request permission directly from Flash; no separate pairing step.
+    // Do this before file reads or downloads while user activation is available.
+    let serialPort, dfuDevice
+    setRunning(true)
+    setPendingSerialAction(null)
     try {
-      serialPort = await CrossPointFlasher.requestPort(install ? DEVICE_PORT_FILTERS : undefined)
+      if (install) {
+        serialPort = await CrossPointFlasher.requestPort(DEVICE_PORT_FILTERS)
+      } else {
+        const connection = await chooseReaderConnection({
+          model, usb: navigator.usb, serial: navigator.serial, authorizedUsb,
+          forceSerial: forceSerial || transport === 'serial',
+        })
+        if (connection.needsSerialPermission) {
+          setPendingSerialAction(action)
+          setConnectionNotice('Reader detected. Chrome requires serial access once for this device. Continue below and select the same reader.')
+          setRunning(false)
+          return
+        }
+        ;({ serialPort, dfuDevice } = connection)
+        if (dfuDevice) setAuthorizedUsb(devices => [...devices.filter(d => d !== dfuDevice), dfuDevice])
+        setConnectionNotice('')
+      }
     } catch (err) {
+      setRunning(false)
       if (err.name !== 'NotFoundError') alert(err.message)
+      else setConnectionNotice('No reader selected. Wake your reader and try Flash again. Serial recovery is also available below.')
       return
     }
+    const useDfu = Boolean(dfuDevice)
 
     if (install) {
       await runDeviceInstall(install, action, serialPort, activeDeviceBuild)
@@ -687,7 +761,7 @@ export default function FlashTools() {
       ? 'Downloading beta firmware...'
       : downloadMsgs[action]
 
-    const steps = [
+    const steps = useDfu ? ['Connect to reader', 'Validate firmware', 'Transfer firmware', 'Verify installation'] : [
       'Connect to device',
       'Validate partition table',
       'Read OTA data',
@@ -703,7 +777,7 @@ export default function FlashTools() {
     // power button to boot. Shown instead of the plain unplug/reset the other
     // devices use.
     setRestart(
-      XTEINK_PRO_MODELS.has(model)
+      useDfu ? null : XTEINK_PRO_MODELS.has(model)
         ? { text: 'Unplug and reconnect the USB cable, then press and hold the power button to boot.' }
         : { unplug: skipReset && model !== 'x4' }
     )
@@ -711,8 +785,23 @@ export default function FlashTools() {
     setProgress({ title, steps, states: [...states], status: downloadMsg ? { kind: 'info', text: downloadMsg } : null })
 
     const analyticsDetails = firmwareAnalyticsDetails(action)
+    let dfu
+    const markStep = (idx, status) => {
+      states[idx] = status
+      setProgress((p) => p ? { ...p, states: [...states] } : p)
+    }
 
     try {
+      if (useDfu) {
+        markStep(0, 'running')
+        dfu = new DfuClient(dfuDevice)
+        await dfu.connect()
+        if ((dfu.model === 'x4pro') !== (model === 'x4pro')) {
+          throw new Error('The connected reader does not match the selected model.')
+        }
+        markStep(0, 'done')
+        markStep(1, 'running')
+      }
       let firmware
       if (action === 'crosspoint') {
         firmware = await fetchReleaseFirmware(model)
@@ -735,20 +824,32 @@ export default function FlashTools() {
 
       setProgress((p) => ({ ...p, status: null }))
 
-      const flasher = new CrossPointFlasher(serialPort, {
-        expectedChip: MODEL_CHIPS[model],
-        deviceName: MODELS.find((m) => m.id === model)?.name,
-      })
-      await flasher.flashFirmware(firmware, {
-        skipReset,
-        onStepChange: (idx, name, status) => {
-          states[idx] = status
-          setProgress((p) => (p ? { ...p, states: [...states] } : p))
-        },
-        onProgress: (step, current, total) => {
-          setPercent((current / total) * 100)
-        },
-      })
+      if (dfu) {
+        await dfu.flash(firmware, {
+          onProgress: ({ phase, fraction }) => {
+            if (phase === 'header') { markStep(1, 'done'); markStep(2, 'running') }
+            if (phase === 'transfer') setPercent(fraction * 100)
+            if (phase === 'verify') { markStep(2, 'done'); markStep(3, 'running') }
+            if (phase === 'complete') markStep(3, 'done')
+          },
+        })
+      } else {
+        const flasher = new CrossPointFlasher(serialPort, {
+          expectedChip: MODEL_CHIPS[model],
+          deviceName: MODELS.find((m) => m.id === model)?.name,
+        })
+        await flasher.flashFirmware(firmware, {
+          skipReset,
+          onStepChange: (idx, name, status) => {
+            states[idx] = status
+            setProgress((p) => (p ? { ...p, states: [...states] } : p))
+          },
+          onProgress: (step, current, total) => {
+            setPercent((current / total) * 100)
+          },
+        })
+
+      }
 
       trackFirmwareFlash(analyticsDetails)
 
@@ -757,7 +858,7 @@ export default function FlashTools() {
         status: {
           kind: 'ok',
           text:
-            XTEINK_PRO_MODELS.has(model)
+            useDfu ? 'Firmware verified and installed. Your reader will restart. Installing firmware without DFU support removes this USB update option.' : XTEINK_PRO_MODELS.has(model)
               ? 'Flash complete! Unplug and reconnect the USB cable, then press and hold the power button to boot.'
               : skipReset
                 ? 'Flash complete! Unplug and replug the USB cable to restart your device.'
@@ -765,6 +866,10 @@ export default function FlashTools() {
         },
       }))
     } catch (err) {
+      if (useDfu) {
+        const activeStep = states.indexOf('running')
+        if (activeStep >= 0) markStep(activeStep, 'error')
+      }
       const stockPartitionMismatch =
         (action === 'stock-en' || action === 'stock-ch') &&
         /^Firmware too large: .* won't fit in app\d+ \(\d+ bytes\)\.$/.test(err.message || '') &&
@@ -779,6 +884,8 @@ export default function FlashTools() {
             : null,
         },
       }))
+    } finally {
+      if (dfu) await dfu.close()
     }
 
     setRunning(false)
@@ -923,10 +1030,10 @@ export default function FlashTools() {
         </p>
 
         {/* Browser check */}
-        {!serialSupported && (
+        {!connectionSupported && (
           <div className="mt-8 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
             <span className="font-semibold">Flashing unavailable.</span> The web flasher uses
-            WebSerial, which requires Chrome or Edge on desktop. You can still browse firmware
+            USB access, which requires Chrome or Edge on desktop. You can still browse firmware
             info and changelogs below.
           </div>
         )}
@@ -941,7 +1048,7 @@ export default function FlashTools() {
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {MODELS.filter(
                 (m) =>
-                  !DEVICE_BUILD_MODELS.includes(m.id) ||
+                  m.id === 'x4pro' || !DEVICE_BUILD_MODELS.includes(m.id) ||
                   deviceAvailability[m.id] ||
                   rcCoversDevice(m.id) ||
                   stableCoversDevice(m.id) ||
@@ -980,6 +1087,34 @@ export default function FlashTools() {
               ))}
             </div>
           </div>
+
+          {['x3', 'x4', 'x4pro'].includes(model) && (
+            <div className="text-sm text-stone-600">
+              <p>{useDfu && detectedDfu.length > 0 ? 'Reader detected — USB update is ready.' : 'Connect your reader, choose firmware, then click Flash.'}</p>
+              {pendingSerialAction && (
+                <div role="status" className="mt-3 rounded-lg border border-brand-200 bg-brand-50 p-4">
+                  <p>{connectionNotice}</p>
+                  <button type="button" disabled={running} onClick={() => runFlash(pendingSerialAction, true)}
+                    className="mt-2 font-medium text-brand-600 underline underline-offset-2">Allow serial access and continue</button>
+                </div>
+              )}
+              <details className="mt-2" open={connectionNotice ? true : undefined}>
+                <summary className="cursor-pointer text-brand-600 hover:text-brand-700">Connection help</summary>
+                <div className="mt-3 space-y-3 rounded-lg bg-stone-50 p-4">
+                  <p>Flash opens the reader picker automatically when permission is needed. Select your reader and installation continues.</p>
+                  <button type="button" disabled={running || !dfuSupported} onClick={pairUsbReader}
+                    className="font-medium text-brand-600 underline underline-offset-2 disabled:opacity-50">Find my reader</button>
+                  <p>For first installation or recovery, use the serial connection.</p>
+                  <button type="button" disabled={running || !serialSupported} onClick={() => { setTransport('serial'); setConnectionNotice('Serial recovery selected for the next installation.') }}
+                    className="font-medium text-brand-600 underline underline-offset-2 disabled:opacity-50">Use serial recovery</button>
+                  {transport === 'serial' && <button type="button" disabled={running} onClick={() => { setTransport('auto'); setConnectionNotice('') }}
+                    className="ml-4 text-brand-600 underline underline-offset-2">Use automatic detection</button>}
+                  <p>Installing firmware without background USB updates removes this connection method.</p>
+                  {connectionNotice && <p role="status">{connectionNotice}</p>}
+                </div>
+              </details>
+            </div>
+          )}
 
           {/* Step 2: Firmware */}
           {model && (
