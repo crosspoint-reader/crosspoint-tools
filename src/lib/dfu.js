@@ -1,6 +1,6 @@
+import { DfuTimer } from './dfu-timer.js'
 export const MAX_IMAGE = 0x640000
 const encoder = new TextEncoder()
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 export const hex = (bytes) =>
   Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 const digest = async (bytes) =>
@@ -127,7 +127,7 @@ export class DfuClient {
   constructor(
     device,
     {
-      wait = sleep,
+      wait = null,
       timeoutMs = 10000,
       onEvent = () => {},
       compress = false,
@@ -304,6 +304,7 @@ export class DfuClient {
       const b = await this.read(3, 6)
       const pollMs = b[1] | (b[2] << 8) | (b[3] << 16)
       this.lastStatus = { status: b[0], state: b[4], pollMs }
+      Object.assign(this.trace.at(-1) || {}, { dfuStatus: b[0], state: b[4], pollMs })
       if (b[0]) {
         const error = new Error(
           `The reader rejected the update (DFU error ${b[0]}). Installation was not confirmed.`
@@ -320,7 +321,15 @@ export class DfuClient {
       })
       // Honor the complete advertised storage interval even if cancellation
       // was requested; issuing ABORT while flash is busy can lose that request.
-      await this.wait(Math.max(2, pollMs))
+      const requested = Math.max(2, pollMs)
+      const before = performance.now()
+      await (this.wait ? this.wait(requested) : this.timer.wait(requested))
+      const elapsed = performance.now() - before
+      this.waitTiming.count++
+      this.waitTiming.requestedMs += requested
+      this.waitTiming.elapsedMs += elapsed
+      this.waitTiming.maxRequestedMs = Math.max(this.waitTiming.maxRequestedMs, requested)
+      this.waitTiming.maxOverrunMs = Math.max(this.waitTiming.maxOverrunMs, elapsed - requested)
     }
     throw new Error('The reader did not finish its DFU operation.')
   }
@@ -334,6 +343,8 @@ export class DfuClient {
     this.cancelled = false
     this.manifestRequested = false
     let started = false
+    this.timer = this.wait ? null : new DfuTimer()
+    this.waitTiming = { count: 0, requestedMs: 0, elapsedMs: 0, maxRequestedMs: 0, maxOverrunMs: 0 }
     const report = {
       ok: false,
       deviceVersion: this.version,
@@ -430,6 +441,9 @@ export class DfuClient {
       error.report = report
       throw error
     } finally {
+      report.waitTiming = { ...this.waitTiming }
+      report.waitTimer = this.wait ? 'injected' : this.timer.worker ? 'worker' : 'page-fallback'
+      this.timer?.close()
       report.seconds = (performance.now() - start) / 1000
       report.usbTrace = this.trace.slice()
       this.running = false

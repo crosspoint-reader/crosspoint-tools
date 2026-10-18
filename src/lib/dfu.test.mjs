@@ -406,3 +406,20 @@ test('X4 uses the shared C3 image and rejects X4 Pro images', async () => {
     /ESP32-C3/
   )
 })
+
+
+test('default pacing reports advertised and elapsed waits and resets per flash', async () => {
+  const dev = new Device(7), client = new DfuClient(dev)
+  await client.connect()
+  const raw = await synthetic()
+  const first = await client.flash(raw)
+  assert(first.waitTiming.count > 0)
+  assert(first.waitTiming.requestedMs > 0)
+  assert(first.waitTiming.elapsedMs >= first.waitTiming.requestedMs)
+  assert.equal(first.waitTimer, 'page-fallback')
+  assert(first.usbTrace.some(t => t.pollMs > 0 && t.status === 'ok'))
+  assert.equal(client.timer.worker, null)
+  const second = await client.flash(raw)
+  assert.equal(second.waitTiming.count, first.waitTiming.count)
+  await client.close()
+})
