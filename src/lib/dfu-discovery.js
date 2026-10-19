@@ -32,6 +32,10 @@ export async function chooseReaderConnection({ model, usb, serial, authorizedUsb
   }) : []
   if (devices.length === 1 && ports.length === 0) return { dfuDevice: devices[0] }
   if (ports.length === 1 && devices.length === 0) return { serialPort: ports[0] }
+  const knownSerial = authorizedUsb.filter(device => device.vendorId === 0x303a && device.productId === 0x1001)
+  if (serial && devices.length === 0 && knownSerial.length === 1 && ports.length === 0) {
+    return { serialPort: await serial.requestPort({ filters: [{ usbVendorId: 0x303a, usbProductId: 0x1001 }] }) }
+  }
   const device = await usb.requestDevice({ filters: READER_USB_FILTERS })
   if (matchingDfuDevices([device], model).length) return { dfuDevice: device }
   if (device.vendorId !== 0x303a || device.productId !== 0x1001) {

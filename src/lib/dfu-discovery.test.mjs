@@ -56,3 +56,11 @@ test('multiple authorized transports still require explicit device selection', a
   assert.equal(result.dfuDevice, c3)
   assert.equal(prompts, 1)
 })
+
+test('USB-paired serial device opens serial permission rather than repeating USB pairing', async () => {
+  const usb = { requestDevice: () => { throw Error('USB picker repeated') } }
+  const serial = { getPorts: async () => [], requestPort: async () => 'serial-port' }
+  const result = await chooseReaderConnection({ model: 'x4pro', usb, serial,
+    authorizedUsb: [{ vendorId: 0x303a, productId: 0x1001 }] })
+  assert.deepEqual(result, { serialPort: 'serial-port' })
+})

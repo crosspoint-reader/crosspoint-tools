@@ -701,11 +701,12 @@ export default function FlashTools() {
       } else {
         const connection = await chooseReaderConnection({
           model, usb: navigator.usb, serial: navigator.serial, authorizedUsb,
-          forceSerial: forceSerial || transport === 'serial',
+          forceSerial: forceSerial || transport === 'serial' || pendingSerialAction === action,
         })
         if (connection.needsSerialPermission) {
           setPendingSerialAction(action)
-          setConnectionNotice('Reader detected. Chrome requires serial access once for this device. Continue below and select the same reader.')
+          setTransport('serial')
+          setConnectionNotice('Reader detected. Chrome requires serial access once for this device. Click Flash again or Allow serial access and continue, then select the reader in the serial picker.')
           setRunning(false)
           return
         }
@@ -1091,13 +1092,6 @@ export default function FlashTools() {
           {['x3', 'x4', 'x4pro'].includes(model) && (
             <div className="text-sm text-stone-600">
               <p>{useDfu && detectedDfu.length > 0 ? 'Reader detected — USB update is ready.' : 'Connect your reader, choose firmware, then click Flash.'}</p>
-              {pendingSerialAction && (
-                <div role="status" className="mt-3 rounded-lg border border-brand-200 bg-brand-50 p-4">
-                  <p>{connectionNotice}</p>
-                  <button type="button" disabled={running} onClick={() => runFlash(pendingSerialAction, true)}
-                    className="mt-2 font-medium text-brand-600 underline underline-offset-2">Allow serial access and continue</button>
-                </div>
-              )}
               <details className="mt-2" open={connectionNotice ? true : undefined}>
                 <summary className="cursor-pointer text-brand-600 hover:text-brand-700">Connection help</summary>
                 <div className="mt-3 space-y-3 rounded-lg bg-stone-50 p-4">
@@ -1524,6 +1518,14 @@ export default function FlashTools() {
               </div>
             </div>
           )}
+
+              {pendingSerialAction && (
+                <div role="status" className="mt-3 rounded-lg border border-brand-200 bg-brand-50 p-4">
+                  <p>{connectionNotice}</p>
+                  <button type="button" disabled={running} onClick={() => runFlash(pendingSerialAction, true)}
+                    className="mt-2 font-medium text-brand-600 underline underline-offset-2">Allow serial access and continue</button>
+                </div>
+              )}
 
           {/* Progress Card */}
           {progress && (
