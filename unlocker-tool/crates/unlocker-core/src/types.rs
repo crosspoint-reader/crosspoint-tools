@@ -258,3 +258,22 @@ pub struct XotaOta {
     /// manifest's `checksum` object for the device's transport integrity check.
     pub xota_crc32: u32,
 }
+
+/// What the helper set up when preparing the hotspot. On macOS this names
+/// the upstream it picked for Internet Sharing so the UI can tell the user
+/// which service to select in System Settings; other platforms leave it
+/// empty because their hotspot comes up without a manual step.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HotspotSetup {
+    /// BSD name of the interface Internet Sharing shares *from*.
+    #[serde(default)]
+    pub upstream_device: Option<String>,
+    /// Network service name for `upstream_device`, exactly as System
+    /// Settings → Sharing lists it in "Share your connection from".
+    #[serde(default)]
+    pub upstream_service: Option<String>,
+    /// True when no real internet interface was available and the helper
+    /// created the temporary loopback-backed "Xteink Unlocker" service.
+    #[serde(default)]
+    pub upstream_adhoc: bool,
+}

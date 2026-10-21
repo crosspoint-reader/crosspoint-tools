@@ -6,7 +6,7 @@ See [`RELEASING.md`](./RELEASING.md) for the build, signing, and release pipelin
 
 ## How it works
 
-1. The Mac becomes a Wi-Fi hotspot via a `feth` virtual upstream + Internet Sharing. (Windows uses Mobile Hotspot — see below.)
+1. The Mac becomes a Wi-Fi hotspot via Internet Sharing. The helper discovers the Wi-Fi adapter, picks an upstream to share from (the Mac's primary service such as Ethernet/USB LAN, the first active wired service when the primary is a VPN, or a temporary loopback-backed "Xteink Unlocker" service when there is none), pre-writes the Internet Sharing config, and then waits for the user to toggle it on. It identifies the resulting bridge by its Wi-Fi/AP member rather than by name, so VM bridges from Docker/OrbStack/UTM on `bridge100` are not mistaken for the hotspot. (Windows uses Mobile Hotspot — see below.)
 2. The privileged helper runs DNS / HTTP / HTTPS listeners bound to the bridge IP. DNS spoofs three hostnames: the locale's Xteink API host (`api-prod.xteink.cc` / `.cn`), `api.github.com`, and `unlocker.crosspointreader.com`. HTTPS uses a real Let's Encrypt cert for `unlocker.crosspointreader.com` — trusted by ESP-IDF's `esp_crt_bundle`, so both stock and CrossPoint/CrossInk firmwares accept it.
 3. The user taps **Check for Updates** on the device. Depending on what's running:
    - **Stock Xteink** → hits `https://api-prod.xteink.{cc,cn}/api/v1/check-update`. We return a manifest pointing at a plain-HTTP firmware URL on the bridge IP.
@@ -142,7 +142,7 @@ In dev mode the bundled helper isn't available. To exercise the helper path loca
 cargo build --release -p unlocker-helper
 ```
 
-The signed app bundles the helper binary at `Contents/MacOS/unlocker-helper` and launches it as root on demand via `osascript`'s admin password prompt — no LaunchDaemon, no SMAppService, no provisioning profile. The helper writes a crash-recovery state file to `/var/db/com.sofriendly.crosspoint.unlocker.helper.state.json` and reverses any leftover changes (pfctl rules, `feth` interfaces, NAT plist) on next launch.
+The signed app bundles the helper binary at `Contents/MacOS/unlocker-helper` and launches it as root on demand via `osascript`'s admin password prompt — no LaunchDaemon, no SMAppService, no provisioning profile. The helper writes a crash-recovery state file to `/var/db/com.sofriendly.crosspoint.unlocker.helper.state.json` and reverses any leftover changes (pfctl rules, the original offload flags of interfaces it touched, the adhoc upstream service, NAT plist) on next launch.
 
 For producing signed bundles to test the full flow, see [`RELEASING.md`](./RELEASING.md) — `scripts/build-macos-dev.sh` is the fastest path (skips notarization).
 
@@ -161,7 +161,7 @@ Windows uses Mobile Hotspot (`NetworkOperatorTetheringManager`) for AP + NAT + D
 Requirements:
 - Windows 10 1607 or newer (Windows 11 recommended).
 - A Wi-Fi adapter that supports Mobile Hotspot.
-- An active internet connection — Windows' tethering API requires a profile to share. (macOS bypasses this with a fake `lo0` upstream; Windows doesn't allow it.)
+- An active internet connection — Windows' tethering API requires a profile to share. (macOS falls back to a fake `lo0` upstream when it has no wired connection; Windows doesn't allow it.)
 
 ### DNS interception (opt-in)
 

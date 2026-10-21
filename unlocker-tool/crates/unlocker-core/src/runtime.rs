@@ -5,7 +5,7 @@
 //! ports 53/80/443). We just sequence the RPCs and watch DHCP leases.
 
 use crate::helper::Helper;
-use crate::types::{ArmServerSpec, Locale, Model, XotaOta};
+use crate::types::{ArmServerSpec, HotspotSetup, Locale, Model, XotaOta};
 use anyhow::{anyhow, Result};
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
@@ -23,15 +23,19 @@ impl Runtime {
         std::sync::Arc::new(Self)
     }
 
-    /// Phase 1: create the temporary lo0-backed upstream service and write the
-    /// Internet Sharing NAT plist.
-    /// After this the user must enable Internet Sharing in System Settings.
-    pub async fn prepare_hotspot(&self, helper: &Helper, ssid: &str, psk: &str) -> Result<()> {
-        helper.is_enable(ssid, psk).await?;
-        Ok(())
+    /// Phase 1: pick an upstream and write the Internet Sharing NAT plist.
+    /// After this the user must enable Internet Sharing in System Settings,
+    /// sharing from the returned `upstream_service`.
+    pub async fn prepare_hotspot(
+        &self,
+        helper: &Helper,
+        ssid: &str,
+        psk: &str,
+    ) -> Result<HotspotSetup> {
+        helper.is_enable(ssid, psk).await
     }
 
-    /// Phase 2: wait for bridge100 to come up (user has toggled Internet Sharing),
+    /// Phase 2: wait for the hotspot bridge to come up (user has toggled Internet Sharing),
     /// then install pfctl rules. Polls indefinitely — toggling Internet Sharing
     /// is a manual user step that may take a while.
     pub async fn await_hotspot(

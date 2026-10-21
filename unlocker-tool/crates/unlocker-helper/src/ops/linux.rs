@@ -18,6 +18,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use std::collections::HashMap;
 use std::ops::Deref;
 use tokio::process::Command;
+use unlocker_core::types::HotspotSetup;
 use zbus::zvariant::{OwnedObjectPath, Value};
 
 // ── D-Bus constants ───────────────────────────────────────────────────────────
@@ -28,6 +29,10 @@ const NM_IFACE: &str = "org.freedesktop.NetworkManager";
 const NM_SETTINGS_PATH: &str = "/org/freedesktop/NetworkManager/Settings";
 const NM_SETTINGS_IFACE: &str = "org.freedesktop.NetworkManager.Settings";
 const NM_DEVICE_IFACE: &str = "org.freedesktop.NetworkManager.Device";
+const NM_ACTIVE_IFACE: &str = "org.freedesktop.NetworkManager.Connection.Active";
+const NM_IP4CONFIG_IFACE: &str = "org.freedesktop.NetworkManager.IP4Config";
+/// NM_ACTIVE_CONNECTION_STATE_ACTIVATED
+const NM_ACTIVE_STATE_ACTIVATED: u32 = 2;
 
 // ── Connection profile tags ───────────────────────────────────────────────────
 
@@ -264,7 +269,7 @@ async fn warn_if_iwd_backend() {
     }
 }
 
-pub async fn is_enable(ssid: &str, psk: &str) -> Result<()> {
+pub async fn is_enable(ssid: &str, psk: &str) -> Result<HotspotSetup> {
     if ssid.is_empty() {
         bail!("ssid is empty");
     }
@@ -326,7 +331,7 @@ pub async fn is_enable(ssid: &str, psk: &str) -> Result<()> {
     firewalld_set_ports(true).await;
 
     tracing::info!(%ssid, "Wi-Fi hotspot activated via NetworkManager");
-    Ok(())
+    Ok(HotspotSetup::default())
 }
 
 pub async fn is_disable() -> Result<()> {
@@ -548,28 +553,44 @@ fn parse_dnsmasq_leases(body: &str) -> Vec<DhcpLease> {
 
 // ── Bridge IP discovery ───────────────────────────────────────────────────────
 //
-// NM's `ipv4.method=shared` creates a bridge/virtual interface and assigns it
-// a fixed IP from 10.42.0.0/24 (by default 10.42.0.1). We use `ip -4 addr`
-// to find any interface in that subnet; fall back to scanning all interfaces.
+// NM's `ipv4.method=shared` assigns the hotspot an address (by default
+// 10.42.0.1). Other interfaces can sit in 10.42.0.0/16 too, and the Wi-Fi
+// device keeps its previous network's address while the hotspot activates,
+// so the address is read from our own connection's IP4Config once NM
+// reports it fully activated.
 
 pub async fn bridge_ip() -> Result<String> {
-    let out = sh("ip", &["-4", "addr", "show"]).await?;
-    find_hotspot_ip(&out).ok_or_else(|| anyhow!("hotspot bridge interface not found"))
-}
-
-fn find_hotspot_ip(ip_addr_output: &str) -> Option<String> {
-    // NM shared mode defaults to 10.42.0.0/24.
-    // We look for "inet 10.42.0." or any AP-mode bridge pattern.
-    for line in ip_addr_output.lines() {
-        let trimmed = line.trim();
-        if let Some(rest) = trimmed.strip_prefix("inet ") {
-            let ip = rest.split('/').next().unwrap_or("").trim();
-            if ip.starts_with("10.42.") {
-                return Some(ip.to_string());
-            }
+    let conn = system_bus().await?;
+    let nm = zbus::Proxy::new(&conn, NM_BUS, NM_PATH, NM_IFACE)
+        .await
+        .context("NM proxy")?;
+    let active: Vec<OwnedObjectPath> = nm
+        .get_property("ActiveConnections")
+        .await
+        .context("NM.ActiveConnections")?;
+    for path in active {
+        let ac = zbus::Proxy::new(&conn, NM_BUS, path.as_str(), NM_ACTIVE_IFACE)
+            .await
+            .context("active connection proxy")?;
+        if ac.get_property::<String>("Uuid").await.ok().as_deref() != Some(CONN_UUID) {
+            continue;
         }
+        let state: u32 = ac.get_property("State").await?;
+        if state != NM_ACTIVE_STATE_ACTIVATED {
+            bail!("hotspot connection not activated yet (state {state})");
+        }
+        let ip4: OwnedObjectPath = ac.get_property("Ip4Config").await?;
+        let cfg = zbus::Proxy::new(&conn, NM_BUS, ip4.as_str(), NM_IP4CONFIG_IFACE)
+            .await
+            .context("IP4Config proxy")?;
+        let addresses: Vec<HashMap<String, zbus::zvariant::OwnedValue>> =
+            cfg.get_property("AddressData").await?;
+        return addresses
+            .iter()
+            .find_map(|a| a.get("address").and_then(|v| String::try_from(v.clone()).ok()))
+            .ok_or_else(|| anyhow!("hotspot connection has no IPv4 address yet"));
     }
-    None
+    Err(anyhow!("hotspot connection is not active"))
 }
 
 // ── Full cleanup ──────────────────────────────────────────────────────────────
@@ -614,25 +635,6 @@ mod tests {
         assert_eq!(leases[1].name, None);
     }
 
-    #[test]
-    fn finds_hotspot_ip() {
-        let sample = r#"
-1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
-    inet 127.0.0.1/8 scope host lo
-2: wlan0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500
-    inet 192.168.1.50/24 brd 192.168.1.255 scope global dynamic wlan0
-3: ap0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500
-    inet 10.42.0.1/24 brd 10.42.0.255 scope global ap0
-"#;
-        assert_eq!(find_hotspot_ip(sample).as_deref(), Some("10.42.0.1"));
-    }
-
-    #[test]
-    fn returns_none_when_no_hotspot() {
-        let sample =
-            "    inet 127.0.0.1/8 scope host lo\n    inet 192.168.1.5/24 scope global eth0\n";
-        assert!(find_hotspot_ip(sample).is_none());
-    }
 }
 
 // ── Integration tests ──────────────────────────────────────────────────────────

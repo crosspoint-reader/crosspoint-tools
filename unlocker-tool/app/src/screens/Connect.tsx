@@ -37,6 +37,8 @@ export function Connect({ state }: { state: StateKind }) {
     ssid: string | null;
     psk: string | null;
     bridge_ip: string | null;
+    upstream_service: string | null;
+    upstream_adhoc: boolean;
     device_ip: string | null;
   }>({
     model: null,
@@ -46,6 +48,8 @@ export function Connect({ state }: { state: StateKind }) {
     ssid: null,
     psk: null,
     bridge_ip: null,
+    upstream_service: null,
+    upstream_adhoc: false,
     device_ip: null,
   });
   const [restarting, setRestarting] = useState(false);
@@ -63,6 +67,8 @@ export function Connect({ state }: { state: StateKind }) {
           ssid: s.ssid,
           psk: s.psk,
           bridge_ip: s.bridge_ip,
+          upstream_service: s.upstream_service ?? null,
+          upstream_adhoc: s.upstream_adhoc ?? false,
           device_ip: s.device_ip,
         });
       }
@@ -112,7 +118,7 @@ export function Connect({ state }: { state: StateKind }) {
               : isWindows()
                 ? "Starting Mobile Hotspot…"
                 : isMac()
-                ? "Preparing the virtual network interface…"
+                ? "Detecting your Wi-Fi adapter and internet connection, then pre-configuring Internet Sharing…"
                 : isLinux()
                 ? "Preparing the virtual network interface…"
                 : "Don't know what your system is, please report this..."
@@ -198,7 +204,12 @@ export function Connect({ state }: { state: StateKind }) {
           <Step n={2} title="Configure sharing" done={false} active={true}>
             Set <strong>Share your connection from</strong> to{" "}
             <span className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-xs text-stone-700">
-              Xteink Unlocker
+              {info.upstream_service ?? "Xteink Unlocker"}
+            </span>
+            <span className="text-stone-500">
+              {info.upstream_service && !info.upstream_adhoc
+                ? " (your Mac's current internet connection)"
+                : " (a temporary service Unlocker created because no wired internet connection was found)"}
             </span>{" "}
             and check{" "}
             <strong>Wi-Fi</strong> in the "To devices using" list. Click{" "}
