@@ -364,7 +364,7 @@ function BannerCard({ secret, log }) {
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Banner text (e.g. New: CrossPoint beta released. Update via https://crosspoint.tools/#flash-tools)"
+          placeholder="Banner text (e.g. New: CrossPoint beta released. Update via https://crosspointreader.com/install)"
           rows={3}
           className={`${inputCls} resize-none`}
         />

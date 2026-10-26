@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Eyebrow } from '../../components/ui.jsx'
+import { Link, useSearchParams } from 'react-router-dom'
+import { DEVICES } from '../../lib/devices.ts'
 
 // Locked device CTA: anchor #unlock-tool is linked publicly, keep it.
 export default function UnlockSection() {
+  const [searchParams] = useSearchParams()
+  const device = DEVICES.find((d) => ['x3', 'x4', 'x4pro', 'x4c'].includes(d.id) && d.id === searchParams.get('device'))
+  const showSd = !device || ['x3', 'x4'].includes(device.id)
+  const unlockerPath = device ? `/unlocker?device=${device.id}` : '/unlocker'
   const [downloading, setDownloading] = useState(false)
   const [status, setStatus] = useState('Latest stable release, the same firmware for X3 and X4.')
 
@@ -52,43 +56,43 @@ export default function UnlockSection() {
       />
       <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-start gap-12 px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:px-8">
         <div>
-          <Eyebrow>USB flashing not working?</Eyebrow>
-          <h2 className="mt-2 max-w-[24ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
-            Have a locked device?
-          </h2>
+          <h1 className="max-w-[24ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
+            Other ways to install CrossPoint
+          </h1>
+          {device && <p className="mt-4 text-base font-medium text-stone-700">Help for your {device.name}</p>}
           <p className="mt-6 max-w-[58ch] font-serif text-xl/9 text-pretty text-stone-600">
-            Some international Xteink devices, including most from AliExpress, ship with{' '}
-            <strong className="font-medium text-stone-900">USB flashing disabled</strong>. The{' '}
-            <strong className="font-medium text-stone-900">SD card method</strong> gets
-            CrossPoint onto a locked device in a few minutes. It won&rsquo;t unlock USB
-            flashing, but it will run custom firmware.
+            Some Xteink readers ship with{' '}
+            <strong className="font-medium text-stone-900">USB flashing disabled</strong>.
+            If your reader still does not appear after trying a USB data cable, you can install
+            CrossPoint using another method. These methods install the firmware without enabling USB flashing.
           </p>
-          <p className="mt-6 text-sm/6 text-pretty text-stone-500">
+          {showSd && <p className="mt-6 text-sm/6 text-pretty text-stone-600">
             Stuck on a firmware that doesn&rsquo;t support SD flashing? Use the{' '}
             <Link
-              to="/unlocker"
+              to={unlockerPath}
               className="font-medium text-brand-600 underline decoration-brand-300 underline-offset-4 hover:text-brand-700 hover:decoration-brand-500"
             >
               OTA Unlocker Tool
             </Link>
             .
-          </p>
-          <p className="mt-3 text-sm/6 text-pretty text-stone-500">
+          </p>}
+          {(!device || device.id === 'x4pro') && <p className="mt-3 text-sm/6 text-pretty text-stone-600">
             <strong className="font-medium text-stone-900">Xteink X4 Pro?</strong> There&rsquo;s no
             known way to SD flash it — you must use the{' '}
             <Link
-              to="/unlocker"
+              to={unlockerPath}
               className="font-medium text-brand-600 underline decoration-brand-300 underline-offset-4 hover:text-brand-700 hover:decoration-brand-500"
             >
               OTA Unlocker Tool
             </Link>
             .
-          </p>
+          </p>}
+          <Link to={device ? `/install?device=${device.id}` : '/install'} className="mt-6 inline-block text-sm font-medium text-brand-700 underline underline-offset-2">Back to USB installation</Link>
         </div>
 
         {/* Primary path: SD card flashing */}
-        <div className="rounded-2xl bg-white p-6 text-left shadow-sm ring-1 ring-stone-950/5 sm:p-7">
-          <h3 className="font-display text-sm font-semibold text-stone-900">Flash from SD card</h3>
+        {showSd ? <div className="rounded-2xl bg-white p-6 text-left shadow-sm ring-1 ring-stone-950/5 sm:p-7">
+          <h2 className="text-lg font-semibold text-stone-900">Flash from SD card</h2>
           <p className="mt-1 text-xs text-stone-400">Recommended for X3 and X4, even on stock firmware.</p>
           <ol className="mt-5 space-y-4">
             {steps.map((content, i) => (
@@ -126,7 +130,11 @@ export default function UnlockSection() {
             </a>
             . Flashing unapproved firmware can <span className="font-semibold">permanently brick your device</span>.
           </p>
-        </div>
+        </div> : <div className="rounded-2xl bg-white p-6 text-left shadow-sm ring-1 ring-stone-950/5 sm:p-7">
+          <h2 className="text-lg font-semibold text-stone-900">Install over WiFi</h2>
+          <p className="mt-3 text-sm/6 text-stone-700">The OTA Unlocker installs CrossPoint through your reader’s WiFi update feature. Download the tool for your computer and choose {device.name} inside it.</p>
+          <Link to={unlockerPath} className="mt-5 inline-flex min-h-11 items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">Get the OTA Unlocker</Link>
+        </div>}
       </div>
     </section>
   )

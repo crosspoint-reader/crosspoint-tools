@@ -633,7 +633,7 @@ export default function DebugPage() {
           <PartitionTable partitions={partitions} title="On-device partition table after repair" highlight />
           {repairForStock ? (
             <div className="flex justify-end">
-              <a href="/#flash-tools" className={btnOutline}>
+              <a href="/install" className={btnOutline}>
                 Return to firmware flasher
               </a>
             </div>

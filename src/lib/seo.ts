@@ -27,6 +27,10 @@ const HOME: PageMeta = {
 
 const PAGES: Record<string, PageMeta> = {
   '/': HOME,
+  '/install': {
+    title: 'Install CrossPoint',
+    description: 'Install the latest stable CrossPoint firmware over USB, with step-by-step instructions and help for your reader.',
+  },
   '/docs': {
     title: 'Docs',
     description: 'Guides and reference for installing, using, and customizing CrossPoint Reader on your e-ink device.',
@@ -65,8 +69,8 @@ const PAGES: Record<string, PageMeta> = {
     description: "Unlock Xteink devices that won't take an SD card flash, over the air, so you can install CrossPoint.",
   },
   '/unlock': {
-    title: 'Have a Locked Device?',
-    description: 'Some Xteink devices, including most from AliExpress, ship locked. Here is how to unlock yours and install CrossPoint.',
+    title: 'Other Ways to Install CrossPoint',
+    description: 'Help installing CrossPoint on Xteink readers with USB flashing disabled, including SD-card and OTA options.',
   },
   '/contact': {
     title: 'Get in Touch',

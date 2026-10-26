@@ -73,6 +73,8 @@ When the Instatus variables in `wrangler.jsonc` and the `INSTATUS_API_KEY` Worke
 
 ## Flashing
 
+The guided installer is at `/install`, linked from the homepage and header. It recommends the latest compatible stable release, keeps other firmware under Advanced options, and links Xteink users to model-specific alternatives when their reader is not listed. Existing `/#flash-tools` and `/sticky` links redirect to the installer.
+
 The browser-based flasher (`public/js/flasher.js`) uses [esptool-js](https://github.com/nicholasgasior/nicholasgasior.github.io) via WebSerial:
 
 1. Connects to the ESP32-C3 over USB serial

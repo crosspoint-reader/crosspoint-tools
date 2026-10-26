@@ -192,7 +192,7 @@ const LEGACY_HTML_ROUTES: Record<string, string> = {
   '/admin.html': '/admin',
   '/login.html': '/login',
   '/kosync.html': '/kosync',
-  '/sticky.html': '/#flash-tools',
+  '/sticky.html': '/install',
   '/unlocker.html': '/unlocker',
 };
 

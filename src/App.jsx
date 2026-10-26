@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage.jsx'
 import { pageMeta } from './lib/seo.ts'
 
 const DocsPage = lazy(() => import('./pages/DocsPage.jsx'))
+const InstallPage = lazy(() => import('./pages/InstallPage.jsx'))
 const RoadmapPage = lazy(() => import('./pages/RoadmapPage.jsx'))
 const FontsPage = lazy(() => import('./pages/FontsPage.jsx'))
 const ThemeBuilderPage = lazy(() => import('./pages/ThemeBuilderPage.jsx'))
@@ -36,15 +37,21 @@ const HTML_REDIRECTS = {
   '/insider.html': '/insider',
   '/login.html': '/login',
   '/kosync.html': '/kosync',
-  '/sticky.html': '/#flash-tools',
+  '/sticky.html': '/install',
   '/unlocker.html': '/unlocker',
 }
 
 // Hash anchors whose sections moved off the homepage onto standalone pages.
 // Old deep links (e.g. /#unlock-tool from Reddit posts) forward to the page.
 const HASH_REDIRECTS = {
+  '#flash-tools': '/install',
   '#unlock-tool': '/unlock',
   '#get-in-touch': '/contact',
+}
+
+function LegacyRedirect({ to }) {
+  const { search, hash } = useLocation()
+  return <Navigate to={`${to}${search}${hash}`} replace />
 }
 
 // On every route change start at the top; when the URL carries a hash anchor,
@@ -60,7 +67,7 @@ function ScrollManager() {
   }, [pathname])
   useEffect(() => {
     if (hash) {
-      const to = HASH_REDIRECTS[hash]
+      const to = pathname === '/' ? HASH_REDIRECTS[hash] : null
       if (to) {
         navigate(to, { replace: true })
         return
@@ -83,6 +90,7 @@ export default function App() {
       <Suspense fallback={null}>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/install" element={<InstallPage />} />
           <Route path="/docs" element={<DocsPage />} />
           <Route path="/roadmap" element={<RoadmapPage />} />
           <Route path="/fonts" element={<FontsPage />} />
@@ -93,8 +101,7 @@ export default function App() {
           <Route path="/early-access" element={<Navigate to="/insider" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/kosync" element={<KosyncPage />} />
-          {/* Standalone Sticky flasher merged into the homepage flasher */}
-          <Route path="/sticky" element={<Navigate to="/#flash-tools" replace />} />
+          <Route path="/sticky" element={<Navigate to="/install" replace />} />
           <Route path="/unlocker" element={<UnlockerPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/unlock" element={<UnlockPage />} />
@@ -108,7 +115,7 @@ export default function App() {
           <Route path="/privacy" element={<LegalPage doc="privacy" />} />
           <Route path="/terms" element={<LegalPage doc="terms" />} />
           {Object.entries(HTML_REDIRECTS).map(([from, to]) => (
-            <Route key={from} path={from} element={<Navigate to={to} replace />} />
+            <Route key={from} path={from} element={<LegacyRedirect to={to} />} />
           ))}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
