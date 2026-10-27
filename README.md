@@ -73,7 +73,7 @@ When the Instatus variables in `wrangler.jsonc` and the `INSTATUS_API_KEY` Worke
 
 ## Flashing
 
-The guided installer is at `/install`, linked from the homepage and header. It recommends the latest compatible stable release, keeps other firmware under Advanced options, and links Xteink users to model-specific alternatives when their reader is not listed. Existing `/#flash-tools` and `/sticky` links redirect to the installer.
+The guided installer is at `/install`, linked from the homepage and header. It recommends the latest compatible stable release, shows nightly, beta, and factory firmware below stable, reserves Advanced options for custom uploads, and links Xteink users to model-specific alternatives when their reader is not listed. Existing `/#flash-tools` and `/sticky` links redirect to the installer.
 
 The browser-based flasher (`public/js/flasher.js`) uses [esptool-js](https://github.com/nicholasgasior/nicholasgasior.github.io) via WebSerial:
 
@@ -168,6 +168,8 @@ For end-to-end build testing, the worker now passes the current request origin t
 ## Acknowledgments
 
 The WebSerial flasher is based on [xteink-flasher](https://github.com/crosspoint-reader/xteink-flasher), licensed under the MIT License. The partition table handling, OTA flashing logic, and device model support were adapted from that project.
+
+Thanks to [daveallie](https://github.com/daveallie) for the original browser flasher.
 
 The SD-card font builder uses the vendored generator in `scripts/font-builder/`, originally sourced from the [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader) firmware repo. Kerning, ligature, and interval behavior now live here, so changes to website-only font features can be made locally without waiting on firmware-repo updates.
 

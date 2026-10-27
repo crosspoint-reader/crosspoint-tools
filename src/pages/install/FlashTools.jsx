@@ -68,9 +68,7 @@ function cardClass(active) {
     : 'group relative rounded-xl border-2 border-stone-200 bg-white p-4 text-left hover:border-stone-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600'
 }
 
-// Firmware-picker card holding a dropdown of related options (stock languages,
-// beta builds) instead of one card per option. Selecting an entry picks that
-// firmware the same way clicking a plain card does.
+// Group factory firmware languages into one labeled control.
 function DropdownCard({ active, title, sub, subClass, value, options, onSelect }) {
   return (
     <div className={cardClass(active)}>
@@ -164,6 +162,21 @@ function StepsList({ steps, states, percent }) {
 // ---------- main component ----------
 
 const MODELS = DEVICES
+
+const MODEL_BRANDS = {
+  x4: '/brands/xteink.png',
+  x4pro: '/brands/xteink.png',
+  x4c: '/brands/xteink.png',
+  x3: '/brands/xteink.png',
+  sticky: '/brands/seeed.png',
+  m5paper: '/brands/m5stack.png',
+  m5papers3: '/brands/m5stack.png',
+  papermono: '/brands/m5stack.png',
+  lilygo: '/brands/lilygo.png',
+  metalio: '/brands/cloudzao.png',
+  eego_a4: '/brands/eego.png',
+  picco: '/brands/boox.svg',
+}
 
 // esptool chip identity each device must report before we write anything.
 // Stops firmware for one board from landing on another (e.g. the Sticky's
@@ -933,6 +946,18 @@ export default function FlashTools() {
     ? deviceBuilds.find((b) => `device-${b.id}` === fw)
     : null
 
+  const showNightly = !visibilityLoading && !isReleaseHidden('nightly') &&
+    (!DEVICE_BUILD_MODELS.includes(model) || nightly.enabled)
+  const hasFactoryFirmware = XTEINK_PRO_MODELS.has(model) ||
+    (!DEVICE_BUILD_MODELS.includes(model) && (!isReleaseHidden('stock-en') || !isReleaseHidden('stock-ch')))
+  const testBuilds = [
+    showNightly && { id: 'nightly', title: 'CrossPoint Nightly', channel: 'Nightly', available: nightly.enabled },
+    rcAsset && { id: 'rc', title: `CrossPoint ${rc.release.tag}`, channel: 'Release candidate', available: true },
+    ...(DEVICE_BUILD_MODELS.includes(model)
+      ? deviceBuilds.slice().reverse().map((b) => ({ id: `device-${b.id}`, title: b.name, channel: 'Beta', available: true }))
+      : visibleBetas.map((b) => ({ id: `beta-${b.id}`, title: betaLabel(b), channel: 'Beta', available: true }))),
+  ].filter(Boolean)
+
   return (
     <section id="flash-tools" className="relative py-12 sm:py-16">
       <div className="mx-auto max-w-3xl px-6">
@@ -963,20 +988,30 @@ export default function FlashTools() {
           <div>
             <div className="flex items-center gap-2.5">
               <StepBadge n={1} active={!!model} />
-              <h2 id="device-step" className="text-base font-semibold text-stone-900">Choose your reader</h2>
+              <h2 id="device-step" className="text-base font-semibold text-stone-900">Choose your device</h2>
             </div>
-            <p className="mt-2 text-sm/6 text-stone-600">Choose the model printed on your box.</p>
-            <select
+            <fieldset
               id="device-picker"
               aria-labelledby="device-step"
-              value={model || ''}
               disabled={running}
-              onChange={(e) => selectModel(e.target.value)}
-              className="mt-4 min-h-12 w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-base text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:opacity-60"
+              className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3"
             >
-              <option value="" disabled>Choose your model</option>
-              {MODELS.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+              {MODELS.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => selectModel(m.id)}
+                  aria-pressed={model === m.id}
+                  className={`${cardClass(model === m.id)} min-w-0 disabled:opacity-60`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <img src={MODEL_BRANDS[m.id]} alt="" className="h-4 max-w-6 shrink-0 object-contain" />
+                    <span className="min-w-0 break-words text-sm font-semibold leading-5 text-stone-900">{m.name}</span>
+                  </span>
+                  <span className="mt-1 block text-xs text-stone-600">{m.width} × {m.height}</span>
+                </button>
+              ))}
+            </fieldset>
           </div>
 
           {/* Step 2: Firmware */}
@@ -1005,94 +1040,59 @@ export default function FlashTools() {
                     <span className="mt-1 block text-sm/6 text-stone-600">The latest stable release for {MODELS.find((m) => m.id === model)?.name}. Ready for everyday reading.</span>
                   </button>
                 ) : (
-                  <p className="text-sm/6 text-stone-600">A stable release is currently unavailable for this reader. Other builds, when available, are under Advanced options.</p>
+                  <p className="text-sm/6 text-stone-600">A stable release is currently unavailable for this reader. Other available firmware is listed below.</p>
                 )}
               </div>
+              {(testBuilds.length > 0 || hasFactoryFirmware) && (
+                <fieldset disabled={running} className="mt-5">
+                  <legend className="text-sm font-medium text-stone-700">Other firmware</legend>
+                  <p className="mt-1 text-sm/6 text-stone-600">Try upcoming changes or restore your reader’s factory firmware.</p>
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {testBuilds.map((build) => (
+                      <button
+                        key={build.id}
+                        type="button"
+                        onClick={() => selectFw(build.id)}
+                        aria-pressed={fw === build.id}
+                        disabled={!build.available}
+                        className={`${cardClass(fw === build.id)} min-w-0 disabled:opacity-60`}
+                      >
+                        <span className="block text-sm font-semibold text-stone-900">{build.title}</span>
+                        <span className="mt-1 block text-xs text-amber-700">{build.channel}</span>
+                        {!build.available && <span className="mt-1 block text-xs text-stone-600">{nightly.text === 'Loading...' ? 'Checking availability…' : 'Currently unavailable'}</span>}
+                      </button>
+                    ))}
+                  {XTEINK_PRO_MODELS.has(model) && (
+                    <button type="button" onClick={() => selectFw('stock-en')} aria-pressed={fw === 'stock-en'} className={cardClass(fw === 'stock-en')}>
+                      <span className="block text-sm font-semibold text-stone-900">XTeink Factory Firmware</span>
+                      <span className="mt-1 block text-xs text-stone-600">Stock English</span>
+                    </button>
+                  )}
+                  {!DEVICE_BUILD_MODELS.includes(model) && (!isReleaseHidden('stock-en') || !isReleaseHidden('stock-ch')) && (
+                    <DropdownCard
+                      active={fw === 'stock-en' || fw === 'stock-ch'}
+                      title="XTeink Factory Firmware"
+                      sub="Stock"
+                      subClass="text-stone-600"
+                      value={fw === 'stock-en' || fw === 'stock-ch' ? fw : ''}
+                      onSelect={selectFw}
+                      options={[
+                        !isReleaseHidden('stock-en') && { value: 'stock-en', label: 'Stock English' },
+                        !isReleaseHidden('stock-ch') && { value: 'stock-ch', label: 'Stock Chinese' },
+                      ].filter(Boolean)}
+                    />
+                  )}
+                  </div>
+                </fieldset>
+              )}
               <details key={model} className="mt-5">
                 <summary className="w-fit cursor-pointer py-2 text-sm font-medium text-stone-700 focus-visible:outline-2 focus-visible:outline-brand-600">Advanced options</summary>
-                <p className="mt-1 text-sm/6 text-stone-600">Test a newer build, restore factory firmware, or install your own file.</p>
-                <fieldset disabled={running} aria-label="Advanced firmware options">
-                  {DEVICE_BUILD_MODELS.includes(model) ? (
-                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {rcAsset && (
-                        <button type="button" onClick={() => selectFw('rc')} aria-pressed={fw === 'rc'} disabled={running} className={cardClass(fw === 'rc')}>
-                          <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>
-                          <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
-                        </button>
-                      )}
-                      {nightly.enabled && (
-                        <button type="button" onClick={() => selectFw('nightly')} aria-pressed={fw === 'nightly'} disabled={running} className={cardClass(fw === 'nightly')}>
-                          <div className="text-sm font-semibold text-stone-900">CrossPoint Nightly</div>
-                          <div className="mt-0.5 font-mono text-xs text-amber-600">Insider</div>
-                        </button>
-                      )}
-                      {deviceBuilds.slice().reverse().map((b) => (
-                        <button
-                          key={b.id}
-                          type="button"
-                          onClick={() => selectFw(`device-${b.id}`)}
-                          aria-pressed={fw === `device-${b.id}`} disabled={running} className={cardClass(fw === `device-${b.id}`)}
-                        >
-                          <div className="text-sm font-semibold text-stone-900">{b.name}</div>
-                          <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
-                        </button>
-                      ))}
-                      {XTEINK_PRO_MODELS.has(model) && (
-                        <button type="button" onClick={() => selectFw('stock-en')} aria-pressed={fw === 'stock-en'} disabled={running} className={cardClass(fw === 'stock-en')}>
-                          <div className="text-sm font-semibold text-stone-900">XTeink Factory Firmware</div>
-                          <div className="mt-0.5 font-mono text-xs text-stone-600">Stock English</div>
-                        </button>
-                      )}
-                      <button type="button" onClick={() => selectFw('custom')} aria-pressed={fw === 'custom'} disabled={running} className={cardClass(fw === 'custom')}>
-                        <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
-                        <div className="mt-0.5 font-mono text-xs text-stone-600">Upload file</div>
-                      </button>
-                    </div>
-                  ) : (
-                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {rcAsset && (
-                      <button type="button" onClick={() => selectFw('rc')} aria-pressed={fw === 'rc'} disabled={running} className={cardClass(fw === 'rc')}>
-                        <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>
-                        <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
-                      </button>
-                    )}
-                    {(!isReleaseHidden('nightly') || visibleBetas.length > 0) && (
-                      <DropdownCard
-                        active={fw === 'nightly' || !!selectedBeta}
-                        title="Insider Builds & Betas"
-                        sub="Insider"
-                        subClass="text-amber-600"
-                        value={fw === 'nightly' ? 'nightly' : selectedBeta ? `beta-${selectedBeta.id}` : ''}
-                        onSelect={selectFw}
-                        options={[
-                          !isReleaseHidden('nightly') && { value: 'nightly', label: 'CrossPoint Nightly' },
-                          ...visibleBetas.map((b) => ({
-                            value: `beta-${b.id}`,
-                            label: betaLabel(b),
-                          })),
-                        ].filter(Boolean)}
-                      />
-                    )}
-                    {(!isReleaseHidden('stock-en') || !isReleaseHidden('stock-ch')) && (
-                      <DropdownCard
-                        active={fw === 'stock-en' || fw === 'stock-ch'}
-                        title="XTeink Factory Firmware"
-                        sub="Stock"
-                        subClass="text-stone-600"
-                        value={fw === 'stock-en' || fw === 'stock-ch' ? fw : ''}
-                        onSelect={selectFw}
-                        options={[
-                          !isReleaseHidden('stock-en') && { value: 'stock-en', label: 'Stock English' },
-                          !isReleaseHidden('stock-ch') && { value: 'stock-ch', label: 'Stock Chinese' },
-                        ].filter(Boolean)}
-                      />
-                    )}
-                    <button type="button" onClick={() => selectFw('custom')} aria-pressed={fw === 'custom'} disabled={running} className={cardClass(fw === 'custom')}>
-                      <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
-                      <div className="mt-0.5 font-mono text-xs text-stone-600">Upload file</div>
-                    </button>
-                  </div>
-                  )}
+                <p className="mt-1 text-sm/6 text-stone-600">Install a firmware .bin file from your computer.</p>
+                <fieldset disabled={running} aria-label="Advanced firmware options" className="mt-4">
+                  <button type="button" onClick={() => selectFw('custom')} aria-pressed={fw === 'custom'} className={cardClass(fw === 'custom')}>
+                    <span className="block text-sm font-semibold text-stone-900">Custom .bin</span>
+                    <span className="mt-1 block text-xs text-stone-600">Upload file</span>
+                  </button>
                 </fieldset>
               </details>
             </div>
@@ -1487,9 +1487,7 @@ export default function FlashTools() {
           )}
         </div>
         <p className="mt-12 text-sm/6 text-stone-600">
-          Browser flasher originally built by{' '}
-          <a href="https://github.com/daveallie" target="_blank" rel="noopener" className="underline underline-offset-2">daveallie</a>.
-          {' '}<Link to="/debug" className="text-brand-700 underline underline-offset-2">Advanced flash controls</Link>
+          <Link to="/debug" className="text-brand-700 underline underline-offset-2">Advanced flash controls</Link>
         </p>
       </div>
     </section>
