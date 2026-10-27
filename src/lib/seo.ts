@@ -82,7 +82,7 @@ const PAGES: Record<string, PageMeta> = {
   },
   '/accessories': {
     title: 'Accessories',
-    description: 'Recommended cases, cables, storage, and other gear that pairs well with CrossPoint readers.',
+    description: 'Ready-made accessories and 3D-printable designs for CrossPoint readers, including cases, cables, docks, and other gear.',
   },
   '/devices': {
     title: 'Devices',

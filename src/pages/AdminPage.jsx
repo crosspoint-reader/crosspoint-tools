@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import { Button, Eyebrow } from '../components/ui.jsx'
 import { readJsonResponse, describeFailure, formatMB, inputCls, inputClsXs } from './admin/api.js'
+import { getAccessoryType } from '../lib/accessories.ts'
 
 const STORAGE_KEY = 'crosspoint-admin-secret'
 
@@ -403,6 +404,7 @@ function AccessoriesCard({ secret, log }) {
   const [link, setLink] = useState('')
   const [comingSoon, setComingSoon] = useState(false)
   const [category, setCategory] = useState('accessory')
+  const [accessoryType, setAccessoryType] = useState('ready-made')
   const [image, setImage] = useState(null)
   const [busy, setBusy] = useState(false)
   const [items, setItems] = useState([])
@@ -437,6 +439,7 @@ function AccessoriesCard({ secret, log }) {
       formData.append('link', link.trim())
       formData.append('comingSoon', String(comingSoon))
       formData.append('category', category)
+      if (category === 'accessory') formData.append('accessoryType', accessoryType)
       if (image) formData.append('image', image)
 
       const res = await fetch('/api/accessories', {
@@ -452,6 +455,7 @@ function AccessoriesCard({ secret, log }) {
         setDescription('')
         setLink('')
         setComingSoon(false)
+        setAccessoryType('ready-made')
         setImage(null)
         if (imageInputRef.current) imageInputRef.current.value = ''
         loadAccessories()
@@ -523,6 +527,7 @@ function AccessoriesCard({ secret, log }) {
           link: a.link || '',
           comingSoon: !!a.comingSoon,
           category: a.category || 'accessory',
+          accessoryType: getAccessoryType(a),
           image: null,
         }
       }
@@ -545,6 +550,7 @@ function AccessoriesCard({ secret, log }) {
       formData.append('link', edit.link.trim())
       formData.append('comingSoon', String(edit.comingSoon))
       formData.append('category', edit.category)
+      if (edit.category === 'accessory') formData.append('accessoryType', edit.accessoryType)
       if (edit.image) formData.append('image', edit.image)
 
       const res = await fetch('/api/accessories/' + id, {
@@ -601,6 +607,7 @@ function AccessoriesCard({ secret, log }) {
           className={inputCls}
         />
         <select
+          aria-label="Shop category"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           className={inputCls}
@@ -608,6 +615,15 @@ function AccessoriesCard({ secret, log }) {
           <option value="accessory">Accessory</option>
           <option value="device">Device</option>
         </select>
+        {category === 'accessory' && (
+          <label className="block text-sm text-stone-700">
+            Accessory type
+            <select value={accessoryType} onChange={(e) => setAccessoryType(e.target.value)} className={`${inputCls} mt-1`}>
+              <option value="ready-made">Ready-made product</option>
+              <option value="3d-print">3D print files</option>
+            </select>
+          </label>
+        )}
         <input
           type="url"
           value={link}
@@ -677,7 +693,7 @@ function AccessoriesCard({ secret, log }) {
                               : 'bg-stone-100 text-stone-500'
                           }`}
                         >
-                          {a.category === 'device' ? 'device' : 'accessory'}
+                          {a.category === 'device' ? 'device' : getAccessoryType(a) === '3d-print' ? '3D print' : 'ready-made'}
                         </span>
                       </div>
                       <div className="truncate text-xs text-stone-400">
@@ -750,6 +766,7 @@ function AccessoriesCard({ secret, log }) {
                       className={inputCls}
                     />
                     <select
+                      aria-label={`Category for ${a.title}`}
                       value={edit.category}
                       onChange={(e) => setEditField(a.id, 'category', e.target.value)}
                       className={inputCls}
@@ -757,6 +774,15 @@ function AccessoriesCard({ secret, log }) {
                       <option value="accessory">Accessory</option>
                       <option value="device">Device</option>
                     </select>
+                    {edit.category === 'accessory' && (
+                      <label className="block text-sm text-stone-700">
+                        Accessory type
+                        <select value={edit.accessoryType} onChange={(e) => setEditField(a.id, 'accessoryType', e.target.value)} className={`${inputCls} mt-1`}>
+                          <option value="ready-made">Ready-made product</option>
+                          <option value="3d-print">3D print files</option>
+                        </select>
+                      </label>
+                    )}
                     <input
                       type="url"
                       value={edit.link}

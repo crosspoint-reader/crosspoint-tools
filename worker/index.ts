@@ -3,6 +3,7 @@ import { betaDevices, betaDisplayName, normalizeBetaBuildList } from './betas';
 import { PR_ARTIFACTS_MARKER, parseArtifactComment, parsePrUrl, unzipFirstBin } from './github-pr';
 import { pageMeta, SITE } from '../src/lib/seo';
 import { DEVICES } from '../src/lib/devices.ts';
+import { isAccessoryType } from '../src/lib/accessories.ts';
 import { getPrebuiltFontAssetUrl, getPrebuiltFontManifest } from './prebuilt-fonts';
 import {
   discardPendingBetaNotification,
@@ -3150,6 +3151,10 @@ async function handleAccessoryCreate(
 
   const description = formData.get('description');
   const id = `acc-${Date.now().toString(36)}`;
+  const accessoryType = formData.get('accessoryType');
+  if (accessoryType !== null && !isAccessoryType(accessoryType)) {
+    return json({ error: 'Accessory type must be ready-made or 3d-print' }, 400, headers);
+  }
   const accessory: Accessory = {
     id,
     title: title.trim(),
@@ -3157,6 +3162,7 @@ async function handleAccessoryCreate(
     description: typeof description === 'string' ? description.trim() : '',
     comingSoon: formData.get('comingSoon') === 'true',
     category: readAccessoryCategory(formData) || 'accessory',
+    ...(accessoryType ? { accessoryType } : {}),
     createdAt: new Date().toISOString(),
   };
   if (img) {
@@ -3216,6 +3222,13 @@ async function handleAccessoryUpdate(
   const category = readAccessoryCategory(formData);
   if (category) {
     accessory.category = category;
+  }
+  const accessoryType = formData.get('accessoryType');
+  if (accessoryType !== null) {
+    if (!isAccessoryType(accessoryType)) {
+      return json({ error: 'Accessory type must be ready-made or 3d-print' }, 400, headers);
+    }
+    accessory.accessoryType = accessoryType;
   }
 
   const img = readAccessoryImage(formData);

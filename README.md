@@ -71,6 +71,10 @@ Editing an entry can update its title, version, notes, and device visibility. It
 
 When the Instatus variables in `wrangler.jsonc` and the `INSTATUS_API_KEY` Worker secret are configured, beta changes are mirrored to the persistent X3 and X4 Beta components. Creating a beta or replacing its binary also sends a subscriber notification containing the beta notes as its changelog; metadata-only edits and deletions update the component descriptions without sending an alert.
 
+## Shop catalog
+
+Accessories appear in two sections on `/accessories`: ready-made products first, then 3D print files. Set the accessory type when adding or editing an item in the admin. Existing model links from MakerWorld, MakerOnline, and Printables appear as 3D prints until an explicit type is saved. Search covers both sections, and each section keeps the admin ordering.
+
 ## Flashing
 
 The guided installer is at `/install`, linked from the homepage and header. It recommends the latest compatible stable release, shows nightly, beta, and factory firmware below stable, reserves Advanced options for custom uploads, and links Xteink users to model-specific alternatives when their reader is not listed. Existing `/#flash-tools` and `/sticky` links redirect to the installer.
