@@ -5,7 +5,6 @@ import PressQuotes from './home/PressQuotes.jsx'
 import Features from './home/Features.jsx'
 import Rhythm from './home/Rhythm.jsx'
 import Community from './home/Community.jsx'
-import GetInTouch from './home/GetInTouch.jsx'
 
 export default function HomePage() {
   return (
@@ -16,7 +15,6 @@ export default function HomePage() {
       <Features />
       <Rhythm />
       <Community />
-      <GetInTouch />
     </Layout>
   )
 }

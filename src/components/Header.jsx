@@ -5,17 +5,6 @@ import { Link, NavLink } from 'react-router-dom'
 // Items with `items` render as a dropdown on desktop and a group on mobile.
 const NAV = [
   { name: 'Install', short: 'Install', href: '/install', route: true },
-  { name: 'Font Builder', short: 'Fonts', href: '/fonts', route: true },
-  {
-    name: 'Resources',
-    short: 'Resources',
-    items: [
-      { name: 'Blog', href: '/blog', route: true },
-      { name: 'Docs', href: '/docs', route: true },
-      { name: 'Device Comparison', href: '/device-comparison', route: true },
-      { name: 'Roadmap', href: '/roadmap', route: true },
-    ],
-  },
   {
     name: 'Shop',
     short: 'Shop',
@@ -24,8 +13,19 @@ const NAV = [
       { name: 'Accessories', href: '/accessories', route: true },
     ],
   },
-  { name: 'Get In Touch', short: 'Contact', href: '/contact', route: true },
+  {
+    name: 'Resources',
+    short: 'Resources',
+    items: [
+      { name: 'Docs', href: '/docs', route: true },
+      { name: 'Blog', href: '/blog', route: true },
+      { name: 'Device Comparison', href: '/device-comparison', route: true },
+      { name: 'Roadmap', href: '/roadmap', route: true },
+    ],
+  },
+  { name: 'Font Builder', short: 'Fonts', href: '/fonts', route: true },
   { name: 'CrossPoint Sync', short: 'Sync', href: 'https://sync.crosspointreader.com' },
+  { name: 'Get In Touch', short: 'Contact', href: '/contact', route: true },
 ]
 
 const FUND_URL = 'https://app.royalty.dev/crosspoint-reader/crosspoint-reader'
@@ -174,7 +174,6 @@ export default function Header() {
       {open && (
         <div className="border-t border-stone-200 lg:hidden">
           <div className="space-y-1 px-4 py-4">
-            <FundButton className="mb-3 flex w-full" onClick={() => setOpen(false)} />
             {NAV.map((item) => {
               const cls =
                 'block rounded-md px-3 py-2.5 text-base font-medium text-stone-700 hover:bg-stone-100'
@@ -207,6 +206,7 @@ export default function Header() {
                 </a>
               )
             })}
+            <FundButton className="mt-3 flex w-full" onClick={() => setOpen(false)} />
           </div>
         </div>
       )}
