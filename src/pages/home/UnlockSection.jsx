@@ -77,8 +77,8 @@ export default function UnlockSection() {
             .
           </p>}
           {(!device || device.id === 'x4pro') && <p className="mt-3 text-sm/6 text-pretty text-stone-600">
-            <strong className="font-medium text-stone-900">Xteink X4 Pro?</strong> There&rsquo;s no
-            known way to SD flash it — you must use the{' '}
+            <strong className="font-medium text-stone-900">Xteink X4 Pro?</strong> Update to the
+            latest Licorice OS from Xteink to enable SD flashing. Otherwise, use the{' '}
             <Link
               to={unlockerPath}
               className="font-medium text-brand-600 underline decoration-brand-300 underline-offset-4 hover:text-brand-700 hover:decoration-brand-500"

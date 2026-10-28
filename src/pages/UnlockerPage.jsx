@@ -66,11 +66,11 @@ export default function UnlockerPage() {
           . Only reach for the Unlocker if your firmware won't flash from the SD card.
         </div>}
 
-        {/* X4 Pro: no SD flash path exists — Unlocker is the only route */}
+        {/* X4 Pro: SD flashing needs the latest Licorice OS; otherwise the Unlocker */}
         {(!device || device.id === 'x4pro') && <div className="my-6 rounded-lg border border-stone-300 bg-stone-50 px-4 py-3 text-sm/6 text-stone-700">
-          <span className="font-semibold">Xteink X4 Pro:</span> there's no known way to flash the X4
-          Pro from an SD card. The Unlocker is the only supported route — it packages firmware into
-          the encrypted OTA format the X4 Pro requires and installs it over the air.
+          <span className="font-semibold">Xteink X4 Pro:</span> update to the latest Licorice OS from
+          Xteink to enable SD card flashing. On older firmware, use the Unlocker — it packages
+          firmware into the encrypted OTA format the X4 Pro requires and installs it over the air.
         </div>}
 
         {/* How it works */}

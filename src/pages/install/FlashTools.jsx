@@ -293,7 +293,7 @@ const APP_ONLY_INSTALLS = {
   picco: {
     name: 'BOOX Picco',
     bootMode:
-      'Press and hold the Power button and Volume Up (+) together for more than 10 seconds to boot into serial flash mode.',
+      'Press and hold the Power button and Volume Up (+) together for more than 10 seconds to boot into serial flash mode. You don\u2019t need to do this if the device is already running CrossPoint.',
     after: 'Press and hold the Power button to restart the device.',
   },
 }
