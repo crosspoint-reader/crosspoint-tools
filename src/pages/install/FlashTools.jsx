@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Eyebrow } from '../../components/ui.jsx'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   CrossPointFlasher,
   CROSSPOINT_PARTITION_TABLE,
@@ -54,7 +54,7 @@ function StepBadge({ n, active }) {
   return (
     <span
       className={`flex size-7 shrink-0 items-center justify-center rounded-full font-mono text-xs font-semibold ${
-        active ? 'bg-brand-500 text-white' : 'bg-stone-200 text-stone-500'
+        active ? 'bg-brand-600 text-white' : 'bg-stone-200 text-stone-700'
       }`}
     >
       {n}
@@ -64,19 +64,18 @@ function StepBadge({ n, active }) {
 
 function cardClass(active) {
   return active
-    ? 'group relative rounded-xl border-2 border-brand-500 bg-brand-50/40 p-4 text-left'
-    : 'group relative rounded-xl border border-stone-200 bg-white p-4 text-left hover:border-stone-300'
+    ? 'group relative rounded-xl border-2 border-brand-600 bg-brand-50/40 p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600'
+    : 'group relative rounded-xl border-2 border-stone-200 bg-white p-4 text-left hover:border-stone-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600'
 }
 
-// Firmware-picker card holding a dropdown of related options (stock languages,
-// beta builds) instead of one card per option. Selecting an entry picks that
-// firmware the same way clicking a plain card does.
+// Group factory firmware languages into one labeled control.
 function DropdownCard({ active, title, sub, subClass, value, options, onSelect }) {
   return (
     <div className={cardClass(active)}>
       <div className="text-sm font-semibold text-stone-900">{title}</div>
       <div className={`mt-0.5 font-mono text-xs ${subClass}`}>{sub}</div>
       <select
+        aria-label={title}
         value={value}
         onChange={(e) => e.target.value && onSelect(e.target.value)}
         className="mt-2 w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none"
@@ -118,7 +117,7 @@ function betaLabel(build) {
 
 const FLASH_STEP_ICONS = { pending: '○', running: '◠', done: '✓', error: '✗' }
 const FLASH_STEP_COLORS = {
-  pending: 'text-stone-400',
+  pending: 'text-stone-500',
   running: 'text-stone-900',
   done: 'text-brand-500',
   error: 'text-red-600',
@@ -126,7 +125,7 @@ const FLASH_STEP_COLORS = {
 
 function StepsList({ steps, states, percent }) {
   return (
-    <ul role="list" className="mt-4 divide-y divide-stone-100">
+    <ul role="list" aria-label="Installation progress" aria-live="polite" className="mt-4 divide-y divide-stone-100">
       {steps.map((name, i) => {
         const st = states[i] || 'pending'
         const spin = st === 'running' ? 'animate-spin' : ''
@@ -139,9 +138,15 @@ function StepsList({ steps, states, percent }) {
               {FLASH_STEP_ICONS[st]}
             </span>
             <span className={showBar ? '' : 'flex-1'}>{name}</span>
+            <span className="sr-only">{st}</span>
             {showBar && (
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-stone-200">
                 <div
+                  role="progressbar"
+                  aria-label={name}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(percent)}
                   className="h-full rounded-full bg-brand-500 transition-all duration-200"
                   style={{ width: `${percent.toFixed(1)}%` }}
                 />
@@ -156,10 +161,8 @@ function StepsList({ steps, states, percent }) {
 
 // ---------- main component ----------
 
-const MODELS = DEVICES.map((d) => ({ ...d, res: `${d.width} × ${d.height}` }))
+const MODELS = DEVICES
 
-// Vendor favicon shown next to each device name in the picker, grouped by
-// brand family (assets under public/brands/).
 const MODEL_BRANDS = {
   x4: '/brands/xteink.png',
   x4pro: '/brands/xteink.png',
@@ -290,7 +293,7 @@ const APP_ONLY_INSTALLS = {
   picco: {
     name: 'BOOX Picco',
     bootMode:
-      'Press and hold the Power button and Volume Up (+) together for more than 10 seconds to boot into serial flash mode.',
+      'Press and hold the Power button and Volume Up (+) together for more than 10 seconds to boot into serial flash mode. You don\u2019t need to do this if the device is already running CrossPoint.',
     after: 'Press and hold the Power button to restart the device.',
   },
 }
@@ -325,15 +328,17 @@ const DEVICE_PORT_FILTERS = [
 ]
 
 export default function FlashTools() {
-  const serialSupported = useMemo(() => typeof navigator !== 'undefined' && 'serial' in navigator, [])
-
-  const [model, setModel] = useState(null)
+  const serialSupported = useMemo(() => typeof navigator !== 'undefined' && typeof navigator.serial?.requestPort === 'function', [])
+  const [searchParams] = useSearchParams()
+  const [model, setModel] = useState(() => {
+    const requested = searchParams.get('device')
+    return MODELS.some((m) => m.id === requested) ? requested : null
+  })
   const [fw, setFw] = useState(null)
   const [running, setRunning] = useState(false)
   const [customFile, setCustomFile] = useState(null)
 
   // Firmware version info (per selected device model)
-  const [crosspoint, setCrosspoint] = useState({ text: 'Loading...', enabled: false, tag: null, notesUrl: null })
   const [nightly, setNightly] = useState({ text: 'Loading...', enabled: false, version: null })
   const [stock, setStock] = useState({
     en: { text: 'Loading...', enabled: false },
@@ -346,6 +351,7 @@ export default function FlashTools() {
   // Per-device visibility for the fixed release buttons on x3/x4.
   // { hidden: { crosspoint: ['x3'], ... } }
   const [releaseVisibility, setReleaseVisibility] = useState({ hidden: {} })
+  const [visibilityLoading, setVisibilityLoading] = useState(true)
 
   // Release-candidate channel (latest GitHub prerelease, admin-gated).
   // { enabled, release: { tag, version, publishedAt, notesUrl, assets } }
@@ -355,70 +361,54 @@ export default function FlashTools() {
   // x4pro) — each device can carry several beta builds at once.
   const [deviceBuilds, setDeviceBuilds] = useState([])
 
-  // Stable release publish date, shown on the Xteink cards (both flash the
-  // same release build).
-  const [releaseDate, setReleaseDate] = useState(null)
-
   // Full stable release metadata. 1.6.0+ releases ship one asset per device
   // family, so `assets: [{ name, size, devices }]` tells us which devices the
   // stable channel covers (now including x4pro/sticky/papermono).
   const [releaseMeta, setReleaseMeta] = useState(null)
+  const [releaseLoading, setReleaseLoading] = useState(true)
+  const [releaseError, setReleaseError] = useState(false)
+  const [releaseRetry, setReleaseRetry] = useState(0)
+  const [connectionIssue, setConnectionIssue] = useState(null)
+  const [confirmed, setConfirmed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
+    setReleaseLoading(true)
+    setReleaseError(false)
     fetchReleaseMeta()
       .then((meta) => {
-        if (cancelled || !meta) return
+        if (cancelled) return
         setReleaseMeta(meta)
-        if (meta.publishedAt) setReleaseDate(meta.publishedAt)
+        setReleaseError(!meta)
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled) setReleaseError(true)
+      })
+      .finally(() => {
+        if (!cancelled) setReleaseLoading(false)
+      })
     return () => {
       cancelled = true
     }
-  }, [])
-
-  // Devices the latest successful nightly built for (buildMeta.devices).
-  const [nightlyDevices, setNightlyDevices] = useState([])
-  const [nightlyDate, setNightlyDate] = useState(null)
-
-  useEffect(() => {
-    let cancelled = false
-    fetchBuildMeta()
-      .then((m) => {
-        if (!cancelled && m?.status === 'success') {
-          setNightlyDevices(m.devices || [])
-          setNightlyDate(m.buildDate || null)
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  }, [releaseRetry])
 
   const stableCoversDevice = (id) =>
     (releaseMeta?.assets || []).some((a) => (a.devices || []).includes(id))
 
-  // Uploaded build per non-Xteink device; their cards stay hidden from the
-  // device grid until one exists (or an RC asset covers the device), and show
-  // the build's upload date.
-  const [deviceAvailability, setDeviceAvailability] = useState({})
+  const stableAvailable = !!releaseMeta && !releaseLoading && !releaseError && !visibilityLoading &&
+    (stableCoversDevice(model) || (!releaseMeta.assets?.length && ['x3', 'x4'].includes(model))) &&
+    !(releaseVisibility.hidden?.crosspoint || []).includes(model)
+  const crosspoint = {
+    enabled: stableAvailable,
+    tag: releaseMeta?.tag,
+    notesUrl: releaseMeta?.htmlUrl,
+    text: releaseMeta ? `${releaseMeta.tag} - ${fmtDate(releaseMeta.publishedAt)}` : 'Release information unavailable',
+  }
 
   useEffect(() => {
-    let cancelled = false
-    DEVICE_BUILD_MODELS.forEach((id) => {
-      fetchDeviceBuildList(id)
-        .then((builds) => {
-          const latest = builds[builds.length - 1]
-          if (!cancelled && latest) setDeviceAvailability((a) => ({ ...a, [id]: latest }))
-        })
-        .catch(() => {})
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    if (!model) return
+    setFw((current) => stableAvailable ? (current || 'crosspoint') : (current === 'crosspoint' ? null : current))
+  }, [model, stableAvailable])
 
   // Nightly changelog + AI summary
   const [changelog, setChangelog] = useState({ status: 'idle', commits: [] })
@@ -443,6 +433,9 @@ export default function FlashTools() {
         if (!cancelled && v) setReleaseVisibility(v)
       })
       .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setVisibilityLoading(false)
+      })
     fetchRcInfo()
       .then((info) => {
         if (!cancelled && info) setRc(info)
@@ -482,31 +475,14 @@ export default function FlashTools() {
               : { text: 'No build available', enabled: false, version: null }
           )
         })
-        .catch(() => {})
-      // Stable release info for the devices the 1.6.0+ releases cover
-      // (x4pro/x4c/sticky/papermono/metalio/eego_a4/picco ship their own release asset).
-      setCrosspoint({ text: 'Loading...', enabled: false, tag: null, notesUrl: null })
-      fetchReleaseMeta()
-        .then((meta) => {
-          if (cancelled) return
-          const covered = (meta?.assets || []).some((a) => (a.devices || []).includes(model))
-          setCrosspoint(
-            covered
-              ? {
-                  text: `${meta.tag} - ${fmtDate(meta.publishedAt)}`,
-                  enabled: true,
-                  tag: meta.tag,
-                  notesUrl: meta.htmlUrl || null,
-                }
-              : { text: 'Unavailable', enabled: false, tag: null, notesUrl: null }
-          )
+        .catch(() => {
+          if (!cancelled) setNightly({ text: 'No build available', enabled: false, version: null })
         })
-        .catch(() => {})
       // The X4 Pro / X4C also offer official stock firmware alongside
       // the admin-uploaded build; there is no Chinese variant.
       if (XTEINK_PRO_MODELS.has(model)) {
         setStock({ en: { text: 'Loading...', enabled: false }, ch: { text: 'Unavailable', enabled: false } })
-        fetchStockFirmwareInfo(model, 'en').then((info) => {
+        fetchStockFirmwareInfo(model, 'en').catch(() => null).then((info) => {
           if (cancelled) return
           setStock((s) => ({
             ...s,
@@ -518,23 +494,11 @@ export default function FlashTools() {
         cancelled = true
       }
     }
-    setCrosspoint({ text: 'Loading...', enabled: false, tag: null, notesUrl: null })
     setNightly({ text: 'Loading...', enabled: false, version: null })
     setStock({ en: { text: 'Loading...', enabled: false }, ch: { text: 'Loading...', enabled: false } })
     ;(async () => {
-      const [meta, buildMeta] = await Promise.all([fetchReleaseMeta(), fetchBuildMeta()])
+      const buildMeta = await fetchBuildMeta().catch(() => null)
       if (cancelled) return
-      if (meta) {
-        setCrosspoint({
-          text: `${meta.tag} - ${fmtDate(meta.publishedAt)}`,
-          enabled: true,
-          tag: meta.tag,
-          notesUrl: meta.htmlUrl || null,
-        })
-      } else {
-        setCrosspoint({ text: 'Failed to load', enabled: false, tag: null, notesUrl: null })
-      }
-
       if (buildMeta && buildMeta.status === 'success') {
         setNightly({
           text: `${buildMeta.version} - ${fmtDate(buildMeta.buildDate)}`,
@@ -546,7 +510,7 @@ export default function FlashTools() {
       }
 
       for (const lang of ['en', 'ch']) {
-        const info = await fetchStockFirmwareInfo(model, lang)
+        const info = await fetchStockFirmwareInfo(model, lang).catch(() => null)
         if (cancelled) return
         setStock((s) => ({
           ...s,
@@ -601,14 +565,23 @@ export default function FlashTools() {
   }, [progress?.title, running])
 
   function selectModel(id) {
-    if (running) return
+    if (running || model === id) return
     setModel(id)
-    setFw(null) // reset firmware selection when device changes
+    setFw(null)
+    setProgress(null)
+    setRestart(null)
+    setConnectionIssue(null)
+    setConfirmed(false)
+    setCustomFile(null)
   }
 
   function selectFw(id) {
     if (running) return
     setFw(id)
+    setProgress(null)
+    setRestart(null)
+    setConnectionIssue(null)
+    setConfirmed(false)
   }
 
   function firmwareAnalyticsDetails(action) {
@@ -638,7 +611,12 @@ export default function FlashTools() {
 
   // --- Flash actions ---
   async function runFlash(action) {
-    if (running) return
+    if (running || !serialSupported) return
+    setRunning(true)
+    setProgress(null)
+    setRestart(null)
+    setConnectionIssue(null)
+    setConfirmed(false)
 
     const install = DEVICE_INSTALLS[model]
     const appOnly = APP_ONLY_INSTALLS[model]
@@ -653,7 +631,13 @@ export default function FlashTools() {
     try {
       serialPort = await CrossPointFlasher.requestPort(install || appOnly ? DEVICE_PORT_FILTERS : undefined)
     } catch (err) {
-      if (err.name !== 'NotFoundError') alert(err.message)
+      setConnectionIssue({
+        message: err.name === 'NotFoundError'
+          ? 'No reader was selected. If your reader was not listed, try the checks below.'
+          : 'We could not open the USB connection. Close other apps or browser tabs using your reader, then try again.',
+        detail: err.name === 'NotFoundError' ? null : err.message,
+      })
+      setRunning(false)
       return
     }
 
@@ -770,12 +754,7 @@ export default function FlashTools() {
         ...p,
         status: {
           kind: 'ok',
-          text:
-            XTEINK_PRO_MODELS.has(model)
-              ? 'Flash complete! Unplug and reconnect the USB cable, then press and hold the power button to boot.'
-              : skipReset
-                ? 'Flash complete! Unplug and replug the USB cable to restart your device.'
-                : 'Flash complete! Your device will restart with the new firmware.',
+          text: 'Firmware installed. Follow the restart steps below.',
         },
       }))
     } catch (err) {
@@ -848,7 +827,7 @@ export default function FlashTools() {
 
       trackFirmwareFlash(analyticsDetails)
 
-      setProgress((p) => ({ ...p, status: { kind: 'ok', text: `Flash complete! ${appOnly.after}` } }))
+      setProgress((p) => ({ ...p, status: { kind: 'ok', text: 'Firmware installed. Follow the restart steps below.' } }))
     } catch (err) {
       setProgress((p) => ({ ...p, status: { kind: 'err', text: err.message } }))
     }
@@ -939,7 +918,7 @@ export default function FlashTools() {
 
       trackFirmwareFlash(analyticsDetails)
 
-      setProgress((p) => ({ ...p, status: { kind: 'ok', text: `Installed! ${install.after}` } }))
+      setProgress((p) => ({ ...p, status: { kind: 'ok', text: 'Firmware installed. Follow the restart steps below.' } }))
     } catch (err) {
       setProgress((p) => ({ ...p, status: { kind: 'err', text: err.message } }))
     }
@@ -957,10 +936,6 @@ export default function FlashTools() {
   // on and the device isn't individually hidden. The worker maps prerelease
   // assets to device ids by filename prefix.
   const rcHidden = (id) => (rc.hiddenDevices || []).includes(id)
-  const rcCoversDevice = (id) =>
-    rc.enabled && rc.release && !rcHidden(id)
-      ? rc.release.assets.some((a) => a.devices.includes(id))
-      : false
   const rcAsset =
     rc.enabled && rc.release && !rcHidden(model)
       ? rc.release.assets.find((a) => a.devices.includes(model)) || null
@@ -971,35 +946,40 @@ export default function FlashTools() {
     ? deviceBuilds.find((b) => `device-${b.id}` === fw)
     : null
 
+  const showNightly = !visibilityLoading && !isReleaseHidden('nightly') &&
+    (!DEVICE_BUILD_MODELS.includes(model) || nightly.enabled)
+  const hasFactoryFirmware = XTEINK_PRO_MODELS.has(model) ||
+    (!DEVICE_BUILD_MODELS.includes(model) && (!isReleaseHidden('stock-en') || !isReleaseHidden('stock-ch')))
+  const testBuilds = [
+    showNightly && { id: 'nightly', title: 'CrossPoint Nightly', channel: 'Nightly', available: nightly.enabled },
+    rcAsset && { id: 'rc', title: `CrossPoint ${rc.release.tag}`, channel: 'Release candidate', available: true },
+    ...(DEVICE_BUILD_MODELS.includes(model)
+      ? deviceBuilds.slice().reverse().map((b) => ({ id: `device-${b.id}`, title: b.name, channel: 'Beta', available: true }))
+      : visibleBetas.map((b) => ({ id: `beta-${b.id}`, title: betaLabel(b), channel: 'Beta', available: true }))),
+  ].filter(Boolean)
+
   return (
-    <section id="flash-tools" className="relative scroll-mt-20 border-t border-stone-200 py-16 sm:py-20">
+    <section id="flash-tools" className="relative py-12 sm:py-16">
       <div className="mx-auto max-w-3xl px-6">
-        <Eyebrow>get CrossPoint</Eyebrow>
-        <h2 className="mt-2 max-w-[30ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
-          Flash from your browser.
-        </h2>
-        <p className="mt-6 max-w-[58ch] font-serif text-xl/9 text-pretty text-stone-600">
-          Flash <strong className="font-medium text-stone-900">right from your browser</strong>,
-          over USB. Works in Chrome, Edge and Firefox on desktop. Originally built by{' '}
-          <a
-            href="https://github.com/daveallie"
-            target="_blank"
-            rel="noopener"
-            className="font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700"
-          >
-            daveallie
-          </a>
-          . CrossPoint is also a foundation to build on: the project has been{' '}
-          <strong className="font-medium text-stone-900">forked over 1,000 times</strong>, with
-          community alternatives worth exploring.
+        <h1 className="font-display text-4xl font-semibold tracking-tight text-balance text-stone-900 sm:text-5xl">
+          Install CrossPoint
+        </h1>
+        <p className="mt-5 max-w-[58ch] text-lg/8 text-pretty text-stone-600">
+          A few steps to better reading. Choose your reader and we will guide you through
+          installing CrossPoint over USB.
+        </p>
+        <p className="mt-3 text-sm/6 text-stone-600">
+          New to custom firmware?{' '}
+          <Link to="/blog/custom-firmware-for-dummies" className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800">
+            Read the beginner’s guide
+          </Link>.
         </p>
 
         {/* Browser check */}
         {!serialSupported && (
           <div className="mt-8 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
-            <span className="font-semibold">Flashing unavailable.</span> The web flasher uses
-            WebSerial, which requires Chrome or Edge on desktop. You can still browse firmware
-            info and changelogs below.
+            <span className="font-semibold">Open this page in Chrome or Edge on a computer to install over USB.</span>{' '}
+            This browser cannot connect to your reader. You can still browse the installation options below.
           </div>
         )}
 
@@ -1008,49 +988,30 @@ export default function FlashTools() {
           <div>
             <div className="flex items-center gap-2.5">
               <StepBadge n={1} active={!!model} />
-              <h3 className="font-display text-sm font-semibold text-stone-900">Select your device</h3>
+              <h2 id="device-step" className="text-base font-semibold text-stone-900">Choose your device</h2>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {MODELS.filter(
-                (m) =>
-                  !DEVICE_BUILD_MODELS.includes(m.id) ||
-                  deviceAvailability[m.id] ||
-                  rcCoversDevice(m.id) ||
-                  stableCoversDevice(m.id) ||
-                  nightlyDevices.includes(m.id)
-              ).map((m) => (
+            <fieldset
+              id="device-picker"
+              aria-labelledby="device-step"
+              disabled={running}
+              className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3"
+            >
+              {MODELS.map((m) => (
                 <button
                   key={m.id}
                   type="button"
                   onClick={() => selectModel(m.id)}
-                  className={cardClass(model === m.id)}
-                  style={running ? { pointerEvents: 'none' } : undefined}
+                  aria-pressed={model === m.id}
+                  className={`${cardClass(model === m.id)} min-w-0 disabled:opacity-60`}
                 >
-                  <div className="flex items-center gap-1.5">
-                    <img src={MODEL_BRANDS[m.id]} alt="" aria-hidden="true" className={`h-4 w-auto shrink-0 object-contain ${m.id === 'eego_a4' ? '' : 'rounded-sm'}`} />
-                    <div className="text-sm font-semibold text-stone-900">{m.name}</div>
-                  </div>
-                  <div className="mt-0.5 font-mono text-xs text-stone-400">
-                    {(() => {
-                      // Cards date themselves by the newest offered RC,
-                      // nightly, uploaded build, or stable release. Resolution
-                      // is the fallback while these are still loading.
-                      const rcDate = rcCoversDevice(m.id) ? rc.release.publishedAt : null
-                      const stableDate =
-                        !DEVICE_BUILD_MODELS.includes(m.id) || stableCoversDevice(m.id) ? releaseDate : null
-                      const ownDate = DEVICE_BUILD_MODELS.includes(m.id)
-                        ? deviceAvailability[m.id]?.uploadedAt
-                        : null
-                      const nightlyBuildDate = nightlyDevices.includes(m.id) ? nightlyDate : null
-                      const date = [rcDate, stableDate, ownDate, nightlyBuildDate]
-                        .filter(Boolean)
-                        .sort((a, b) => new Date(b) - new Date(a))[0]
-                      return date ? `Updated ${fmtDate(date)}` : m.res
-                    })()}
-                  </div>
+                  <span className="flex items-center gap-1.5">
+                    <img src={MODEL_BRANDS[m.id]} alt="" className="h-4 max-w-6 shrink-0 object-contain" />
+                    <span className="min-w-0 break-words text-sm font-semibold leading-5 text-stone-900">{m.name}</span>
+                  </span>
+                  <span className="mt-1 block text-xs text-stone-600">{m.width} × {m.height}</span>
                 </button>
               ))}
-            </div>
+            </fieldset>
           </div>
 
           {/* Step 2: Firmware */}
@@ -1058,110 +1019,82 @@ export default function FlashTools() {
             <div>
               <div className="flex items-center gap-2.5">
                 <StepBadge n={2} active={!!fw} />
-                <h3 className="font-display text-sm font-semibold text-stone-900">Choose firmware</h3>
+                <h2 className="text-base font-semibold text-stone-900">Your CrossPoint release</h2>
               </div>
-              {APP_ONLY_INSTALLS[model] && (
-                <p className="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-sm/6 font-semibold text-amber-800">
-                  {APP_ONLY_INSTALLS[model].bootMode}
-                </p>
-              )}
-              {DEVICE_BUILD_MODELS.includes(model) ? (
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {stableCoversDevice(model) && (
-                    <button type="button" onClick={() => selectFw('crosspoint')} className={cardClass(fw === 'crosspoint')}>
-                      <div className="text-sm font-semibold text-stone-900">
-                        {crosspoint.tag ? `CrossPoint ${crosspoint.tag}` : 'CrossPoint'}
-                      </div>
-                      <div className="mt-0.5 font-mono text-xs text-brand-600">Stable</div>
+              <div className="mt-4" aria-live="polite">
+                {releaseLoading || visibilityLoading ? (
+                  <p className="text-sm/6 text-stone-600">Checking the latest stable release…</p>
+                ) : releaseError ? (
+                  <div className="rounded-lg bg-amber-50 p-4 text-sm/6 text-amber-900">
+                    <p>We could not load the latest release. Check your internet connection and try again.</p>
+                    <button type="button" disabled={running} onClick={() => setReleaseRetry((n) => n + 1)} className="mt-2 min-h-11 font-semibold underline underline-offset-2">
+                      Retry loading the release
                     </button>
-                  )}
-                  {rcAsset && (
-                    <button type="button" onClick={() => selectFw('rc')} className={cardClass(fw === 'rc')}>
-                      <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>
-                      <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
-                    </button>
-                  )}
-                  {nightly.enabled && (
-                    <button type="button" onClick={() => selectFw('nightly')} className={cardClass(fw === 'nightly')}>
-                      <div className="text-sm font-semibold text-stone-900">CrossPoint Nightly</div>
-                      <div className="mt-0.5 font-mono text-xs text-amber-600">Insider</div>
-                    </button>
-                  )}
-                  {deviceBuilds.slice().reverse().map((b) => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onClick={() => selectFw(`device-${b.id}`)}
-                      className={cardClass(fw === `device-${b.id}`)}
-                    >
-                      <div className="text-sm font-semibold text-stone-900">{b.name}</div>
-                      <div className="mt-0.5 font-mono text-xs text-amber-600">Beta</div>
-                    </button>
-                  ))}
+                  </div>
+                ) : stableAvailable ? (
+                  <button type="button" disabled={running} onClick={() => selectFw('crosspoint')} aria-pressed={fw === 'crosspoint'} className={`${cardClass(fw === 'crosspoint')} w-full`}>
+                    <span className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold text-stone-900">CrossPoint {crosspoint.tag}</span>
+                      <span className="text-sm font-medium text-brand-700">Stable · Recommended</span>
+                    </span>
+                    <span className="mt-1 block text-sm/6 text-stone-600">The latest stable release for {MODELS.find((m) => m.id === model)?.name}. Ready for everyday reading.</span>
+                  </button>
+                ) : (
+                  <p className="text-sm/6 text-stone-600">A stable release is currently unavailable for this reader. Other available firmware is listed below.</p>
+                )}
+              </div>
+              {(testBuilds.length > 0 || hasFactoryFirmware) && (
+                <fieldset disabled={running} className="mt-5">
+                  <legend className="text-sm font-medium text-stone-700">Other firmware</legend>
+                  <p className="mt-1 text-sm/6 text-stone-600">Try upcoming changes or restore your reader’s factory firmware.</p>
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {testBuilds.map((build) => (
+                      <button
+                        key={build.id}
+                        type="button"
+                        onClick={() => selectFw(build.id)}
+                        aria-pressed={fw === build.id}
+                        disabled={!build.available}
+                        className={`${cardClass(fw === build.id)} min-w-0 disabled:opacity-60`}
+                      >
+                        <span className="block text-sm font-semibold text-stone-900">{build.title}</span>
+                        <span className="mt-1 block text-xs text-amber-700">{build.channel}</span>
+                        {!build.available && <span className="mt-1 block text-xs text-stone-600">{nightly.text === 'Loading...' ? 'Checking availability…' : 'Currently unavailable'}</span>}
+                      </button>
+                    ))}
                   {XTEINK_PRO_MODELS.has(model) && (
-                    <button type="button" onClick={() => selectFw('stock-en')} className={cardClass(fw === 'stock-en')}>
-                      <div className="text-sm font-semibold text-stone-900">XTeink Factory Firmware</div>
-                      <div className="mt-0.5 font-mono text-xs text-stone-400">Stock English</div>
+                    <button type="button" onClick={() => selectFw('stock-en')} aria-pressed={fw === 'stock-en'} className={cardClass(fw === 'stock-en')}>
+                      <span className="block text-sm font-semibold text-stone-900">XTeink Factory Firmware</span>
+                      <span className="mt-1 block text-xs text-stone-600">Stock English</span>
                     </button>
                   )}
-                  <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
-                    <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
-                    <div className="mt-0.5 font-mono text-xs text-stone-400">Upload file</div>
-                  </button>
-                </div>
-              ) : (
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {rcAsset && (
-                  <button type="button" onClick={() => selectFw('rc')} className={cardClass(fw === 'rc')}>
-                    <div className="text-sm font-semibold text-stone-900">CrossPoint {rc.release.tag}</div>
-                    <div className="mt-0.5 font-mono text-xs text-amber-600">Release Candidate</div>
-                  </button>
-                )}
-                {!isReleaseHidden('crosspoint') && (
-                  <button type="button" onClick={() => selectFw('crosspoint')} className={cardClass(fw === 'crosspoint')}>
-                    <div className="text-sm font-semibold text-stone-900">
-                      {crosspoint.tag ? `CrossPoint ${crosspoint.tag}` : 'CrossPoint'}
-                    </div>
-                    <div className="mt-0.5 font-mono text-xs text-brand-600">Stable</div>
-                  </button>
-                )}
-                {(!isReleaseHidden('nightly') || visibleBetas.length > 0) && (
-                  <DropdownCard
-                    active={fw === 'nightly' || !!selectedBeta}
-                    title="Insider Builds & Betas"
-                    sub="Insider"
-                    subClass="text-amber-600"
-                    value={fw === 'nightly' ? 'nightly' : selectedBeta ? `beta-${selectedBeta.id}` : ''}
-                    onSelect={selectFw}
-                    options={[
-                      !isReleaseHidden('nightly') && { value: 'nightly', label: 'CrossPoint Nightly' },
-                      ...visibleBetas.map((b) => ({
-                        value: `beta-${b.id}`,
-                        label: betaLabel(b),
-                      })),
-                    ].filter(Boolean)}
-                  />
-                )}
-                {(!isReleaseHidden('stock-en') || !isReleaseHidden('stock-ch')) && (
-                  <DropdownCard
-                    active={fw === 'stock-en' || fw === 'stock-ch'}
-                    title="XTeink Factory Firmware"
-                    sub="Stock"
-                    subClass="text-stone-400"
-                    value={fw === 'stock-en' || fw === 'stock-ch' ? fw : ''}
-                    onSelect={selectFw}
-                    options={[
-                      !isReleaseHidden('stock-en') && { value: 'stock-en', label: 'Stock English' },
-                      !isReleaseHidden('stock-ch') && { value: 'stock-ch', label: 'Stock Chinese' },
-                    ].filter(Boolean)}
-                  />
-                )}
-                <button type="button" onClick={() => selectFw('custom')} className={cardClass(fw === 'custom')}>
-                  <div className="text-sm font-semibold text-stone-900">Custom .bin</div>
-                  <div className="mt-0.5 font-mono text-xs text-stone-400">Upload file</div>
-                </button>
-              </div>
+                  {!DEVICE_BUILD_MODELS.includes(model) && (!isReleaseHidden('stock-en') || !isReleaseHidden('stock-ch')) && (
+                    <DropdownCard
+                      active={fw === 'stock-en' || fw === 'stock-ch'}
+                      title="XTeink Factory Firmware"
+                      sub="Stock"
+                      subClass="text-stone-600"
+                      value={fw === 'stock-en' || fw === 'stock-ch' ? fw : ''}
+                      onSelect={selectFw}
+                      options={[
+                        !isReleaseHidden('stock-en') && { value: 'stock-en', label: 'Stock English' },
+                        !isReleaseHidden('stock-ch') && { value: 'stock-ch', label: 'Stock Chinese' },
+                      ].filter(Boolean)}
+                    />
+                  )}
+                  </div>
+                </fieldset>
               )}
+              <details key={model} className="mt-5">
+                <summary className="w-fit cursor-pointer py-2 text-sm font-medium text-stone-700 focus-visible:outline-2 focus-visible:outline-brand-600">Advanced options</summary>
+                <p className="mt-1 text-sm/6 text-stone-600">Install a firmware .bin file from your computer.</p>
+                <fieldset disabled={running} aria-label="Advanced firmware options" className="mt-4">
+                  <button type="button" onClick={() => selectFw('custom')} aria-pressed={fw === 'custom'} className={cardClass(fw === 'custom')}>
+                    <span className="block text-sm font-semibold text-stone-900">Custom .bin</span>
+                    <span className="mt-1 block text-xs text-stone-600">Upload file</span>
+                  </button>
+                </fieldset>
+              </details>
             </div>
           )}
 
@@ -1170,24 +1103,31 @@ export default function FlashTools() {
             <div>
               <div className="flex items-center gap-2.5">
                 <StepBadge n={3} active />
-                <h3 className="font-display text-sm font-semibold text-stone-900">Flash</h3>
+                <h2 className="text-base font-semibold text-stone-900">Connect and install</h2>
               </div>
+              <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm/6 text-stone-700">
+                <li>Connect your reader to this computer with a USB cable that supports data.</li>
+                {APP_ONLY_INSTALLS[model] && <li>{APP_ONLY_INSTALLS[model].bootMode}</li>}
+                {DEVICE_INSTALLS[model]?.note && <li className="font-medium">{DEVICE_INSTALLS[model].note}</li>}
+                <li>Use the button below, choose your reader in the browser’s device picker, then select Connect. Installation will start.</li>
+                <li>Keep the USB cable connected until installation finishes.</li>
+              </ol>
               <div className="mt-4">
                 <div className="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
                   {/* CrossPoint panel */}
                   {fw === 'crosspoint' && (
                     <div>
                       <div className="text-sm font-semibold text-stone-900">CrossPoint Firmware</div>
-                      <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">{crosspoint.text}</div>
-                      <div className="mt-4 flex items-center gap-3">
+                      <div className="mt-1 font-mono text-xs text-stone-600 tabular-nums">{crosspoint.text}</div>
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
                         <button
                           type="button"
                           onClick={() => runFlash('crosspoint')}
-                          disabled={running || !crosspoint.enabled}
-                          className="inline-flex items-center justify-center rounded-md bg-brand-500 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={!serialSupported || running || !crosspoint.enabled}
+                          className="inline-flex items-center justify-center rounded-md bg-brand-600 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <BoltIcon />
-                          Flash CrossPoint
+                          Install CrossPoint via USB
                         </button>
                         {crosspoint.notesUrl && (
                           <a
@@ -1199,30 +1139,8 @@ export default function FlashTools() {
                             Release Notes
                           </a>
                         )}
-                        {/* Hand-drawn annotation: reassurance at the moment of hesitation */}
-                        <div className="hidden items-center gap-1.5 sm:flex" aria-hidden="true">
-                          <svg
-                            className="w-8 shrink-0 text-stone-400"
-                            viewBox="0 0 32 20"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M30 16 C 22 18, 12 16, 4 8" />
-                            <path d="M4 8 l1 6" />
-                            <path d="M4 8 l6 0.5" />
-                          </svg>
-                          <span className="-rotate-2 font-hand text-lg/6 font-medium text-stone-500">
-                            takes about two minutes
-                          </span>
-                        </div>
+                        <span className="text-sm text-stone-600">About two minutes</span>
                       </div>
-                      <p className="mt-2 text-xs text-stone-400">
-                        If you are coming from Stock or another firmware you may need to flash
-                        twice for CrossPoint to show up.
-                      </p>
                     </div>
                   )}
 
@@ -1230,19 +1148,19 @@ export default function FlashTools() {
                   {fw === 'nightly' && (
                     <div>
                       <div className="text-sm font-semibold text-stone-900">CrossPoint Nightly</div>
-                      <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">{nightly.text}</div>
-                      <div className="mt-4 flex items-center gap-3">
+                      <div className="mt-1 font-mono text-xs text-stone-600 tabular-nums">{nightly.text}</div>
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
                         <button
                           type="button"
                           onClick={() => runFlash('nightly')}
-                          disabled={running || !nightly.enabled}
-                          className="inline-flex items-center justify-center rounded-md bg-brand-500 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={!serialSupported || running || !nightly.enabled}
+                          className="inline-flex items-center justify-center rounded-md bg-brand-600 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <BoltIcon />
                           Flash Nightly
                         </button>
                       </div>
-                      <p className="mt-2 text-xs text-stone-400">
+                      <p className="mt-2 text-xs text-stone-600">
                         Built from the latest master commit. If you are coming from Stock or
                         another firmware you may need to flash twice.
                       </p>
@@ -1252,7 +1170,7 @@ export default function FlashTools() {
                         <div className="flex items-center justify-between">
                           <div className="font-display text-sm font-semibold text-stone-700">What's in this build</div>
                           {changelog.status === 'loaded' && (
-                            <span className="font-mono text-xs text-stone-400 tabular-nums">
+                            <span className="font-mono text-xs text-stone-600 tabular-nums">
                               {changelog.commits.length} commit{changelog.commits.length !== 1 ? 's' : ''}
                             </span>
                           )}
@@ -1274,18 +1192,18 @@ export default function FlashTools() {
                                 <li key={i} className="flex gap-3 py-2.5 text-sm">
                                   <div className="min-w-0 flex-1">
                                     <div className="text-stone-800">{cleanMsg}</div>
-                                    <div className="mt-0.5 text-xs text-stone-400">{c.author}</div>
+                                    <div className="mt-0.5 text-xs text-stone-600">{c.author}</div>
                                   </div>
-                                  <span className="shrink-0 pt-0.5 text-xs text-stone-400 tabular-nums">
+                                  <span className="shrink-0 pt-0.5 text-xs text-stone-600 tabular-nums">
                                     {c.date ? relativeTime(c.date) : ''}
                                   </span>
                                 </li>
                               )
                             })
                           ) : changelog.status === 'empty' ? (
-                            <li className="py-2.5 text-sm text-stone-400">No changelog available</li>
+                            <li className="py-2.5 text-sm text-stone-600">No changelog available</li>
                           ) : (
-                            <li className="py-2.5 text-sm text-stone-400">Loading...</li>
+                            <li className="py-2.5 text-sm text-stone-600">Loading...</li>
                           )}
                         </ul>
                       </div>
@@ -1298,16 +1216,16 @@ export default function FlashTools() {
                       <div className="text-sm font-semibold text-stone-900">
                         CrossPoint {rc.release.tag} Release Candidate
                       </div>
-                      <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">
+                      <div className="mt-1 font-mono text-xs text-stone-600 tabular-nums">
                         <span className="text-amber-600">Version: {rc.release.version}</span> &middot;{' '}
                         {(rcAsset.size / 1024 / 1024).toFixed(1)} MB &middot; {fmtDate(rc.release.publishedAt)}
                       </div>
-                      <div className="mt-4 flex items-center gap-3">
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
                         <button
                           type="button"
                           onClick={() => runFlash('rc')}
-                          disabled={running}
-                          className="inline-flex items-center justify-center rounded-md bg-amber-600 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={!serialSupported || running}
+                          className="inline-flex items-center justify-center rounded-md bg-amber-700 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <BoltIcon />
                           Flash {rc.release.tag} RC
@@ -1323,7 +1241,7 @@ export default function FlashTools() {
                           </a>
                         )}
                       </div>
-                      <p className="mt-2 text-xs text-stone-400">
+                      <p className="mt-2 text-xs text-stone-600">
                         Pre-release build for testing before the stable release. If you are coming
                         from Stock or another firmware you may need to flash twice for CrossPoint
                         to show up.
@@ -1337,10 +1255,10 @@ export default function FlashTools() {
                       <div className="text-sm font-semibold text-stone-900">
                         {fw === 'stock-en' ? 'XTeink Factory Firmware (English)' : 'XTeink Factory Firmware (Chinese)'}
                       </div>
-                      <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">
+                      <div className="mt-1 font-mono text-xs text-stone-600 tabular-nums">
                         {stock[fw === 'stock-en' ? 'en' : 'ch'].text}
                       </div>
-                      <p className="mt-2 text-xs text-stone-400">
+                      <p className="mt-2 text-xs text-stone-600">
                         This is the manufacturer's factory firmware from XTeink — it is not a
                         CrossPoint release. To install CrossPoint, go back and pick a CrossPoint
                         build instead.
@@ -1348,7 +1266,7 @@ export default function FlashTools() {
                       <button
                         type="button"
                         onClick={() => runFlash(fw)}
-                        disabled={running || !stock[fw === 'stock-en' ? 'en' : 'ch'].enabled}
+                        disabled={!serialSupported || running || !stock[fw === 'stock-en' ? 'en' : 'ch'].enabled}
                         className="mt-4 inline-flex items-center justify-center rounded-md bg-stone-800 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-stone-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-800 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <BoltIcon />
@@ -1361,7 +1279,7 @@ export default function FlashTools() {
                   {selectedBeta && (
                     <div>
                       <div className="text-sm font-semibold text-stone-900">{betaTitle(selectedBeta)}</div>
-                      <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">
+                      <div className="mt-1 font-mono text-xs text-stone-600 tabular-nums">
                         {selectedBeta.version && (
                           <>
                             <span className="text-amber-600">Version: {selectedBeta.version}</span> &middot;{' '}
@@ -1383,13 +1301,13 @@ export default function FlashTools() {
                       <button
                         type="button"
                         onClick={() => runFlash(`beta-${selectedBeta.id}`)}
-                        disabled={running}
-                        className="mt-4 inline-flex items-center justify-center rounded-md bg-amber-600 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!serialSupported || running}
+                        className="mt-4 inline-flex items-center justify-center rounded-md bg-amber-700 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <BoltIcon />
                         Flash {betaLabel(selectedBeta)}
                       </button>
-                      <p className="mt-2 text-xs text-stone-400">
+                      <p className="mt-2 text-xs text-stone-600">
                         If you are coming from Stock or another firmware you may need to flash
                         twice for CrossPoint to show up.
                       </p>
@@ -1400,7 +1318,7 @@ export default function FlashTools() {
                   {selectedDeviceBuild && (
                     <div>
                       <div className="text-sm font-semibold text-stone-900">{selectedDeviceBuild.name}</div>
-                      <div className="mt-1 font-mono text-xs text-stone-400 tabular-nums">
+                      <div className="mt-1 font-mono text-xs text-stone-600 tabular-nums">
                         {(selectedDeviceBuild.firmwareSize / 1024 / 1024).toFixed(1)} MB &middot;{' '}
                         {fmtDate(selectedDeviceBuild.uploadedAt)}
                       </div>
@@ -1413,8 +1331,8 @@ export default function FlashTools() {
                       <button
                         type="button"
                         onClick={() => runFlash(`device-${selectedDeviceBuild.id}`)}
-                        disabled={running}
-                        className="mt-4 inline-flex items-center justify-center rounded-md bg-amber-600 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!serialSupported || running}
+                        className="mt-4 inline-flex items-center justify-center rounded-md bg-amber-700 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <BoltIcon />
                         Flash {selectedDeviceBuild.name}
@@ -1422,7 +1340,7 @@ export default function FlashTools() {
                       {DEVICE_INSTALLS[model]?.note && (
                         <p className="mt-3 text-sm font-semibold text-amber-700">{DEVICE_INSTALLS[model].note}</p>
                       )}
-                      <p className="mt-2 text-xs text-stone-400">
+                      <p className="mt-2 text-xs text-stone-600">
                         Beta build for the {MODELS.find((m) => m.id === model)?.name}.{' '}
                         {APP_ONLY_INSTALLS[model]
                           ? 'Flashes the app partition only.'
@@ -1437,27 +1355,29 @@ export default function FlashTools() {
                   {fw === 'custom' && (
                     <div>
                       <div className="text-sm font-semibold text-stone-900">Custom Firmware</div>
-                      <p className="mt-1 text-xs text-stone-400">
+                      <p className="mt-1 text-xs text-stone-600">
                         {APP_ONLY_INSTALLS[model]
                           ? 'Upload a firmware .bin. Flashes the app partition only; the bootloader and partition table are left untouched.'
                           : DEVICE_INSTALLS[model]
                             ? 'Upload a firmware .bin. Writes the full boot region (bootloader + partition table + firmware).'
                             : 'Upload a .bin file to flash to the OTA partition.'}
                       </p>
-                      <div className="mt-4 flex gap-2">
-                        <label className="flex flex-1 cursor-pointer items-center justify-center rounded-md border border-dashed border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
-                          <span>{customFile ? customFile.name : 'Choose file...'}</span>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <label className="flex min-w-0 flex-1 cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 items-center justify-center rounded-md border border-dashed border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
+                          <span className="break-all">{customFile ? customFile.name : 'Choose firmware file…'}</span>
                           <input
                             type="file"
+                            aria-label="Choose firmware file"
+                            disabled={running}
                             accept=".bin"
-                            className="hidden"
+                            className="sr-only"
                             onChange={(e) => setCustomFile(e.target.files[0] || null)}
                           />
                         </label>
                         <button
                           type="button"
                           onClick={() => runFlash('custom')}
-                          disabled={running || !customFile}
+                          disabled={!serialSupported || running || !customFile}
                           className="shrink-0 rounded-md bg-stone-800 py-2 pr-4 pl-3 text-sm font-semibold text-white shadow-sm hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <BoltIcon className="mr-1.5 inline size-4 shrink-0 align-text-bottom" />
@@ -1468,25 +1388,48 @@ export default function FlashTools() {
                   )}
                 </div>
               </div>
+              {connectionIssue && (
+                <div role="status" className="mt-4 rounded-lg bg-amber-50 p-4 text-sm/6 text-amber-900">
+                  <p>{connectionIssue.message}</p>
+                  {connectionIssue.detail && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer font-medium">Connection details</summary>
+                      <p className="mt-1 break-words">{connectionIssue.detail}</p>
+                    </details>
+                  )}
+                </div>
+              )}
+              <details open={!!connectionIssue} className="mt-4 text-sm/6 text-stone-700">
+                <summary className="w-fit cursor-pointer py-2 font-medium underline underline-offset-2">My device isn’t listed</summary>
+                <p className="mt-2">Check that your USB cable supports data, try another USB port, and close other flashing tools before trying again.</p>
+                {['x3', 'x4', 'x4pro', 'x4c'].includes(model) && (
+                  <p className="mt-3">
+                    Some Xteink readers have USB flashing disabled. If your reader still does not appear,{' '}
+                    <Link to={`/unlock?device=${model}`} className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800">see other ways to install CrossPoint</Link>.
+                  </p>
+                )}
+              </details>
             </div>
           )}
 
           {/* Progress Card */}
           {progress && (
             <div ref={progressRef} className="scroll-mt-20 rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
-              <h3 className="font-display text-lg font-semibold tracking-tight text-stone-900 sm:text-base/6">
-                {progress.title}
-              </h3>
+              <h2 className="text-lg font-semibold tracking-tight text-stone-900">
+                {progress.status?.kind === 'ok' ? 'Installation complete' : progress.status?.kind === 'err' ? 'Installation needs attention' : progress.title}
+              </h2>
               <StepsList steps={progress.steps} states={progress.states} percent={percent} />
               {progress.status && (
-                <div className="mt-4">
-                  {progress.status.kind === 'info' && <p className="text-sm text-stone-400">{progress.status.text}</p>}
+                <div className="mt-4" role={progress.status.kind === 'err' ? 'alert' : 'status'}>
+                  {progress.status.kind === 'info' && <p className="text-sm text-stone-600">{progress.status.text}</p>}
                   {progress.status.kind === 'ok' && (
                     <div className="rounded-lg bg-brand-50 px-4 py-3 text-sm/6 text-brand-700">{progress.status.text}</div>
                   )}
                   {progress.status.kind === 'err' && (
                     <div className="rounded-lg bg-red-50 px-4 py-3 text-sm/6 text-red-800">
-                      <p>{progress.status.text}</p>
+                      <p className="font-semibold">Installation could not finish.</p>
+                      <p className="mt-1 break-words">{progress.status.text}</p>
+                      <button type="button" disabled={!serialSupported || running} onClick={() => runFlash(fw)} className="mt-3 min-h-11 font-semibold underline underline-offset-2">Try again</button>
                       {progress.status.repairUrl ? (
                         <a
                           href={progress.status.repairUrl}
@@ -1503,27 +1446,49 @@ export default function FlashTools() {
           )}
 
           {/* Restart Instructions */}
-          {restart && (
+          {restart && progress?.status?.kind === 'ok' && (
             <div className="rounded-xl bg-stone-100/70 p-5 ring-1 ring-stone-950/5">
-              <div className="font-display text-sm font-semibold text-stone-700">After flashing</div>
+              <h2 className="text-base font-semibold text-stone-900">Restart your reader</h2>
               {restart.text ? (
                 // Non-Xteink full install: device-specific instructions from DEVICE_INSTALLS
-                <p className="mt-1 text-sm/6 text-stone-500">{restart.text}</p>
+                <p className="mt-2 text-sm/6 text-stone-700">{restart.text}</p>
               ) : restart.unplug ? (
                 // X3 + CrossPoint/beta/custom: no serial reset, device must be power-cycled by unplugging USB
-                <p className="mt-1 text-sm/6 text-stone-500">
+                <p className="mt-2 text-sm/6 text-stone-700">
                   Unplug and reconnect the USB cable. Don't press the Reset button.
                 </p>
               ) : (
                 // Default: hard reset happened on the serial side, user just needs to finish the power cycle
-                <p className="mt-1 text-sm/6 text-stone-500">
+                <p className="mt-2 text-sm/6 text-stone-700">
                   Press the <strong className="text-stone-600">Reset</strong> button, then press and hold the power
                   button for 3-5 seconds.
                 </p>
               )}
+              {fw !== 'custom' && !fw?.startsWith('stock-') && (
+                <div className="mt-4 border-t border-stone-200 pt-4">
+                  {confirmed ? (
+                    <p role="status" className="text-sm/6 text-brand-800">You’re ready to read. Welcome to CrossPoint!{' '}
+                      <Link to="/docs" className="font-medium underline underline-offset-2">See how to add books and make it yours</Link>.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm/6 text-stone-700">Wait for the CrossPoint home screen to appear on your reader.</p>
+                      <button type="button" onClick={() => setConfirmed(true)} className="mt-3 min-h-11 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">CrossPoint started</button>
+                      <details className="mt-3 text-sm/6 text-stone-700">
+                        <summary className="w-fit cursor-pointer py-2 font-medium underline underline-offset-2">Something went wrong</summary>
+                        <p className="mt-2">Try the restart steps above. If your reader returns to its previous firmware, you may need to install CrossPoint a second time.</p>
+                        <Link to="/report-issue" className="mt-2 inline-block font-medium text-brand-700 underline underline-offset-2">Get help with your installation</Link>
+                      </details>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
+        <p className="mt-12 text-sm/6 text-stone-600">
+          <Link to="/debug" className="text-brand-700 underline underline-offset-2">Advanced flash controls</Link>
+        </p>
       </div>
     </section>
   )

@@ -454,7 +454,7 @@ export default function InsiderPage() {
           <span className="font-semibold">Heads up:</span> Nightly builds are tested internally but
           may introduce regressions. Stock X3 owners should{' '}
           <Link
-            to="/#flash-tools"
+            to="/install"
             className="font-medium text-brand-600 underline underline-offset-2"
           >
             flash a release build

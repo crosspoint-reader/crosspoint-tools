@@ -1,20 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 
-// Each item carries a short label (md–xl viewports) and a full one (xl+).
+// Each item carries a short label (lg–xl viewports) and a full one (xl+).
 // Items with `items` render as a dropdown on desktop and a group on mobile.
 const NAV = [
-  { name: 'Font Builder', short: 'Fonts', href: '/fonts', route: true },
-  {
-    name: 'Resources',
-    short: 'Resources',
-    items: [
-      { name: 'Blog', href: '/blog', route: true },
-      { name: 'Docs', href: '/docs', route: true },
-      { name: 'Device Comparison', href: '/device-comparison', route: true },
-      { name: 'Roadmap', href: '/roadmap', route: true },
-    ],
-  },
+  { name: 'Install', short: 'Install', href: '/install', route: true },
   {
     name: 'Shop',
     short: 'Shop',
@@ -23,8 +13,19 @@ const NAV = [
       { name: 'Accessories', href: '/accessories', route: true },
     ],
   },
-  { name: 'Get In Touch', short: 'Contact', href: '/contact', route: true },
+  {
+    name: 'Resources',
+    short: 'Resources',
+    items: [
+      { name: 'Docs', href: '/docs', route: true },
+      { name: 'Blog', href: '/blog', route: true },
+      { name: 'Device Comparison', href: '/device-comparison', route: true },
+      { name: 'Roadmap', href: '/roadmap', route: true },
+    ],
+  },
+  { name: 'Font Builder', short: 'Fonts', href: '/fonts', route: true },
   { name: 'CrossPoint Sync', short: 'Sync', href: 'https://sync.crosspointreader.com' },
+  { name: 'Get In Touch', short: 'Contact', href: '/contact', route: true },
 ]
 
 const FUND_URL = 'https://app.royalty.dev/crosspoint-reader/crosspoint-reader'
@@ -131,37 +132,37 @@ export default function Header() {
           </span>
         </Link>
 
-        {/* Nav links: short labels from md, full labels from xl */}
-        <div className="hidden min-w-0 items-center gap-x-4 md:flex lg:gap-x-6 xl:gap-x-7">
+        {/* Nav links: short labels from lg, full labels from xl */}
+        <div className="hidden min-w-0 items-center gap-x-4 lg:flex lg:gap-x-6 xl:gap-x-7">
           {NAV.map((item) => {
             if (item.items) {
               return <NavDropdown key={item.name} item={item} />
             }
             const cls =
-              'text-sm font-medium whitespace-nowrap text-stone-600 transition hover:text-stone-900'
+              'text-sm font-medium whitespace-nowrap transition hover:text-stone-900'
             return item.route ? (
-              <Link key={item.name} to={item.href} className={cls}>
+              <NavLink key={item.name} to={item.href} className={({ isActive }) => `${cls} ${isActive ? 'font-semibold text-brand-700' : 'text-stone-600'}`}>
                 <NavLabel item={item} />
-              </Link>
+              </NavLink>
             ) : (
-              <a key={item.name} href={item.href} className={cls}>
+              <a key={item.name} href={item.href} className={`${cls} text-stone-600`}>
                 <NavLabel item={item} />
               </a>
             )
           })}
         </div>
 
-        <div className="hidden shrink-0 items-center md:flex">
+        <div className="hidden shrink-0 items-center lg:flex">
           <FundButton compact />
         </div>
 
-        <div className="flex items-center gap-x-2 md:hidden">
+        <div className="flex items-center gap-x-2 lg:hidden">
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
             aria-label="Toggle navigation menu"
             aria-expanded={open}
-            className="inline-flex size-9 items-center justify-center rounded-md text-stone-700 ring-1 ring-stone-300"
+            className="inline-flex size-11 items-center justify-center rounded-md text-stone-700 ring-1 ring-stone-300"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="size-5" aria-hidden="true">
               {open ? <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" /> : <path strokeLinecap="round" d="M4 7h16M4 12h16M4 17h16" />}
@@ -171,9 +172,8 @@ export default function Header() {
       </nav>
 
       {open && (
-        <div className="border-t border-stone-200 md:hidden">
+        <div className="border-t border-stone-200 lg:hidden">
           <div className="space-y-1 px-4 py-4">
-            <FundButton className="mb-3 flex w-full" onClick={() => setOpen(false)} />
             {NAV.map((item) => {
               const cls =
                 'block rounded-md px-3 py-2.5 text-base font-medium text-stone-700 hover:bg-stone-100'
@@ -206,6 +206,7 @@ export default function Header() {
                 </a>
               )
             })}
+            <FundButton className="mt-3 flex w-full" onClick={() => setOpen(false)} />
           </div>
         </div>
       )}

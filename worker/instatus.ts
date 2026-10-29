@@ -591,7 +591,7 @@ export async function reconcileReleaseStatusSnapshot(
         build.fingerprint,
         ids,
         `New stable release: ${build.version}`,
-        `CrossPoint ${build.version} is now available for ${labels.join(', ')}.\n\nRelease notes: https://github.com/crosspoint-reader/crosspoint-reader/releases/latest\n\nFlash it at https://crosspointreader.com/#flash-tools`
+        `CrossPoint ${build.version} is now available for ${labels.join(', ')}.\n\nRelease notes: https://github.com/crosspoint-reader/crosspoint-reader/releases/latest\n\nFlash it at https://crosspointreader.com/install`
       );
     }
   }
@@ -673,7 +673,7 @@ export async function reconcileStableStatus(
       build.fingerprint,
       ids,
       `New stable release: ${build.version}`,
-      `CrossPoint ${build.version} is now available for Xteink X3 and X4.\n\nRelease notes: https://github.com/crosspoint-reader/crosspoint-reader/releases/latest\n\nFlash it at https://crosspointreader.com/#flash-tools`
+      `CrossPoint ${build.version} is now available for Xteink X3 and X4.\n\nRelease notes: https://github.com/crosspoint-reader/crosspoint-reader/releases/latest\n\nFlash it at https://crosspointreader.com/install`
     );
   }
 }
@@ -746,7 +746,7 @@ async function deliverDeviceBuildNotification(
     [
       `${build.name} is now available for ${label}.`,
       ...(notes ? [`What's new:\n${notes}`] : []),
-      'Flash it at https://crosspointreader.com/#flash-tools',
+      'Flash it at https://crosspointreader.com/install',
     ].join('\n\n')
   );
   await env.BUILD_META.delete(pendingDeviceNotificationKey(device));

@@ -6,7 +6,7 @@ const COLUMNS = [
   {
     title: 'Firmware',
     links: [
-      { name: 'Flash from browser', href: '/#flash-tools' },
+      { name: 'Install CrossPoint', href: '/install', route: true },
       { name: 'Stable releases', href: `${GITHUB}/releases` },
       { name: 'Update Notifications', href: 'https://updates.crosspointreader.com' },
       { name: 'Roadmap', href: '/roadmap', route: true },

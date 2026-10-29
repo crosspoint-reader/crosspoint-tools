@@ -123,7 +123,13 @@ Editing an entry can update its title, version, notes, and device visibility. It
 
 When the Instatus variables in `wrangler.jsonc` and the `INSTATUS_API_KEY` Worker secret are configured, beta changes are mirrored to the persistent X3 and X4 Beta components. Creating a beta or replacing its binary also sends a subscriber notification containing the beta notes as its changelog; metadata-only edits and deletions update the component descriptions without sending an alert.
 
+## Shop catalog
+
+Accessories appear in two sections on `/accessories`: ready-made products first, then 3D print files. Set the accessory type when adding or editing an item in the admin. Existing model links from MakerWorld, MakerOnline, and Printables appear as 3D prints until an explicit type is saved. Search covers both sections, and each section keeps the admin ordering.
+
 ## Flashing
+
+The guided installer is at `/install`, linked from the homepage and header. It recommends the latest compatible stable release, shows nightly, beta, and factory firmware below stable, reserves Advanced options for custom uploads, and links Xteink users to model-specific alternatives when their reader is not listed. Existing `/#flash-tools` and `/sticky` links redirect to the installer.
 
 The browser-based flasher (`public/js/flasher.js`) uses [esptool-js](https://github.com/nicholasgasior/nicholasgasior.github.io) via WebSerial:
 
@@ -218,6 +224,8 @@ For end-to-end build testing, the worker now passes the current request origin t
 ## Acknowledgments
 
 The WebSerial flasher is based on [xteink-flasher](https://github.com/crosspoint-reader/xteink-flasher), licensed under the MIT License. The partition table handling, OTA flashing logic, and device model support were adapted from that project.
+
+Thanks to [daveallie](https://github.com/daveallie) for the original browser flasher.
 
 The SD-card font builder descends from the generator in the [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader) firmware repo (`lib/EpdFont/scripts/fontconvert_sdcard.py`). Kerning, ligature, and interval behavior now live here, so website-only font features can move without waiting on firmware-repo updates. The browser build uses [FreeType](https://freetype.org/) and [HarfBuzz](https://harfbuzz.github.io/) compiled to WebAssembly, and [fontkit](https://github.com/foliojs/fontkit) for OpenType table parsing.
 

@@ -7,41 +7,49 @@ import { Eyebrow } from '../../components/ui.jsx'
 const RELEASES = [
   {
     version: '1.0',
+    tag: '1.0.0',
     date: 'February 2026',
     blurb: 'The 1.0 milestone: the new Lyra theme and in-firmware over-the-air updates.',
   },
   {
     version: '1.1',
+    tag: '1.1.0',
     date: 'February 2026',
     blurb: 'Images in EPUBs, a web-based settings editor, the interface in eight languages, and more Lyra screens.',
   },
   {
     version: '1.2',
+    tag: '1.2.0',
     date: 'April 2026',
     blurb: 'Kerning and ligatures, footnote navigation, and an on-device EPUB optimizer.',
   },
   {
     version: '1.3',
+    tag: '1.3.0',
     date: 'May 2026',
     blurb: 'Custom fonts, tilt-to-turn page turns, Focus Reading, and an OPDS overhaul with in-catalog search.',
   },
   {
     version: '1.4',
+    tag: '1.4.0',
     date: 'June 2026',
     blurb: 'Bookmarks, right-to-left reading, Quick Resume, and live font previews.',
   },
   {
     version: '1.5',
+    tag: 'v1.5.0',
     date: 'August 2026',
     blurb: 'A built-in dictionary, faster book opening, what-to-read-next suggestions, and Arabic reading.',
   },
   {
     version: '1.6',
+    tag: '1.6.0',
     date: 'September 2026',
     blurb: 'X4 Pro and PaperMono support, Reading Night Mode, transparent sleep screens, and styled dictionary definitions.',
   },
   {
     version: '1.6.5',
+    tag: '1.6.5',
     date: 'September 2026',
     blurb: 'A Library for every book on the SD card, TrueType fonts, the Cover Grid home theme, word and character spacing, and X4 Classic support.',
   },
@@ -104,7 +112,7 @@ export default function Rhythm() {
       <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
         <Eyebrow>always getting better</Eyebrow>
         <h2 className="mt-2 max-w-[26ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
-          A new release every month.
+          Updates shaped by readers.
         </h2>
         <p className="mt-4 max-w-[56ch] text-base/7 text-pretty text-stone-600">
           Updates are free, delivered over the air, and planned in the open. Follow along on
@@ -130,13 +138,20 @@ export default function Rhythm() {
                   r.upcoming ? 'border-dashed border-brand-400 bg-brand-50' : 'border-brand-500/70 bg-white'
                 }`}
               />
-              <div className="flex items-baseline gap-x-3">
-                <span className="font-display text-2xl font-semibold text-stone-900">{r.version}</span>
-                <span className={`text-xs tracking-[0.15em] uppercase ${r.upcoming ? 'text-brand-600' : 'text-stone-400'}`}>
-                  {r.date}
-                </span>
-              </div>
-              <p className="mt-1.5 text-sm/6 text-pretty text-stone-600">{r.blurb}</p>
+              <a
+                href={`https://github.com/crosspoint-reader/crosspoint-reader/releases/tag/${r.tag}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group block rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600"
+              >
+                <div className="flex items-baseline gap-x-3">
+                  <span className="font-display text-2xl font-semibold text-stone-900 underline decoration-stone-300 underline-offset-4 group-hover:text-brand-700 group-hover:decoration-brand-600">{r.version}</span>
+                  <span className={`text-xs tracking-[0.15em] uppercase ${r.upcoming ? 'text-brand-600' : 'text-stone-400'}`}>
+                    {r.date}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-sm/6 text-pretty text-stone-600">{r.blurb}</p>
+              </a>
               {r.upcoming && (
                 <Link
                   to="/insider"

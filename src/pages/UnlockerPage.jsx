@@ -1,9 +1,8 @@
-// OTA Xteink Unlocker: downloads for the desktop tool that installs CrossPoint
-// over the air on locked X3/X4 devices. Port of public/unlocker.html — same
-// copy and download links, restyled in the Free-Ink shell.
-import { Link } from 'react-router-dom'
+// Downloads for the desktop OTA installer for Xteink readers with USB flashing disabled.
+import { Link, useSearchParams } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import { Eyebrow } from '../components/ui.jsx'
+import { DEVICES } from '../lib/devices.ts'
 
 const DOWNLOADS = [
   {
@@ -37,6 +36,9 @@ function DownloadIcon() {
 }
 
 export default function UnlockerPage() {
+  const [searchParams] = useSearchParams()
+  const device = DEVICES.find((d) => ['x3', 'x4', 'x4pro', 'x4c'].includes(d.id) && d.id === searchParams.get('device'))
+  const showSd = !device || ['x3', 'x4'].includes(device.id)
   return (
     <Layout>
       <div className="mx-auto max-w-2xl px-6 pb-20">
@@ -48,27 +50,28 @@ export default function UnlockerPage() {
           <p className="mt-3 max-w-[52ch] text-lg text-pretty text-stone-600 sm:text-base/7">
             For locked Xteink devices that won't take an SD card flash.
           </p>
+          {device && <p className="mt-3 text-sm/6 text-stone-700">Choose {device.name} in the desktop tool.</p>}
         </div>
 
         {/* Try SD flashing first */}
-        <div className="my-6 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
+        {showSd && <div className="my-6 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm/6 text-amber-900">
           <span className="font-semibold">Try SD card flashing first.</span> It's simpler and needs
           no extra software.{' '}
           <Link
-            to="/unlock"
+            to={device ? `/unlock?device=${device.id}` : '/unlock'}
             className="font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700"
           >
             See the SD flashing steps
           </Link>
           . Only reach for the Unlocker if your firmware won't flash from the SD card.
-        </div>
+        </div>}
 
-        {/* X4 Pro: no SD flash path exists — Unlocker is the only route */}
-        <div className="my-6 rounded-lg border border-stone-300 bg-stone-50 px-4 py-3 text-sm/6 text-stone-700">
-          <span className="font-semibold">Xteink X4 Pro:</span> there's no known way to flash the X4
-          Pro from an SD card. The Unlocker is the only supported route — it packages firmware into
-          the encrypted OTA format the X4 Pro requires and installs it over the air.
-        </div>
+        {/* X4 Pro: SD flashing needs the latest Licorice OS; otherwise the Unlocker */}
+        {(!device || device.id === 'x4pro') && <div className="my-6 rounded-lg border border-stone-300 bg-stone-50 px-4 py-3 text-sm/6 text-stone-700">
+          <span className="font-semibold">Xteink X4 Pro:</span> update to the latest Licorice OS from
+          Xteink to enable SD card flashing. On older firmware, use the Unlocker — it packages
+          firmware into the encrypted OTA format the X4 Pro requires and installs it over the air.
+        </div>}
 
         {/* How it works */}
         <div className="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
@@ -76,8 +79,8 @@ export default function UnlockerPage() {
             How it works
           </h2>
           <p className="mt-2 text-sm/6 text-pretty text-stone-600">
-            International Xteink devices (including those from AliExpress) ship with USB flashing
-            disabled. Xteink Unlocker turns your computer into a local hotspot that intercepts the
+            Some Xteink readers ship with USB flashing disabled. Xteink Unlocker turns your
+            computer into a local hotspot that intercepts the
             device's official update channel and serves CrossPoint or Crossink instead of the stock
             firmware, installing community firmware entirely over the air. It does not unlock your
             USB flashing capabilities, but it does allow flashing of custom firmware.

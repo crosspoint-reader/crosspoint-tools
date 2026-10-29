@@ -4,11 +4,13 @@ export default function AccessoriesPage() {
   return (
     <ShopGridPage
       category="accessory"
-      eyebrow="Gear we actually use"
       title="Accessories"
-      intro="Recommended products for your device — cases, cables, storage, and other gear that pairs well with CrossPoint readers."
+      intro="Every item listed here has been used by the CrossPoint team."
       emptyText="No accessories listed yet. Check back soon."
-      ctaLabel="Get It Here"
+      sections={[
+        { type: 'ready-made', title: 'Accessories', ctaLabel: 'Buy accessory' },
+        { type: '3d-print', title: '3D prints', description: 'Design files for cases, docks, and other accessories. Requires a 3D printer or printing service.', ctaLabel: 'View print files' },
+      ]}
     />
   )
 }

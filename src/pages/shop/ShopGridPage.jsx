@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout.jsx'
 import { Eyebrow } from '../../components/ui.jsx'
+import { getAccessoryType } from '../../lib/accessories.ts'
 
 export function accessoryImageUrl(a) {
   return a.imageUpdatedAt
@@ -133,6 +134,7 @@ export default function ShopGridPage({
   emptyText,
   showSearch = true,
   ctaLabel = 'Buy Now',
+  sections,
 }) {
   const items = useShopItems(category)
   const [query, setQuery] = useState('')
@@ -148,7 +150,7 @@ export default function ShopGridPage({
     <Layout>
       <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8 lg:py-20">
         <div className="max-w-2xl">
-          <Eyebrow>{eyebrow}</Eyebrow>
+          {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
           <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
             {title}
           </h1>
@@ -173,6 +175,26 @@ export default function ShopGridPage({
 
         {items === null ? (
           <p className="mt-10 text-sm text-stone-400">Loading...</p>
+        ) : filtered.length > 0 && sections ? (
+          <div className="mt-10 space-y-12">
+            {sections.map((section) => {
+              const sectionItems = filtered.filter((a) => getAccessoryType(a) === section.type)
+              if (sectionItems.length === 0) return null
+              return (
+                <section key={section.type} aria-labelledby={`accessories-${section.type}`}>
+                  <h2 id={`accessories-${section.type}`} className="font-display text-2xl font-semibold tracking-tight text-stone-900">{section.title}</h2>
+                  {section.description && <p className="mt-2 max-w-2xl text-sm/6 text-stone-600">{section.description}</p>}
+                  <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {sectionItems.map((a) => (
+                      <ProductCard key={a.id} item={a} ctaLabel={section.ctaLabel}>
+                        {section.type === '3d-print' && <span className="mt-2 text-xs font-medium text-stone-700">Requires 3D printing</span>}
+                      </ProductCard>
+                    ))}
+                  </div>
+                </section>
+              )
+            })}
+          </div>
         ) : filtered.length > 0 ? (
           <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filtered.map((a) => (

@@ -1,3 +1,5 @@
+import type { AccessoryType } from '../src/lib/accessories.ts';
+
 // Cloudflare Email Service binding (send-only). Kept as a local interface
 // until the installed workers-types ships an official one.
 export interface EmailSendBinding {
@@ -210,6 +212,8 @@ export interface Accessory {
   // Which shop page the item appears on. Absent on legacy entries; treat
   // undefined as 'accessory'.
   category?: 'device' | 'accessory';
+  // Section within /accessories. Legacy records derive this from known model-page links.
+  accessoryType?: AccessoryType;
   createdAt: string;
   // Set when an image has been uploaded; bumped on replacement so the
   // frontend can cache-bust /api/accessories/{id}/image?v={imageUpdatedAt}.
