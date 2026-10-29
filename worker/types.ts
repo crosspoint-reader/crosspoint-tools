@@ -143,25 +143,6 @@ export interface CustomBuildMetadata {
   fontSizes?: Record<string, number[]>;   // family -> [small, medium, large, xlarge] point sizes
 }
 
-export interface FontBuildMetadata {
-  buildId: string;
-  status: 'pending' | 'building' | 'success' | 'failed';
-  uid: string;
-  family: string;
-  fallbackFamily?: string;
-  fallbackFamilies?: string[];
-  sizes: number[];
-  intervals: string;
-  styles: string[];                       // styles uploaded, e.g. ["regular","bold"]
-  fallbackStyles?: string[];              // optional fallback family uploads
-  outputs?: string[];                     // .cpfont filenames produced
-  generatorVersion?: string;              // revision of the local font generator that ran
-  log?: string;                           // tail of stderr (glyph/kern stats)
-  error?: string;
-  createdAt: string;
-  completedAt?: string;
-}
-
 export interface ThemeBuildMetadata {
   buildId: string;
   status: 'pending' | 'building' | 'success' | 'failed';

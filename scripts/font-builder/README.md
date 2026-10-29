@@ -1,4 +1,21 @@
-This directory owns the website's SD-card font generator.
+This directory owns the reference implementation of the website's SD-card font
+generator.
+
+The website itself no longer runs this script: `/fonts` converts fonts in the
+visitor's browser (`src/lib/cpfont`, a WebAssembly FreeType build). This script
+stays as the reference the browser generator is ported from and compared
+against:
+
+```bash
+pip install freetype-py fonttools
+node ../../scripts/font-builder/parity.mjs --regular SomeFont-Regular.ttf \
+  --default-fallbacks --intervals reading --sizes 14
+```
+
+`parity.mjs` runs both generators and requires byte equality everywhere except
+glyph bitmaps, which get a small documented tolerance (see the repo README).
+Any change to coverage resolution, kerning, ligatures, or the binary layout has
+to land in both implementations in the same change.
 
 `fontconvert_sdcard.py` and `cpfont_version.py` were initially copied from:
 
@@ -29,8 +46,9 @@ That same ownership split is also used when extracting kerning and ligatures, so
 fallback families only contribute data for the codepoints they actually supply.
 
 The default fallback font files live in `default-fallback-fonts/`. They are
-committed to this repo so CI builds do not depend on downloading fonts at build
-time. Noto color emoji fonts are intentionally not used because the current
+committed to this repo; a Vite plugin (see `vite.config.js`) serves them at
+`/font-fallbacks/<name>` for the browser generator, and this script reads them
+straight off disk via `--default-fallback-font`. Noto color emoji fonts are intentionally not used because the current
 converter rasterizes monochrome FreeType glyph bitmaps.
 
 ## Interval coverage behavior

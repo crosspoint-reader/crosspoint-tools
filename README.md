@@ -10,19 +10,20 @@ Web-based firmware flasher, build system, and font builder for [CrossPoint Reade
 - **Insider builds** — Nightly firmware compiled automatically from the upstream `master` branch
 - **Beta builds** — Curated test builds exposed alongside stable, sourced from either an admin-uploaded `.bin` or a tagged GitHub release on the firmware repo
 - **Custom font firmware** — Replace built-in fonts in the firmware with user-supplied TTF/OTF files via a CI build
-- **SD-card font builder** — Convert TTF/OTF files into `.cpfont` files for SD-card font loading on the device, using the firmware repo's own conversion script (no client-side reimplementation)
+- **SD-card font builder** — Convert TTF/OTF files into `.cpfont` files for SD-card font loading on the device, entirely in the browser via a WebAssembly build of FreeType (nothing is uploaded)
 - **Stock firmware** — Restore original Xteink firmware (English or Chinese) for both X3 and X4
 - **Admin dashboard** — Manually trigger builds, manage beta entries, and monitor build status
 
 ## Architecture
 
-The project runs on [Cloudflare Workers](https://workers.cloudflare.com/) with [GitHub Actions](https://github.com/features/actions) handling everything that needs a real toolchain (firmware compilation, font conversion):
+The project runs on [Cloudflare Workers](https://workers.cloudflare.com/) with [GitHub Actions](https://github.com/features/actions) handling everything that needs a real toolchain (firmware compilation, including custom-font firmware):
 
-- **Worker** (`src/index.ts`) — API routes, firmware proxying, beta/font orchestration, static asset serving
-- **R2 (`crosspoint-firmware`)** — Compiled firmware binaries and font build artifacts
-- **KV (`BUILD_META`)** — Build metadata, sha caches, font build state
+- **Worker** (`worker/index.ts`) — API routes, firmware proxying, beta/custom-build orchestration, static asset serving
+- **R2 (`crosspoint-firmware`)** — Compiled firmware binaries and custom-build artifacts
+- **KV (`BUILD_META`)** — Build metadata, sha caches, build state
 - **Static assets** (`public/`) — HTML pages, the WebSerial flasher module, the admin dashboard, and bundled X3 firmware
 - **GitHub Actions workflows** in `.github/workflows/` — long-running build jobs the Worker can dispatch
+- **Browser (WebAssembly)** — the SD-card font builder; no server involved
 
 ## Build pipelines
 
@@ -46,19 +47,70 @@ Lets a user replace one or more built-in fonts in the firmware:
 3. Workflow checks out the firmware repo, drops the user's TTFs over the built-in font sources, applies any label/size overrides, runs the firmware-side font conversion, then builds the firmware
 4. The completed `firmware.bin` is uploaded back to the Worker; the user is offered a download
 
-### 3. SD-card font builder (`build-fonts.yml`)
+### 3. SD-card font builder (in the browser)
 
-Converts arbitrary TTF/OTF files into `.cpfont` files for SD-card loading **without recompiling firmware**:
-
-1. The user uploads up to four primary styles (regular, bold, italic, bold-italic), up to two fallback family regular styles, plus a family name, point sizes, and either a Unicode interval preset or custom converter ranges at `/fonts`
-2. Worker stores the TTFs in R2 under `font-builds/{buildId}/in/` and dispatches the workflow
-3. Workflow checks out this repo, installs `freetype-py fonttools brotli`, and runs the vendored SD-card generator at `scripts/font-builder/fontconvert_sdcard.py`
-4. Each `.cpfont` is uploaded back to the Worker under `font-builds/{buildId}/out/`
-5. The frontend polls `/api/font-build/status`, streams the script's stderr (glyph counts, kerning pair counts) into the UI, and offers individual or zipped downloads
-
-The current generator started as a snapshot of `crosspoint-reader`'s `lib/EpdFont/scripts/fontconvert_sdcard.py`, but it now lives in this repo so the website can evolve SD-card-specific features like multi-family fallback handling independently.
+Converts arbitrary TTF/OTF files into `.cpfont` files for SD-card loading **without recompiling firmware** and without a server: the conversion runs in the visitor's browser on a WebAssembly build of FreeType (`src/lib/cpfont`). See [SD-card font builder](#sd-card-font-builder) below.
 
 Built `.cpfont` files install on the device by copying to the SD card under `/fonts/YourFont/` (or `/.fonts/YourFont/` for a hidden folder).
+
+## SD-card font builder
+
+`/fonts` converts TTF/OTF files to `.cpfont` entirely in the browser. The user's fonts are never uploaded, there is no build queue, and a full CJK family (6 sizes, ~27k glyphs each) takes a few seconds instead of a GitHub Actions round trip.
+
+| Piece | What it does |
+|---|---|
+| `src/lib/cpfont/wasm/freetype.{mjs,wasm}` | Committed build artifacts: `cpfont_ft.c` + FreeType + HarfBuzz compiled to WebAssembly (1.4 MB `.wasm` plus 16 KB of glue), fetched only when a build starts |
+| `src/lib/cpfont/wasm-url.js` | Hands the wrapper the bundler-resolved `.wasm` URL; node reads the file instead |
+| `scripts/font-builder/wasm/` | Sources for that artifact — the C shim and `build.sh` |
+| `src/lib/cpfont/freetype.js` | JS wrapper over the wasm module (faces, coverage, glyph rendering, metrics) |
+| `src/lib/cpfont/opentype.js` | Kerning and ligature extraction via [fontkit](https://github.com/foliojs/fontkit) (replaces fontTools) |
+| `src/lib/cpfont/intervals.js` | Unicode coverage presets and custom range parsing |
+| `src/lib/cpfont/build.js` | Rasterization, kern-class derivation, and the `.cpfont` container writer |
+| `src/lib/cpfont/cpfont.worker.js` | Web Worker host: downloads fallback fonts, runs the build, streams log lines to the page |
+| `src/lib/cpfont/fallbacks.js` | The bundled fallback chain, served from `/font-fallbacks/` (emitted by a plugin in `vite.config.js` from `scripts/font-builder/default-fallback-fonts/`) |
+
+`scripts/font-builder/fontconvert_sdcard.py` stays in the repo as the reference implementation. Glyph rasterization, 2-bit packing, coverage resolution, kerning classes, ligature chaining, and the binary layout are ports of that script — change both together.
+
+### Verifying parity
+
+```bash
+pip install freetype-py fonttools      # same deps the old CI step installed
+node scripts/font-builder/parity.mjs --regular path/to/Font-Regular.ttf \
+  --bold path/to/Font-Bold.ttf --default-fallbacks \
+  --intervals reading,greek --sizes 12,14,16,18
+```
+
+The harness runs both generators over the same inputs and compares the output. Every section — header, style TOC, intervals, glyph metrics, kerning tables, ligatures — must match byte for byte. Glyph bitmaps get a small tolerance: FreeType's TrueType bytecode interpreter does its hinting math in C `long`, which is 32-bit under wasm and 64-bit in the Python generator's native build, so a few antialiased edge pixels can land one 2-bit level apart (measured: 3 bytes in 458 KB, 33 in 784 KB on hinted Latin families). CFF/OTF outlines, autohinted and unhinted rendering all match exactly.
+
+### Rebuilding the wasm module
+
+Needs [emsdk](https://emscripten.org/docs/getting_started/downloads.html) and CMake:
+
+```bash
+scripts/font-builder/wasm/build.sh      # rewrites src/lib/cpfont/wasm/freetype.{mjs,wasm}
+```
+
+The module is built for `web,worker` only and the wasm ships as a separate
+file, so the browser streams and caches it like any other asset (`worker.format: 'es'`
+in `vite.config.js` is what lets the worker bundle carry a split-out asset). Under
+node the wrapper passes `wasmBinary` straight from disk.
+
+The script pins the FreeType version and builds HarfBuzz in. Both matter for parity: FreeType's hinting changes between releases, and FreeType's auto-hinter asks HarfBuzz which characters a script covers when computing blue zones — a build without HarfBuzz hints symbol and emoji fonts up to a pixel differently. Keep `FT_VERSION` equal to what the reference generator links against (`python3 -c "import freetype; print(freetype.version())"`).
+
+### Backend-less deployment
+
+`NO_BACKEND=1 WEB_ONLY=1 npm run build` produces a client bundle that never
+touches the Worker API: `WEB_ONLY` drops the Cloudflare plugin (no bindings or
+credentials needed) and `NO_BACKEND` tells the UI to hide the features that need
+the Worker — the pre-built font library on `/fonts` and the site-wide banner. The
+SD-card font builder is unaffected because it runs entirely in the browser, so
+the page loads and converts fonts with **zero** `/api/` requests.
+
+Any static host works: point it at `dist`, send unknown paths to
+`index.html`, and cache `/font-fallbacks/*` immutably. The pre-built library
+cannot work there even as a direct browser fetch — GitHub serves release assets
+from a host that sends no CORS headers, which is why the Worker proxies them in
+the first place.
 
 ## Beta builds
 
@@ -147,7 +199,7 @@ If you want local builds to dispatch GitHub Actions, set `GITHUB_TOKEN` in `.dev
 - `GITHUB_ACTIONS_REPO=owner/repo`
 - `GITHUB_ACTIONS_REF=branch-or-tag`
 
-Without `GITHUB_TOKEN`, font/custom/manual build triggers will fail before the GitHub Actions step starts.
+Without `GITHUB_TOKEN`, custom/manual build triggers will fail before the GitHub Actions step starts.
 
 If Wrangler fails while downloading `cloudflared`, install it yourself and rerun the tunnel command:
 
@@ -175,7 +227,7 @@ The WebSerial flasher is based on [xteink-flasher](https://github.com/crosspoint
 
 Thanks to [daveallie](https://github.com/daveallie) for the original browser flasher.
 
-The SD-card font builder uses the vendored generator in `scripts/font-builder/`, originally sourced from the [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader) firmware repo. Kerning, ligature, and interval behavior now live here, so changes to website-only font features can be made locally without waiting on firmware-repo updates.
+The SD-card font builder descends from the generator in the [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader) firmware repo (`lib/EpdFont/scripts/fontconvert_sdcard.py`). Kerning, ligature, and interval behavior now live here, so website-only font features can move without waiting on firmware-repo updates. The browser build uses [FreeType](https://freetype.org/) and [HarfBuzz](https://harfbuzz.github.io/) compiled to WebAssembly, and [fontkit](https://github.com/foliojs/fontkit) for OpenType table parsing.
 
 ## License
 

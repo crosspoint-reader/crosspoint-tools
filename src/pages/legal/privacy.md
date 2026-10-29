@@ -24,7 +24,9 @@ We use [Fathom Analytics](https://usefathom.com) to count page views and a few e
 
 The browser flasher talks to your device directly over USB from your browser. Your device's contents aren't uploaded to us. Firmware downloads come from our servers or from GitHub.
 
-If you use the **font builder** or **custom builds**, the files you upload are sent to our build system, which runs on GitHub Actions, so we can compile them into firmware. To track your build, we set a cookie called `cp_uid`. It holds a random ID that isn't linked to your name or email, and it lasts up to a year.
+The **SD-card font builder** converts your fonts entirely in your browser. The font files you pick are never uploaded; the only thing downloaded is the set of bundled fallback fonts the converter needs.
+
+If you use **custom font firmware** or **custom builds**, the files you upload are sent to our build system, which runs on GitHub Actions, so we can compile them into firmware. To track your build, we set a cookie called `cp_uid`. It holds a random ID that isn't linked to your name or email, and it lasts up to a year.
 
 ### Contact form
 

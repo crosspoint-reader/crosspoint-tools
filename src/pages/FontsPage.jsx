@@ -25,6 +25,13 @@ const fileInputWhiteCls =
 
 const LOG_COLORS = { info: 'text-stone-500', success: 'text-brand-600', error: 'text-red-600' }
 
+// Set by the backend-less static build (NO_BACKEND=1, see vite.config.js).
+// The font builder itself never calls an API — it converts in the browser — but
+// the pre-built font library needs the Worker to proxy GitHub release assets,
+// whose host sends no CORS headers. A static deploy hides that section rather
+// than firing a request that cannot succeed.
+const NO_BACKEND = __NO_BACKEND__
+
 function Code({ children, className = '' }) {
   return (
     <code className={`rounded bg-stone-100 px-1 py-0.5 font-mono text-xs text-stone-700 ${className}`}>
@@ -78,12 +85,11 @@ export default function FontsPage() {
   const fallbackRegularRef = useRef(null)
   const fallback2RegularRef = useRef(null)
 
-  const pollTimerRef = useRef(null)
+  const workerRef = useRef(null)
   const builtFilesRef = useRef([])
   const familyNameRef = useRef('')
   familyNameRef.current = familyName
   const logPanelRef = useRef(null)
-  const resumedRef = useRef(false)
 
   function log(msg, level) {
     setLogLines((prev) => [...(prev || []), { msg, level: level || 'info' }])
@@ -97,11 +103,13 @@ export default function FontsPage() {
 
   useEffect(() => {
     return () => {
-      if (pollTimerRef.current) clearTimeout(pollTimerRef.current)
+      workerRef.current?.terminate()
+      builtFilesRef.current.forEach((file) => URL.revokeObjectURL(file.url))
     }
   }, [])
 
   useEffect(() => {
+    if (NO_BACKEND) return undefined
     let cancelled = false
     fetch('/api/prebuilt-fonts')
       .then((response) => {
@@ -183,102 +191,104 @@ export default function FontsPage() {
     return parts.length ? parts.join(',') : 'base'
   }
 
-  // -- polling --------------------------------------------------------------
-  function renderResults(build) {
-    const files = (build.outputs || []).map((name) => ({
-      filename: name,
-      url: '/api/font-build/result/' + encodeURIComponent(name),
-      byteLength: null,
-    }))
-    builtFilesRef.current = files
-    setResults({ files })
-    log('Generated ' + files.length + ' file(s)', 'success')
+  // -- in-browser build ------------------------------------------------------
+  //
+  // The conversion runs in a Web Worker on a wasm FreeType build (src/lib/cpfont).
+  // Nothing is uploaded: the fonts never leave the browser, and the only network
+  // traffic is the bundled fallback fonts the worker pulls from /font-fallbacks/.
+  function releaseResults() {
+    builtFilesRef.current.forEach((file) => URL.revokeObjectURL(file.url))
+    builtFilesRef.current = []
   }
 
-  function pollUntilDone() {
+  function runBuild(request) {
+    workerRef.current?.terminate()
+    const worker = new Worker(new URL('../lib/cpfont/cpfont.worker.js', import.meta.url), {
+      type: 'module',
+    })
+    workerRef.current = worker
+
     const startedAt = Date.now()
-    let lastLogLen = 0
+    let sizesStarted = 0
+
+    const finish = () => {
+      worker.terminate()
+      workerRef.current = null
+      setBuilding(false)
+    }
 
     return new Promise((resolve, reject) => {
-      function tick() {
-        fetch('/api/font-build/status', { credentials: 'same-origin' })
-          .then((r) => r.json())
-          .then((data) => {
-            const b = data.build
-            if (!b) {
-              throw new Error('Build disappeared. Try again?')
-            }
-            // Stream new log lines into the panel as they appear.
-            if (b.log && b.log.length > lastLogLen) {
-              const fresh = b.log.slice(lastLogLen)
-              lastLogLen = b.log.length
-              fresh.split('\n').forEach((line) => {
-                if (line.trim()) log(line, 'info')
-              })
-            }
-            if (b.status === 'success') {
-              setProgress({
-                pct: 100,
-                text: 'Done in ' + Math.round((Date.now() - startedAt) / 1000) + 's',
-              })
-              renderResults(b)
-              setBuilding(false)
-              resolve()
-              return
-            }
-            if (b.status === 'failed') {
-              throw new Error(b.error || 'Build failed. Check Actions logs.')
-            }
-            // Soft progress: 15% -> 90% over ~45s, then idle at 90%.
-            const elapsed = (Date.now() - startedAt) / 1000
-            const pct = Math.min(90, 15 + Math.round((elapsed / 45) * 75))
+      worker.onmessage = (event) => {
+        const message = event.data
+        if (message.type === 'log') {
+          log(message.line, 'info')
+          return
+        }
+        if (message.type === 'phase') {
+          setProgress(
+            message.phase === 'fallbacks'
+              ? { pct: 5, text: 'Loading fallback fonts...' }
+              : { pct: 20, text: 'Rasterizing glyphs...' }
+          )
+          return
+        }
+        if (message.type === 'progress') {
+          if (message.phase === 'fallbacks') {
+            // Fallback downloads get the first 20%; the CJK files are ~16 MB each.
             setProgress({
-              pct,
-              text:
-                (b.status === 'pending' ? 'Queued' : 'Building') +
-                '... ' +
-                Math.round(elapsed) +
-                's elapsed',
+              pct: 5 + Math.round((message.index / message.total) * 15),
+              text: `Loading fallback fonts (${message.index + 1}/${message.total})...`,
             })
-            pollTimerRef.current = setTimeout(tick, 2000)
+          } else {
+            setProgress({
+              pct: 20 + Math.round((sizesStarted++ / request.sizes.length) * 75),
+              text: `Building ${message.name}...`,
+            })
+          }
+          return
+        }
+        if (message.type === 'done') {
+          releaseResults()
+          const files = message.files.map((file) => {
+            const blob = new Blob([file.data], { type: 'application/octet-stream' })
+            return {
+              filename: file.name,
+              url: URL.createObjectURL(blob),
+              blob,
+              byteLength: blob.size,
+            }
           })
-          .catch((err) => {
-            setBuilding(false)
-            reject(err)
+          builtFilesRef.current = files
+          setResults({ files })
+          setProgress({
+            pct: 100,
+            text: 'Done in ' + Math.round((Date.now() - startedAt) / 1000) + 's',
           })
+          log('Generated ' + files.length + ' file(s)', 'success')
+          finish()
+          resolve()
+          return
+        }
+        if (message.type === 'error') {
+          finish()
+          reject(new Error(message.message))
+        }
       }
-      tick()
+
+      worker.onerror = (event) => {
+        finish()
+        reject(new Error(event.message || 'The font builder failed to start'))
+      }
+
+      // Font bytes are transferred rather than copied — a CJK family runs to
+      // tens of megabytes.
+      const transfers = Object.values(request.styles).filter(Boolean)
+      for (const family of request.fallbacks) {
+        if (family) transfers.push(...Object.values(family).filter(Boolean))
+      }
+      worker.postMessage({ type: 'build', request }, transfers)
     })
   }
-
-  // On load: if there's a prior in-progress build for this user, resume polling.
-  useEffect(() => {
-    if (resumedRef.current) return
-    resumedRef.current = true
-    ;(async function resumeIfBuilding() {
-      try {
-        const res = await fetch('/api/font-build/status', { credentials: 'same-origin' })
-        if (!res.ok) return
-        const data = await res.json()
-        const b = data.build
-        if (!b) return
-        if (b.status === 'success') {
-          renderResults(b)
-        } else if (b.status === 'pending' || b.status === 'building') {
-          setBuilding(true)
-          setProgress({ pct: 15, text: 'Resuming previous build...' })
-          setLogLines((prev) => prev || [])
-          log('Resuming build ' + b.buildId + '...', 'info')
-          pollUntilDone().catch((err) => {
-            log('Error: ' + err.message, 'error')
-          })
-        }
-      } catch (e) {
-        /* no-op */
-      }
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // -- build ----------------------------------------------------------------
   async function startBuild() {
@@ -324,12 +334,8 @@ export default function FontsPage() {
     setBuilding(true)
     setLogLines([])
     setResults(null)
-    setProgress({ pct: 5, text: 'Uploading fonts...' })
-    builtFilesRef.current = []
-    if (pollTimerRef.current) {
-      clearTimeout(pollTimerRef.current)
-      pollTimerRef.current = null
-    }
+    releaseResults()
+    setProgress({ pct: 0, text: 'Reading font files...' })
 
     try {
       const sizeValues = [
@@ -351,52 +357,29 @@ export default function FontsPage() {
         sizeValues.sort((a, b) => a - b)
       }
 
-      // Always start fresh; clears any prior build for this user so we
-      // never collide with the worker's per-user lock from an old session.
-      await fetch('/api/font-build/clear', { method: 'POST', credentials: 'same-origin' })
-
-      const fd = new FormData()
-      fd.append('regular', regularFile)
-      const bold = boldRef.current.files[0]
-      const italic = italicRef.current.files[0]
-      const boldItalic = boldItalicRef.current.files[0]
-      if (bold) fd.append('bold', bold)
-      if (italic) fd.append('italic', italic)
-      if (boldItalic) fd.append('bolditalic', boldItalic)
-      fd.append('family', familyRaw)
-      fd.append('sizes', sizeValues.join(','))
-      fd.append('intervals', intervals)
-      if (fallbackFamilyRaw) {
-        fd.append('fallbackFamily', fallbackFamilyRaw)
+      // ArrayBuffers, not Files: the worker gets the bytes transferred to it.
+      const readFile = async (file) => (file ? await file.arrayBuffer() : null)
+      const styles = {
+        regular: await readFile(regularFile),
+        bold: await readFile(boldRef.current.files[0]),
+        italic: await readFile(italicRef.current.files[0]),
+        bolditalic: await readFile(boldItalicRef.current.files[0]),
       }
-      if (fallbackRegular) fd.append('fallback_regular', fallbackRegular)
-      if (fallback2FamilyRaw) {
-        fd.append('fallback2Family', fallback2FamilyRaw)
-      }
-      if (fallback2Regular) fd.append('fallback2_regular', fallback2Regular)
+      const fallbacks = [
+        fallbackRegular ? { regular: await readFile(fallbackRegular) } : null,
+        fallback2Regular ? { regular: await readFile(fallback2Regular) } : null,
+      ]
 
-      const uploadCount =
-        1 +
-        (bold ? 1 : 0) +
-        (italic ? 1 : 0) +
-        (boldItalic ? 1 : 0) +
-        (fallbackRegular ? 1 : 0) +
-        (fallback2Regular ? 1 : 0)
-      log('Uploading ' + uploadCount + ' file(s)...', 'info')
+      const styleCount = Object.values(styles).filter(Boolean).length
+      log(`Converting ${styleCount} style(s) at ${sizeValues.length} size(s) in your browser...`, 'info')
 
-      const res = await fetch('/api/font-build/upload', {
-        method: 'POST',
-        body: fd,
-        credentials: 'same-origin',
+      await runBuild({
+        family: familyRaw,
+        sizes: sizeValues,
+        intervals,
+        styles,
+        fallbacks,
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(body.error || 'Upload failed: HTTP ' + res.status)
-      }
-      log('Build queued (id ' + body.buildId + '). Running fontconvert_sdcard.py on a fresh runner...', 'info')
-      setProgress({ pct: 15, text: 'Building... (this usually takes ~30s)' })
-
-      await pollUntilDone()
     } catch (err) {
       log('Error: ' + err.message, 'error')
       setProgress((prev) => ({ pct: prev ? prev.pct : 0, text: 'Failed' }))
@@ -414,14 +397,8 @@ export default function FontsPage() {
       const zip = new JSZip()
       const fam = sanitizeFamilyName(familyNameRef.current)
       const folder = zip.folder(fam)
-      for (let i = 0; i < builtFiles.length; i++) {
-        const f = builtFiles[i]
-        const res = await fetch(f.url, { credentials: 'same-origin' })
-        if (!res.ok) {
-          log('Failed to fetch ' + f.filename + ' (HTTP ' + res.status + ')', 'error')
-          continue
-        }
-        folder.file(f.filename, await res.blob())
+      for (const f of builtFiles) {
+        folder.file(f.filename, f.blob)
       }
       const content = await zip.generateAsync({ type: 'blob' })
       const a = document.createElement('a')
@@ -797,7 +774,8 @@ export default function FontsPage() {
                   need.
                 </p>
                 {/* Preset values MUST match the INTERVAL_PRESETS keys in
-                    scripts/font-builder/fontconvert_sdcard.py (the script CI runs). */}
+                    src/lib/cpfont/intervals.js and its reference implementation,
+                    scripts/font-builder/fontconvert_sdcard.py. */}
                 <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
                   {INTERVAL_PRESETS.map((p) => (
                     <label
@@ -1016,6 +994,11 @@ export default function FontsPage() {
                         <span className="font-mono text-sm font-medium text-stone-900">
                           {f.filename}
                         </span>
+                        {f.byteLength != null && (
+                          <span className="ml-2 font-mono text-xs text-stone-400">
+                            {formatSize(f.byteLength)}
+                          </span>
+                        )}
                       </div>
                       <a
                         href={f.url}
@@ -1062,7 +1045,8 @@ export default function FontsPage() {
         </div>
       </section>
 
-      {/* Pre-built library */}
+      {/* Pre-built library (Worker-backed; hidden in the static build) */}
+      {!NO_BACKEND && (
       <section className="pb-20 sm:pb-24">
         <div className="mx-auto max-w-5xl px-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
@@ -1129,6 +1113,7 @@ export default function FontsPage() {
           )}
         </div>
       </section>
+      )}
     </Layout>
   )
 }

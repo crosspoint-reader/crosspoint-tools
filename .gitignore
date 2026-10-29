@@ -15,3 +15,7 @@ notes.md
 src/pages/blog/meta.generated.json
 public/blog/rss.xml
 unlocker-tool/X4PRO-API-REFERENCE.md
+
+# FreeType/HarfBuzz wasm build tree (sources are downloaded, artifact is committed)
+scripts/font-builder/wasm/.build/
+.vercel

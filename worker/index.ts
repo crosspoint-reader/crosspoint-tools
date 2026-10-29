@@ -1,4 +1,4 @@
-import type { Env, BuildMetadata, CustomBuildMetadata, FontBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, PrDeviceBuild, Accessory, FirmwareDevice, ReleaseVisibility } from './types';
+import type { Env, BuildMetadata, CustomBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, PrDeviceBuild, Accessory, FirmwareDevice, ReleaseVisibility } from './types';
 import { betaDevices, betaDisplayName, normalizeBetaBuildList } from './betas';
 import { PR_ARTIFACTS_MARKER, parseArtifactComment, parsePrUrl, unzipFirstBin } from './github-pr';
 import { pageMeta, SITE } from '../src/lib/seo';
@@ -87,6 +87,22 @@ export default {
         if (assetType) headers.set('Content-Type', assetType);
       }
       return new Response(body, { status: res.status, headers });
+    }
+
+    // Bundled fallback fonts for the in-browser .cpfont builder
+    // (src/lib/cpfont/fallbacks.js). These come out of the client bundle, but
+    // they get an explicit route for two reasons: the SPA asset fallback would
+    // answer a typo'd filename with index.html and 200, which the builder would
+    // then try to parse as a font; and these files never change under a given
+    // name, so they can be cached hard.
+    if (url.pathname.startsWith('/font-fallbacks/')) {
+      const res = await env.ASSETS.fetch(request);
+      if (!res.ok || res.headers.get('Content-Type')?.includes('text/html')) {
+        return json({ error: 'Unknown fallback font' }, 404);
+      }
+      const headers = new Headers(res.headers);
+      headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+      return new Response(res.body, { status: res.status, headers });
     }
 
     // Gate insider builds behind Royalty.dev subscription
@@ -320,21 +336,6 @@ async function handleApi(
       case '/api/custom-build/status-update':
         return handleCustomBuildStatusUpdate(request, env, corsHeaders);
 
-      case '/api/font-build/upload':
-        return handleFontBuildUpload(request, env, corsHeaders);
-
-      case '/api/font-build/status':
-        return handleFontBuildStatus(request, env, corsHeaders);
-
-      case '/api/font-build/clear':
-        return handleFontBuildClear(request, env, corsHeaders);
-
-      case '/api/font-build/upload-result':
-        return handleFontBuildUploadResult(request, env, corsHeaders);
-
-      case '/api/font-build/status-update':
-        return handleFontBuildStatusUpdate(request, env, corsHeaders);
-
       case '/api/theme-build/icons':
         return handleThemeBuildStart(request, env, corsHeaders);
 
@@ -458,14 +459,6 @@ async function handleApi(
         // Dynamic routes: /api/custom-build/fonts/{buildId}/{filename}
         if (url.pathname.startsWith('/api/custom-build/fonts/')) {
           return handleCustomBuildFontDownload(request, url, env, corsHeaders);
-        }
-        // /api/font-build/files/{buildId}/{style}.ttf  — workflow downloads inputs
-        if (url.pathname.startsWith('/api/font-build/files/')) {
-          return handleFontBuildFileDownload(request, url, env, corsHeaders);
-        }
-        // /api/font-build/result/{filename}            — user downloads outputs
-        if (url.pathname.startsWith('/api/font-build/result/')) {
-          return handleFontBuildResultDownload(request, url, env, corsHeaders);
         }
         if (url.pathname.startsWith('/api/prebuilt-fonts/')) {
           return handlePrebuiltFontDownload(url, env, corsHeaders);
@@ -2303,413 +2296,10 @@ async function handleCustomBuildStatusUpdate(
   return json({ ok: true }, 200, headers);
 }
 
-// --- Font Build (.cpfont generation via local Python generator) ---
-//
-// The web tool uploads TTFs, dispatches a GitHub Actions workflow, runs the
-// vendored SD-card font generator in this repo, then downloads the resulting
-// .cpfont files. That keeps the conversion logic local so the website can
-// evolve features like fallback-family handling independently of firmware CI.
-
-const FONT_BUILD_LOCK_TTL = 10 * 60;
-const FONT_BUILD_STYLES = ['regular', 'bold', 'italic', 'bolditalic'] as const;
-type FontBuildStyle = typeof FONT_BUILD_STYLES[number];
-const FONT_FAMILY_NAME_RE = /^[A-Za-z0-9 _-]{1,40}$/;
-
-async function collectUploadedFontStyles(
-  formData: FormData,
-  prefix = ''
-): Promise<{ uploadedStyles: FontBuildStyle[]; validatedFiles: Map<FontBuildStyle, ArrayBuffer> }> {
-  const uploadedStyles: FontBuildStyle[] = [];
-  const validatedFiles = new Map<FontBuildStyle, ArrayBuffer>();
-
-  for (const style of FONT_BUILD_STYLES) {
-    const key = prefix ? `${prefix}${style}` : style;
-    const entry = formData.get(key) as string | File | null;
-    if (!entry || typeof entry === 'string') continue;
-    const data = await entry.arrayBuffer();
-    if (!isValidFontFile(data)) {
-      throw new Error(`Invalid font file for ${key}`);
-    }
-    validatedFiles.set(style, data);
-    uploadedStyles.push(style);
-  }
-
-  return { uploadedStyles, validatedFiles };
-}
-
-async function collectUploadedFallbackRegular(formData: FormData, key: string): Promise<ArrayBuffer | null> {
-  const entry = formData.get(key) as string | File | null;
-  if (!entry || typeof entry === 'string') return null;
-  const data = await entry.arrayBuffer();
-  if (!isValidFontFile(data)) {
-    throw new Error(`Invalid font file for ${key}`);
-  }
-  return data;
-}
-
-function isValidFontIntervals(intervals: string): boolean {
-  if (intervals.length < 1 || intervals.length > 2000) return false;
-
-  const preset = '[A-Za-z0-9_-]+';
-  const range = '\\(0x[0-9A-Fa-f]+-0x[0-9A-Fa-f]+\\)';
-  const token = `(?:${preset}|${range})`;
-  return new RegExp(`^${token}(?:,${token})*$`).test(intervals);
-}
-
-async function handleFontBuildUpload(
-  request: Request,
-  env: Env,
-  headers: Record<string, string>
-): Promise<Response> {
-  if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405, headers);
-  }
-
-  let uid = getUserId(request);
-  if (!uid) uid = generateUserId();
-
-  const lock = await env.BUILD_META.get(`font-build-lock:${uid}`);
-  if (lock) {
-    return json({ error: 'Your previous font build is still running. Try again shortly.' }, 409, headers);
-  }
-
-  const formData = await request.formData();
-
-  const family = (formData.get('family') as string | null)?.trim();
-  if (!family || !FONT_FAMILY_NAME_RE.test(family)) {
-    return json({ error: 'Invalid or missing family name' }, 400, headers);
-  }
-
-  const fallbackFamilyInputs = [
-    { family: (formData.get('fallbackFamily') as string | null)?.trim() || '', fileKey: 'fallback_regular' },
-    { family: (formData.get('fallback2Family') as string | null)?.trim() || '', fileKey: 'fallback2_regular' },
-  ];
-  for (const entry of fallbackFamilyInputs) {
-    if (entry.family && !FONT_FAMILY_NAME_RE.test(entry.family)) {
-      return json({ error: 'Invalid fallback family name' }, 400, headers);
-    }
-  }
-
-  const sizesRaw = (formData.get('sizes') as string | null)?.trim() || '';
-  const sizes = sizesRaw.split(',').map(s => parseInt(s.trim(), 10));
-  if (sizes.length === 0 || sizes.some(s => isNaN(s) || s < 6 || s > 48)) {
-    return json({ error: 'Invalid sizes (must be 6–48 pt)' }, 400, headers);
-  }
-
-  const intervals = ((formData.get('intervals') as string | null)?.trim() || 'base');
-  if (intervals.length > 2000) {
-    return json({ error: 'Unicode coverage is too long (max 2000 characters). Use named presets (e.g. hangul, cjk-jp) instead of many explicit ranges.' }, 400, headers);
-  }
-  if (!isValidFontIntervals(intervals)) {
-    return json({ error: 'Invalid Unicode coverage format. Use preset names or hex ranges like (0x4E00-0x9FFF), comma-separated.' }, 400, headers);
-  }
-
-  let uploadedStyles: FontBuildStyle[] = [];
-  let validatedFiles = new Map<FontBuildStyle, ArrayBuffer>();
-  let fallbackUploads: Array<{ family: string; data: ArrayBuffer }> = [];
-  try {
-    ({ uploadedStyles, validatedFiles } = await collectUploadedFontStyles(formData));
-    for (const entry of fallbackFamilyInputs) {
-      const data = await collectUploadedFallbackRegular(formData, entry.fileKey);
-      if (data) {
-        fallbackUploads.push({ family: entry.family, data });
-      } else if (entry.family) {
-        return json({ error: 'A fallback regular style is required when using a fallback family' }, 400, headers);
-      }
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Invalid font upload';
-    return json({ error: message }, 400, headers);
-  }
-
-  if (uploadedStyles.length === 0) {
-    return json({ error: 'Upload at least one TTF (regular at minimum)' }, 400, headers);
-  }
-  if (!uploadedStyles.includes('regular')) {
-    return json({ error: 'A regular style is required' }, 400, headers);
-  }
-  for (const entry of fallbackFamilyInputs) {
-    const hasUpload = fallbackUploads.some(upload => upload.family === entry.family);
-    if (hasUpload && !entry.family) {
-      return json({ error: 'Fallback font uploads require a fallback family name' }, 400, headers);
-    }
-  }
-
-  const buildId = generateBuildId();
-
-  for (const [style, data] of validatedFiles) {
-    await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/in/${style}.ttf`, data);
-  }
-  for (let i = 0; i < fallbackUploads.length; i++) {
-    await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/in/fallback${i + 1}/regular.ttf`, fallbackUploads[i].data);
-  }
-
-  await env.BUILD_META.put(`font-build-lock:${uid}`, buildId, { expirationTtl: FONT_BUILD_LOCK_TTL });
-  await env.BUILD_META.put(`font-build:user:${uid}`, buildId);
-
-  const meta: FontBuildMetadata = {
-    buildId,
-    status: 'pending',
-    uid,
-    family,
-    fallbackFamily: fallbackUploads[0]?.family || undefined,
-    fallbackFamilies: fallbackUploads.length ? fallbackUploads.map(upload => upload.family) : undefined,
-    sizes,
-    intervals,
-    styles: uploadedStyles,
-    fallbackStyles: fallbackUploads.length ? ['regular'] : undefined,
-    createdAt: new Date().toISOString(),
-  };
-  await env.BUILD_META.put(`font-build:${buildId}`, JSON.stringify(meta));
-
-  const gitHubToken = getGitHubAuthToken(env);
-  if (!gitHubToken) {
-    await env.BUILD_META.delete(`font-build-lock:${uid}`);
-    await env.BUILD_META.delete(`font-build:user:${uid}`);
-    await env.BUILD_META.delete(`font-build:${buildId}`);
-    return json({ error: 'Missing GITHUB_TOKEN in local/deployed worker config' }, 500, headers);
-  }
-
-  const ghRes = await fetch(
-    getWorkflowDispatchUrl(env, 'build-fonts.yml'),
-    {
-      method: 'POST',
-      headers: {
-        'User-Agent': 'crosspoint-tools',
-        Authorization: `Bearer ${gitHubToken}`,
-        Accept: 'application/vnd.github.v3+json',
-      },
-      body: JSON.stringify({
-        ref: getGitHubActionsRef(env),
-        inputs: {
-          buildId,
-          family,
-          sizes: sizes.join(','),
-          intervals,
-          webhookBaseUrl: getWebhookBaseUrl(request, env),
-        },
-      }),
-    }
-  );
-
-  if (!ghRes.ok) {
-    await env.BUILD_META.delete(`font-build-lock:${uid}`);
-    await env.BUILD_META.delete(`font-build:user:${uid}`);
-    await env.BUILD_META.delete(`font-build:${buildId}`);
-    const body = await ghRes.text();
-    console.error(`Font build dispatch failed: ${ghRes.status} ${body}`);
-    const isAuthFailure = ghRes.status === 401 || ghRes.status === 403;
-    return json({ error: isAuthFailure ? 'GitHub workflow dispatch failed: missing or invalid GITHUB_TOKEN' : 'Failed to start build' }, 502, headers);
-  }
-
-  const response = json({ buildId, styles: uploadedStyles }, 202, headers);
-  setUserIdCookie(response, uid);
-  return response;
-}
-
-async function handleFontBuildStatus(
-  request: Request,
-  env: Env,
-  headers: Record<string, string>
-): Promise<Response> {
-  const uid = getUserId(request);
-  if (!uid) return json({ build: null }, 200, headers);
-
-  const buildId = await env.BUILD_META.get(`font-build:user:${uid}`);
-  if (!buildId) return json({ build: null }, 200, headers);
-
-  const raw = await env.BUILD_META.get(`font-build:${buildId}`);
-  if (!raw) return json({ build: null }, 200, headers);
-
-  const meta = JSON.parse(raw) as FontBuildMetadata;
-  // List outputs from R2 (strongly consistent) on every read rather than
-  // accumulating them in KV — concurrent upload-result handlers would otherwise
-  // race each other's read-modify-writes and lose filenames.
-  const list = await env.FIRMWARE_BUCKET.list({ prefix: `font-builds/${buildId}/out/` });
-  const prefix = `font-builds/${buildId}/out/`;
-  meta.outputs = list.objects
-    .map(o => o.key.startsWith(prefix) ? o.key.slice(prefix.length) : o.key)
-    .filter(name => name.endsWith('.cpfont'))
-    .sort();
-
-  return json({ build: meta }, 200, headers);
-}
-
-async function handleFontBuildClear(
-  request: Request,
-  env: Env,
-  headers: Record<string, string>
-): Promise<Response> {
-  if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405, headers);
-  }
-  const uid = getUserId(request);
-  if (!uid) return json({ ok: true }, 200, headers);
-
-  const buildId = await env.BUILD_META.get(`font-build:user:${uid}`);
-  if (buildId) {
-    await env.BUILD_META.delete(`font-build:user:${uid}`);
-    await env.BUILD_META.delete(`font-build:${buildId}`);
-    await env.BUILD_META.delete(`font-build-lock:${uid}`);
-  }
-  return json({ ok: true }, 200, headers);
-}
-
-// Workflow downloads input TTFs from here.
-async function handleFontBuildFileDownload(
-  request: Request,
-  url: URL,
-  env: Env,
-  headers: Record<string, string>
-): Promise<Response> {
-  if (!isAuthorizedWebhookRequest(request, env)) {
-    return json({ error: 'Unauthorized' }, 401, headers);
-  }
-
-  // Path: /api/font-build/files/{buildId}/{style}.ttf
-  const rawPath = url.pathname.replace('/api/font-build/files/', '');
-  const slashIndex = rawPath.indexOf('/');
-  if (slashIndex === -1) return json({ error: 'Invalid path' }, 400, headers);
-  const buildId = rawPath.slice(0, slashIndex);
-  const rawFilename = rawPath.slice(slashIndex + 1);
-  let filename: string;
-  try { filename = decodeURIComponent(rawFilename); } catch { return json({ error: 'Invalid path' }, 400, headers); }
-  const normalized = filename.replace(/\\/g, '/');
-  if (!/^(?:fallback(?:[12])?\/)?regular\.ttf$/i.test(normalized) && !/^(bold|italic|bolditalic)\.ttf$/i.test(normalized)) {
-    return json({ error: 'Invalid style' }, 400, headers);
-  }
-
-  const object = await env.FIRMWARE_BUCKET.get(`font-builds/${buildId}/in/${normalized}`);
-  if (!object) return json({ error: 'Not found' }, 404, headers);
-
-  return new Response(object.body, {
-    headers: {
-      ...headers,
-      'Content-Type': 'application/octet-stream',
-      'Content-Length': String(object.size),
-    },
-  });
-}
-
-// Workflow uploads each .cpfont here. Stored under font-builds/{buildId}/out/.
-async function handleFontBuildUploadResult(
-  request: Request,
-  env: Env,
-  headers: Record<string, string>
-): Promise<Response> {
-  if (request.method !== 'PUT') {
-    return json({ error: 'Method not allowed' }, 405, headers);
-  }
-  if (!isAuthorizedWebhookRequest(request, env)) {
-    return json({ error: 'Unauthorized' }, 401, headers);
-  }
-
-  const buildId = request.headers.get('X-Build-Id');
-  const filename = request.headers.get('X-Filename');
-  if (!buildId || !filename) {
-    return json({ error: 'Missing X-Build-Id or X-Filename' }, 400, headers);
-  }
-  if (!/^[A-Za-z0-9 _.-]+\.cpfont$/.test(filename)) {
-    return json({ error: 'Invalid filename' }, 400, headers);
-  }
-
-  const data = await request.arrayBuffer();
-  await env.FIRMWARE_BUCKET.put(`font-builds/${buildId}/out/${filename}`, data);
-
-  // Outputs are listed from R2 in handleFontBuildStatus, not tracked in KV.
-  // Touching the meta key here would race other concurrent upload-results and
-  // status-update under KV's eventual consistency.
-
-  return json({ ok: true, size: data.byteLength }, 200, headers);
-}
-
-async function handleFontBuildStatusUpdate(
-  request: Request,
-  env: Env,
-  headers: Record<string, string>
-): Promise<Response> {
-  if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405, headers);
-  }
-  if (!isAuthorizedWebhookRequest(request, env)) {
-    return json({ error: 'Unauthorized' }, 401, headers);
-  }
-
-  const body = await request.json() as {
-    buildId: string;
-    status: FontBuildMetadata['status'];
-    generatorVersion?: string;
-    log?: string;
-    error?: string;
-  };
-
-  const raw = await env.BUILD_META.get(`font-build:${body.buildId}`);
-  if (!raw) return json({ error: 'Build not found' }, 404, headers);
-
-  const meta = JSON.parse(raw) as FontBuildMetadata;
-  meta.status = body.status;
-  if (body.generatorVersion) meta.generatorVersion = body.generatorVersion;
-  if (body.log) meta.log = body.log;
-  if (body.error) meta.error = body.error;
-  if (body.status === 'success' || body.status === 'failed') {
-    meta.completedAt = new Date().toISOString();
-    if (meta.uid) await env.BUILD_META.delete(`font-build-lock:${meta.uid}`);
-  }
-
-  await env.BUILD_META.put(`font-build:${body.buildId}`, JSON.stringify(meta));
-  return json({ ok: true }, 200, headers);
-}
-
-// User downloads a built .cpfont. Path: /api/font-build/result/{filename}
-// Looked up against the user's current build (via cookie), so users can't
-// snoop each other's outputs by guessing buildIds.
-async function handleFontBuildResultDownload(
-  request: Request,
-  url: URL,
-  env: Env,
-  headers: Record<string, string>
-): Promise<Response> {
-  const uid = getUserId(request);
-  if (!uid) return json({ error: 'Not found' }, 404, headers);
-
-  const buildId = await env.BUILD_META.get(`font-build:user:${uid}`);
-  if (!buildId) return json({ error: 'Not found' }, 404, headers);
-
-  // Family names can contain spaces (the auto-detect on the frontend converts
-  // "Noto-Serif" -> "Noto Serif"), so the script writes "Noto Serif_12.cpfont"
-  // to R2 and the frontend encodes that as "Noto%20Serif_12.cpfont" in the URL.
-  // Decode before validating and looking up R2.
-  let filename: string;
-  try {
-    filename = decodeURIComponent(url.pathname.replace('/api/font-build/result/', ''));
-  } catch {
-    return json({ error: 'Invalid filename' }, 400, headers);
-  }
-  if (!/^[A-Za-z0-9 _.-]+\.cpfont$/.test(filename)) {
-    return json({ error: 'Invalid filename' }, 400, headers);
-  }
-
-  const object = await env.FIRMWARE_BUCKET.get(`font-builds/${buildId}/out/${filename}`);
-  if (!object) return json({ error: 'Not found' }, 404, headers);
-
-  // RFC 5987 / 6266: bare quoted filename can't contain spaces safely on all
-  // clients, so include filename* for UTF-8 / spaces and keep the simple form
-  // as a fallback (with spaces -> underscores).
-  const fallback = filename.replace(/[^A-Za-z0-9._-]/g, '_');
-  return new Response(object.body, {
-    headers: {
-      ...headers,
-      'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
-      'Content-Length': String(object.size),
-    },
-  });
-}
-
 // --- Theme Icon Build (.bmp generation via firmware-repo Python scripts) ---
 //
-// Mirrors the font-build flow, but the canonical conversion logic is NOT
-// vendored here: the build-theme-icons.yml workflow checks out the firmware
+// Mirrors the custom-firmware build flow, but the canonical conversion logic
+// is NOT vendored here: the build-theme-icons.yml workflow checks out the firmware
 // repo at FIRMWARE_THEME_REF and runs its scripts/convert_icon.py and
 // scripts/generate-theme-icons.py so the BMP format stays a single source of
 // truth in the firmware repo. The web builder bundles the returned BMPs into

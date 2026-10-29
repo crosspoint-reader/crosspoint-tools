@@ -21,6 +21,9 @@ export default function SiteBanner() {
   const [html, setHtml] = useState('')
 
   useEffect(() => {
+    // The backend-less static build (NO_BACKEND=1, see vite.config.js) has no
+    // Worker to ask, so skip the request entirely rather than fail it.
+    if (__NO_BACKEND__) return undefined
     let cancelled = false
     fetch('/api/banner')
       .then((res) => (res.ok ? res.json() : null))
