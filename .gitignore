@@ -19,3 +19,4 @@ unlocker-tool/X4PRO-API-REFERENCE.md
 # FreeType/HarfBuzz wasm build tree (sources are downloaded, artifact is committed)
 scripts/font-builder/wasm/.build/
 .vercel
+deck/open-source-money/

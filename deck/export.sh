@@ -1,11 +1,12 @@
 #!/bin/zsh
-# Export each deck slide to a 1920×1080 JPG (deck/slides/slide-NN.jpg).
-# Uses headless Chrome + macOS sips. Usage: ./deck/export.sh [quality 0-100]
+# Export each deck slide to JPG in the selected deck's slides directory.
+# Uses headless Chrome + macOS sips. Usage: ./deck/export.sh [quality 0-100] [deck directory]
 set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
+DIR="$(cd "${2:-$DIR}" && pwd)"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 QUALITY="${1:-92}"
-SLIDES=21
+SLIDES=$(grep -c '<section class="slide' "$DIR/index.html")
 OUT="$DIR/slides"
 mkdir -p "$OUT"
 
