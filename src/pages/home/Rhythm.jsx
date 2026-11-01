@@ -53,6 +53,12 @@ const RELEASES = [
     date: 'September 2026',
     blurb: 'A Library for every book on the SD card, TrueType fonts, the Cover Grid home theme, word and character spacing, and X4 Classic support.',
   },
+  {
+    version: '2.0',
+    tag: '2.0.0',
+    date: 'November 2026',
+    blurb: 'SD card plugins, OPDS 2.0, highlights and clippings, Bluetooth page turners, richer EPUB rendering, and support for the Metalio E-Ink 4, EEGO A4, and BOOX Picco.',
+  },
 ]
 
 // Live numbers come from /api/stats. These are the last known good values and
@@ -181,7 +187,8 @@ export default function Rhythm() {
         <div className="mt-16 max-w-3xl border-t border-stone-200 pt-10">
           <h3 className="font-display text-lg font-semibold text-stone-900">There&rsquo;s more where that came from.</h3>
           <p className="mt-4 font-serif text-xl/9 text-pretty text-stone-600">
-            <LittleThing>Tilt the device</LittleThing> to turn the page.{' '}
+            <LittleThing>Tilt the device</LittleThing> to turn the page, or pair a{' '}
+            <LittleThing>Bluetooth page turner</LittleThing>.{' '}
             <LittleThing>Themes</LittleThing> that restyle the whole
             interface, including a <LittleThing>cover grid</LittleThing> of your recent books.
             A <LittleThing>clock</LittleThing> on the home screen that handles daylight saving

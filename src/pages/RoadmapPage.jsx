@@ -36,11 +36,22 @@ function FocusGrid({ items }) {
     <div className="mt-6">
       <p className="font-mono text-xs font-semibold tracking-wide text-stone-500 uppercase">Focus areas</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {items.map((item) => (
-          <div key={item} className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-700 ring-1 ring-stone-200/70">
-            {item}
-          </div>
-        ))}
+        {items.map((item) => {
+          // Items are plain labels, or { label, done } once an area has shipped.
+          const { label, done } = typeof item === 'string' ? { label: item, done: false } : item
+          return (
+            <div
+              key={label}
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ring-1 ${
+                done ? 'bg-brand-50 text-brand-900 ring-brand-200' : 'bg-stone-50 text-stone-700 ring-stone-200/70'
+              }`}
+            >
+              {done && <CheckIcon className="size-4 shrink-0 text-brand-500" />}
+              {label}
+              {done && <span className="ml-auto font-mono text-[10px] font-semibold tracking-wide text-brand-700 uppercase">2.0</span>}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -302,9 +313,9 @@ export default function RoadmapPage() {
 
               <FocusGrid
                 items={[
-                  'SD-loaded plugins',
+                  { label: 'SD-loaded plugins', done: true },
                   'SD-loaded themes',
-                  'Clippings',
+                  { label: 'Clippings', done: true },
                   'CJK localization',
                 ]}
               />
@@ -318,6 +329,13 @@ export default function RoadmapPage() {
                 Landed in 1.6.5: TrueType and OpenType fonts loaded straight from the SD card on devices with
                 external RAM, Portuguese hyphenation, an Arabic keyboard layout, Korean justification that stretches
                 only the spaces between words, and a build option to choose which UI languages are compiled in.
+              </p>
+              <p className="mt-2 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-900 ring-1 ring-brand-200">
+                Landed in 2.0 (November 1, 2026): <strong className="font-semibold">SD-loaded plugins</strong> for
+                book catalogs, downloads, and web-interface tools, and{' '}
+                <strong className="font-semibold">highlights and clippings</strong> with optional sync. 2.0 also
+                brought Bluetooth page turners, OPDS 2.0, richer EPUB rendering, an Azerbaijani UI, and support for
+                the Metalio E-Ink 4, EEGO A4, and BOOX Picco. SD-loaded themes and CJK localization remain open.
               </p>
             </div>
           </li>
@@ -624,15 +642,16 @@ export default function RoadmapPage() {
                   <h4 className="font-display font-semibold text-stone-900">
                     Themes &amp; Plugins: Move Them Off-Firmware
                   </h4>
-                  <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-stone-700 uppercase ring-1 ring-stone-300">
-                    Help wanted
+                  <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-brand-700 uppercase">
+                    Plugins shipped in 2.0
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-stone-600">
                   Abstract themes and plugins out of firmware so they load from SD card instead of consuming flash.
                 </p>
                 <p className="mt-3 text-xs text-stone-500">
-                  <strong className="font-semibold text-stone-700">Status:</strong>{' '}
+                  <strong className="font-semibold text-stone-700">Status:</strong> The SD card plugin system,
+                  built by{' '}
                   <a
                     href="https://github.com/itsthisjustin"
                     target="_blank"
@@ -640,8 +659,8 @@ export default function RoadmapPage() {
                     className="text-brand-600 underline underline-offset-2"
                   >
                     @itsthisjustin
-                  </a>{' '}
-                  plans to take this on eventually but is open to someone claiming it sooner.
+                  </a>
+                  , shipped in 2.0. SD-loaded themes are still help wanted.
                 </p>
               </div>
 

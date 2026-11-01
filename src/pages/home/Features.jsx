@@ -133,7 +133,9 @@ export default function Features() {
           >
             Calibre
           </a>{' '}
-          with the CrossPoint plugin, or browse OPDS libraries right on the device. However you keep your library, someone in the community has
+          with the CrossPoint plugin, or browse <Em>OPDS</Em> libraries, including{' '}
+          <Em>OPDS 2.0</Em> catalogs, right on the device. <Em>SD card plugins</Em> add even more
+          catalogs and download sources. However you keep your library, someone in the community has
           built a path for it.
         </Story>
 
@@ -145,6 +147,7 @@ export default function Features() {
         >
           <Em>Quick Resume</Em> shows your page while the device sleeps, and waking drops you
           straight back into the book. <Em>Bookmark</Em> any passage, give it a name, and flip back in a tap.
+          <Em>Highlight</Em> the lines worth keeping and save them as <Em>clippings</Em>.
           Finish a book, and CrossPoint{' '}
           <Em>suggests what to read next</Em>.
           If you read on more than one device, <Em>KOReader sync</Em> keeps them all on the
@@ -160,7 +163,7 @@ export default function Features() {
             </div>
           }
         >
-          Look up words without leaving your book or connecting to the internet.{' '}
+          Look up words, or select a whole phrase, without leaving your book or connecting to the internet.{' '}
           <Em>Bring your own dictionary</Em> in the StarDict format, then follow the{' '}
           <a
             href="https://crosspointreader.com/docs#dictionary"
