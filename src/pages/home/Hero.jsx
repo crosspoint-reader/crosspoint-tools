@@ -28,17 +28,6 @@ export default function Hero() {
 
       <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-6 py-16 lg:grid-cols-[1fr_auto] lg:gap-16 lg:px-8 lg:py-24">
         <div>
-          <Link
-            to="/blog/release-2.0.0"
-            className="group mb-6 inline-flex items-center gap-2 rounded-full bg-white py-1 pr-3 pl-1 text-sm text-stone-600 ring-1 ring-stone-950/10 transition hover:ring-brand-300"
-          >
-            <span className="rounded-full bg-brand-500 px-2 py-0.5 font-mono text-xs font-semibold text-white">2.0</span>
-            <span>
-              <span className="font-medium text-stone-900">CrossPoint 2.0 is out:</span> plugins, Bluetooth page
-              turners, and OPDS 2.0
-            </span>
-            <span aria-hidden="true" className="text-stone-400 transition group-hover:translate-x-0.5 group-hover:text-brand-600">&rarr;</span>
-          </Link>
           <Eyebrow>built by readers, for readers</Eyebrow>
           <h1 className="mt-2 max-w-[18ch] font-display text-5xl/[1.05] font-semibold tracking-tight text-balance text-stone-900 sm:text-7xl/[1.05]">
             Read without limits.
