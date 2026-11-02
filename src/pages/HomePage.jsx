@@ -43,7 +43,7 @@ export default function HomePage() {
         <section className="home-hero home-wrap">
           <div className="home-hero-heading">
             <div>
-              <h2>A good book.<br />A <span className="home-underline">little room</span> for it.</h2>
+              <h2>Find the reader<br />that <span className="home-underline">fits your pocket</span>.</h2>
             </div>
             <div className="home-hero-intro">
               <p>Find an e-reader you’ll want to take everywhere. Make it yours with CrossPoint, our free, open source reading software.</p>
