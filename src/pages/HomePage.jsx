@@ -60,23 +60,23 @@ export default function HomePage() {
         <PressQuotes />
 
         <section className="home-sync home-wrap" id="crosspoint-sync">
-          <div className="home-section-heading">
-            <div>
-              <h2>CrossPoint Sync</h2>
+          <h2>CrossPoint Sync</h2>
+          <div className="home-sync-layout">
+            <div className="home-sync-screens">
+              <img className="reader-screenshot home-sync-library" src="/sync/library.webp" alt="CrossPoint Sync web library showing current books and reading progress" width="1600" height="1000" loading="lazy" />
+              <img className="reader-screenshot home-sync-clippings" src="/sync/clippings.webp" alt="CrossPoint Sync mobile clippings view with search, Markdown export, and sharing" width="780" height="1688" loading="lazy" />
+            </div>
+            <div className="home-sync-copy">
+              <div className="home-sync-details">
+                <div><h3>Reading progress across devices</h3><p>Keep your place across CrossPoint and KOReader devices. View your current books, finished reads, and reading stats in the app.</p></div>
+                <div><h3>Search and share highlights</h3><p>Find saved passages across your books, copy clippings as Markdown, or share a passage as an image.</p></div>
+                <div><h3>Connect your reading services</h3><p>Update your shelves and progress on Hardcover, send highlights to Readwise, or sync your place with BookFusion and Audiobookshelf.</p></div>
+              </div>
               <div className="home-sync-actions">
                 <Button href="https://sync.crosspointreader.com/" variant="primary">Explore CrossPoint Sync <span aria-hidden="true">↗</span></Button>
                 <Link className="home-text-link" to="/docs#367-koreader-sync-quick-setup?doc=user_guide">Set up your reader →</Link>
               </div>
             </div>
-          </div>
-          <div className="home-sync-details">
-            <div><h3>Reading progress across devices</h3><p>Keep your place across CrossPoint and KOReader devices. View your current books, finished reads, and reading stats in the app.</p></div>
-            <div><h3>Search and share highlights</h3><p>Find saved passages across your books, copy clippings as Markdown, or share a passage as an image.</p></div>
-            <div><h3>Connect your reading services</h3><p>Update your shelves and progress on Hardcover, send highlights to Readwise, or sync your place with BookFusion and Audiobookshelf.</p></div>
-          </div>
-          <div className="home-sync-screens">
-            <img className="reader-screenshot" src="/sync/library.webp" alt="CrossPoint Sync web library showing current books and reading progress" width="1600" height="1000" loading="lazy" />
-            <img className="reader-screenshot" src="/sync/clippings.webp" alt="CrossPoint Sync mobile clippings view with search, Markdown export, and sharing" width="780" height="1688" loading="lazy" />
           </div>
         </section>
 

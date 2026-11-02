@@ -12,6 +12,7 @@ import struct
 import subprocess
 import tempfile
 import time
+from urllib.parse import urlsplit
 
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
@@ -47,6 +48,17 @@ def read_recipe(path):
             if not scene.get('book') or len(scene['position']) != 2 or any(
                     not isinstance(n, int) or not 0 <= n < 65535 for n in scene['position']):
                 raise ValueError(f'{name}: position needs a book and [spine, page] indexes')
+        servers = scene.get('opdsServers', [])
+        if not isinstance(servers, list) or len(servers) > 8:
+            raise ValueError(f'{name}: opdsServers must be a list of at most 8 servers')
+        for server in servers:
+            if not isinstance(server, dict) or set(server) != {'name', 'url'}:
+                raise ValueError(f'{name}: each OPDS server needs only name and url')
+            if not isinstance(server['name'], str) or not server['name'].strip() or not isinstance(server['url'], str):
+                raise ValueError(f'{name}: OPDS name and URL must be nonempty strings')
+            url = urlsplit(server['url'])
+            if url.scheme not in {'http', 'https'} or not url.hostname or url.username or url.password:
+                raise ValueError(f'{name}: OPDS URL must be HTTP(S) without credentials')
         previous = -1
         for at, action in scene.get('inputs', []):
             if not isinstance(at, int) or not previous < at < scene['at']:
@@ -121,6 +133,7 @@ def capture(binary, books, recipe, output, fonts=None):
             settings = {'language': 'EN', 'textAntiAliasing': 1, **recipe.get('settings', {}),
                         **scene.get('settings', {})}
             (sd / '.crosspoint/settings.json').write_text(json.dumps(settings))
+            (sd / '.crosspoint/opds.json').write_text(json.dumps({'servers': scene.get('opdsServers', [])}))
             state = {'showBootScreen': False, 'lastSleepFromReader': bool(scene.get('book')),
                      'openEpubPath': f"/books/{scene['book']}" if scene.get('book') else ''}
             (sd / '.crosspoint/state.json').write_text(json.dumps(state))

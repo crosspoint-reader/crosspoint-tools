@@ -39,9 +39,11 @@ class PipelineTest(unittest.TestCase):
             binary = root / 'program'
             binary.write_bytes(b'binary')
             recipe = {'books': ['Test.epub'], 'settings': {'fontSize': 14, 'screenMargin': 20}, 'scenes': [
-                {'name': 'test', 'book': 'Test.epub', 'position': [8, 1], 'at': 2000, 'settings': {'fontSize': 18}}]}
+                {'name': 'test', 'book': 'Test.epub', 'position': [8, 1], 'at': 2000, 'settings': {'fontSize': 18}, 'opdsServers': [{'name': 'Library', 'url': 'https://example.org/opds'}]}]}
             def simulator(command, **kwargs):
                 sd = Path(kwargs['env']['CROSSPOINT_SIM_SD'])
+                self.assertEqual(json.loads((sd / '.crosspoint/opds.json').read_text()),
+                                 {'servers': [{'name': 'Library', 'url': 'https://example.org/opds'}]})
                 self.assertEqual(json.loads((sd / '.crosspoint/settings.json').read_text())['fontSize'], 18)
                 self.assertEqual(json.loads((sd / '.crosspoint/settings.json').read_text())['screenMargin'], 20)
                 self.assertEqual(json.loads((sd / '.crosspoint/state.json').read_text())['openEpubPath'], '/books/Test.epub')
@@ -131,6 +133,19 @@ class PipelineTest(unittest.TestCase):
                 path.write_text(json.dumps(recipe))
                 with self.assertRaises(ValueError):
                     pipeline.read_recipe(path)
+
+    def test_rejects_invalid_opds_servers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'recipe.json'
+            for servers in (None, [{}], [{'name': '', 'url': 'https://example.org'}],
+                            [{'name': 'Library', 'url': 'file:///tmp/catalog'}],
+                            [{'name': 'Library', 'url': 'https://user:secret@example.org'}],
+                            [{'name': 'Library', 'url': 'https://example.org'}] * 9):
+                with self.subTest(servers=servers):
+                    path.write_text(json.dumps({'books': [], 'scenes': [
+                        {'name': 'home', 'at': 2000, 'opdsServers': servers}]}))
+                    with self.assertRaises(ValueError):
+                        pipeline.read_recipe(path)
 
     def test_regular_dither_is_smoothed_without_changing_paper(self):
         with tempfile.TemporaryDirectory() as directory:

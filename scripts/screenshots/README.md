@@ -104,6 +104,7 @@ For landscape, set `"orientation": 1` in the scene's `settings` and `"size": [80
 | `book` | EPUB to open at startup. Omit to start at Home. |
 | `position` | Optional zero-based `[spine, page]`: EPUB reading-order section and page within that section. Font or margin changes alter page contents, so the same page number need not show the same passage. |
 | `settings` | Overrides for this scene only. |
+| `opdsServers` | Optional list of up to eight `{ "name": "Common Stacks", "url": "http://library.local/opds" }` objects, staged into the firmware’s OPDS store. |
 | `inputs` | Ordered `[milliseconds, button]` pairs. Omit when no input is needed. |
 | `at` | Capture time, 1000–180000 milliseconds after startup. |
 | `size` | Expected native logical panel size, default `[480, 800]`. Output is three times this size. |
@@ -216,3 +217,5 @@ Run `npm run test:screenshots` after code changes. It checks image processing, o
 Firmware and simulator revisions are pinned in [sources.json](sources.json). The firmware pin precedes a web-server change that failed to compile with the pinned simulator. Do not update pins for routine captures. When deliberately upgrading, preserve old cached checkouts, rerun setup, check the firmware settings/progress schema, and review the affected scenes again. See the firmware checkout's own instructions before modifying it.
 
 Automation runs on the machine holding the EPUB collection. Hosted GitHub runners cannot access `/Users/jmitch/Books/Common Stacks`; no hosted capture job or scheduled task is installed by this pipeline.
+
+The `hero-home` scene uses *Dungeon Crawler Carl* and a Common Stacks OPDS entry so the home menu includes OPDS. `http://library.local/opds` is a screenshot fixture, not a hosted service; home-screen capture does not connect to it. Set a real endpoint before capturing a browsing session. Do not put credentials in this public configuration.

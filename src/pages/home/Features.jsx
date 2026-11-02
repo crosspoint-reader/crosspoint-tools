@@ -48,7 +48,7 @@ export default function Features() {
         </Story>
       </div>
       <div className="home-extras">
-        <article><h3>SD card plugins</h3><p>Load plugins from your SD card to add book catalogs, download sources, and web-interface tools without reflashing the firmware. Manage books with the browser file manager and reduce EPUB file sizes with the optimizer.</p><Link className="home-text-link" to="/docs#364-system?doc=user_guide">Set up SD card plugins →</Link></article>
+        <article><h3>SD card plugins</h3><p>Add book catalogs and download sources with SD card plugins, without reflashing firmware. Use web tools to manage books in your browser and shrink EPUB files with the optimizer.</p><Link className="home-text-link" to="/docs#364-system?doc=user_guide">Set up SD card plugins →</Link></article>
         <article><h3>Free over-the-air updates</h3><p>Update CrossPoint over Wi-Fi for free on supported devices. BOOX Picco updates use USB. Follow development on the roadmap, suggest changes, or try new features in nightly builds.</p><Link className="home-text-link" to="/docs#firmware-updates?doc=user_guide">Read the update instructions →</Link></article>
       </div>
     </section>

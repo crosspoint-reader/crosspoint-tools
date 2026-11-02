@@ -50,9 +50,9 @@
     {
       "name": "hero-home",
       "at": 14000,
-      "book": "Project Hail Mary - Andy Weir.epub",
+      "book": "Dungeon Crawler Carl - Matt Dinniman.epub",
       "position": [
-        19,
+        5,
         1
       ],
       "inputs": [
@@ -60,6 +60,12 @@
           8000,
           "BACK"
         ]
+      ],
+      "opdsServers": [
+        {
+          "name": "Common Stacks",
+          "url": "http://library.local/opds"
+        }
       ]
     },
     {
