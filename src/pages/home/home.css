@@ -66,7 +66,7 @@
 .home-opening-copy > p { max-width: 440px; font-size: 16px; line-height: 1.8; color: #555b50; margin-top: 25px; }
 .home-opening-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
 .home-opening-copy > p.home-opening-note { font-size: 11px; margin-top: 16px; }
-.home-opening-screens { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 32px; padding: 32px; background: var(--color-panel); }
+.home-opening-screens { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 32px; padding: 32px; }
 .home-opening-screens figure:first-child { margin-top: 48px; }
 .home-extras { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; margin-top: 50px; padding-top: 35px; border-top: 1px solid var(--home-rule); }
 .home-extras h3 { font-size: 1.65rem; }
