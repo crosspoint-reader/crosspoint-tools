@@ -25,8 +25,11 @@ const ASSETS = [
 const COLORS = [
   { name: 'Reader Green', hex: '#3d6652', swatch: 'bg-brand-600' },
   { name: 'Sage', hex: '#8fb9a6', swatch: 'bg-brand-300' },
-  { name: 'Ink', hex: '#1c1917', swatch: 'bg-stone-900' },
-  { name: 'Paper', hex: '#fafaf9', swatch: 'bg-stone-50' },
+  { name: 'Ink', hex: '#242820', swatch: 'bg-stone-900' },
+  { name: 'Paper', hex: '#faf8f3', swatch: 'bg-stone-50' },
+  { name: 'Forest', hex: '#315243', swatch: 'bg-brand-700' },
+  { name: 'Sage panel', hex: '#e7e7dc', swatch: 'bg-panel' },
+  { name: 'Tan panel', hex: '#ebe7de', swatch: 'bg-stone-100' },
 ]
 
 export default function BrandPage() {
@@ -49,7 +52,7 @@ export default function BrandPage() {
           {ASSETS.map((a) => (
             <li
               key={a.file}
-              className={`overflow-hidden rounded-xl bg-white ring-1 ring-stone-950/10 ${a.wide ? 'sm:col-span-2 lg:col-span-3' : ''}`}
+              className={`overflow-hidden rounded-sm bg-panel ring-1 ring-stone-950/10 ${a.wide ? 'sm:col-span-2 lg:col-span-3' : ''}`}
             >
               <div className={`flex h-48 items-center justify-center p-8 ${a.bg} ${a.wide ? 'sm:h-56' : ''}`}>
                 <img
@@ -79,6 +82,10 @@ export default function BrandPage() {
         <div className="mt-16 grid gap-12 lg:grid-cols-2">
           <div>
             <h2 className="font-display text-xl font-semibold text-stone-900">Colors</h2>
+            <p className="mt-4 text-sm/6 text-stone-600">
+              Use Paper for page backgrounds and Ink for text. Forest is the primary button color;
+              Reader Green and Sage are supporting accents. Use the muted panel colors for grouped content.
+            </p>
             <ul role="list" className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
               {COLORS.map((c) => (
                 <li key={c.hex}>
@@ -92,19 +99,52 @@ export default function BrandPage() {
           <div>
             <h2 className="font-display text-xl font-semibold text-stone-900">Type</h2>
             <p className="mt-4 text-sm/6 text-stone-600">
-              The wordmark and headlines are set in{' '}
+              Headlines are set in{' '}
               <a href="https://fonts.google.com/specimen/Lora" className="font-medium text-brand-600 hover:text-brand-700">
                 Lora
               </a>{' '}
-              SemiBold. Body text uses{' '}
+              Regular (400). The logo wordmark remains Lora SemiBold (600). Body text and controls use{' '}
               <a href="https://rsms.me/inter/" className="font-medium text-brand-600 hover:text-brand-700">
                 Inter
               </a>
-              . Write the name as <span className="font-medium text-stone-900">CrossPoint Reader</span>, or{' '}
+              . Use Geist Mono for technical values and compact labels.
+            </p>
+            <p className="mt-3 text-sm/6 text-stone-600">
+              Write the name as <span className="font-medium text-stone-900">CrossPoint Reader</span>, or{' '}
               <span className="font-medium text-stone-900">CrossPoint</span> for short.
             </p>
           </div>
         </div>
+
+        <section className="mt-16" aria-labelledby="brand-design-heading">
+          <h2 id="brand-design-heading" className="font-display text-2xl text-stone-900">Design and writing</h2>
+          <div className="mt-6 grid gap-8 md:grid-cols-3">
+            <div>
+              <h3 className="font-display text-xl text-stone-900">Layout and surfaces</h3>
+              <p className="mt-3 text-sm/6 text-stone-600">
+                Give headings and images room. Use flat, muted panels with square or subtly rounded
+                corners. Keep borders light and use them only where they help separate content.
+                Avoid bright white cards, decorative dividers, and heavy card shadows.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-display text-xl text-stone-900">Photography and screenshots</h3>
+              <p className="mt-3 text-sm/6 text-stone-600">
+                Use real device photography and screenshots of the software. Frame screenshots with
+                a dark bezel, rounded corners, and a small, solid offset shadow. Keep the original
+                proportions and make the interface readable at its displayed size.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-display text-xl text-stone-900">Clear feature copy</h3>
+              <p className="mt-3 text-sm/6 text-stone-600">
+                Name the feature and explain what it does. Use “SD card plugins” or “Offline dictionaries”
+                instead of slogans. Link to the relevant guide. Skip decorative subtitles and redundant
+                labels, and describe only features that are available.
+              </p>
+            </div>
+          </div>
+        </section>
       </div>
     </Layout>
   )

@@ -55,8 +55,20 @@ function getDeepLinkDoc() {
   return null
 }
 
-function setDeepLink(docName) {
-  history.replaceState(null, '', '#' + encodeURIComponent(docName))
+function getDeepLinkAnchor() {
+  const value = window.location.hash.slice(1).split('?')[0]
+  try {
+    const anchor = decodeURIComponent(value)
+    return FILES.some((file) => file.name === anchor + '.md') ? '' : anchor
+  } catch {
+    return ''
+  }
+}
+
+function setDeepLink(docName, anchor = '') {
+  history.replaceState(null, '', anchor
+    ? '#' + encodeURIComponent(anchor) + '?doc=' + encodeURIComponent(docName)
+    : '#' + encodeURIComponent(docName))
 }
 
 function Spinner() {
@@ -74,20 +86,26 @@ export default function DocsPage() {
   const articleRef = useRef(null)
   const activeNameRef = useRef(null)
   const requestSeq = useRef(0)
+  const anchorRef = useRef('')
 
-  const loadDoc = useCallback(async (file) => {
+  const loadDoc = useCallback(async (file, anchor = '') => {
     const seq = ++requestSeq.current
     setActiveName(file.name)
     activeNameRef.current = file.name
     setDoc({ status: 'loading', html: '' })
-    setDeepLink(file.name.replace(/\.md$/, ''))
+    anchorRef.current = anchor
+    setDeepLink(file.name.replace(/\.md$/, ''), anchor)
 
     try {
       const res = await fetch(file.download_url)
       if (!res.ok) throw new Error('HTTP ' + res.status)
       const md = await res.text()
 
-      const html = renderMarkdown(md)
+      // The upstream update instructions are a list item, so they need an explicit anchor.
+      const html = renderMarkdown(md.replace(
+        /^- \*\*Check for updates\*\*:/m,
+        '- <strong id="firmware-updates">Check for updates</strong>:',
+      ))
       if (seq !== requestSeq.current) return
       setDoc({ status: 'ready', html })
     } catch {
@@ -102,15 +120,20 @@ export default function DocsPage() {
     const deepDoc = getDeepLinkDoc()
     const target =
       (deepDoc && FILES.find((f) => f.name.replace(/\.md$/, '') === deepDoc)) || FILES[0]
-    if (target) loadDoc(target)
+    if (target) loadDoc(target, getDeepLinkAnchor())
 
     const onHashChange = () => {
       const docName = getDeepLinkDoc()
       if (!docName) return
       const current = activeNameRef.current
-      if (current && current.replace(/\.md$/, '') === docName) return // Already viewing
+      const anchor = getDeepLinkAnchor()
+      if (current && current.replace(/\.md$/, '') === docName) {
+        anchorRef.current = anchor
+        document.getElementById(anchor)?.scrollIntoView({ block: 'start' })
+        return
+      }
       const file = FILES.find((f) => f.name === docName + '.md')
-      if (file) loadDoc(file)
+      if (file) loadDoc(file, anchor)
       // Otherwise it's a sub-header hash within the doc; nothing to reload.
     }
     window.addEventListener('hashchange', onHashChange)
@@ -122,14 +145,15 @@ export default function DocsPage() {
   useEffect(() => {
     if (doc.status !== 'ready') return
     const content = articleRef.current
-    const pendingAnchor = window.sessionStorage.getItem('pendingDocAnchor')
+    const pendingAnchor = anchorRef.current || window.sessionStorage.getItem('pendingDocAnchor')
     if (pendingAnchor) {
+      anchorRef.current = ''
       window.sessionStorage.removeItem('pendingDocAnchor')
       // Wait a tick for the DOM to update
       const t = setTimeout(() => {
         const targetElement = document.getElementById(pendingAnchor)
         if (targetElement) {
-          targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          targetElement.scrollIntoView({ behavior: 'instant', block: 'start' })
         } else if (content) {
           content.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
@@ -188,7 +212,7 @@ export default function DocsPage() {
 
   return (
     <Layout>
-      <section className="border-b border-stone-200 bg-white">
+      <section className="border-b border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-7xl px-6 py-12 sm:py-16 lg:px-8">
           <div className="flex flex-col gap-10 md:flex-row md:gap-0">
             {/* Sidebar */}

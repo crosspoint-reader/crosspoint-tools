@@ -65,7 +65,7 @@ function StepBadge({ n, active }) {
 function cardClass(active) {
   return active
     ? 'group relative rounded-xl border-2 border-brand-600 bg-brand-50/40 p-4 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600'
-    : 'group relative rounded-xl border-2 border-stone-200 bg-white p-4 text-left hover:border-stone-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600'
+    : 'group relative rounded-xl border-2 border-stone-200 bg-stone-50 p-4 text-left hover:border-stone-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600'
 }
 
 // Group factory firmware languages into one labeled control.
@@ -78,7 +78,7 @@ function DropdownCard({ active, title, sub, subClass, value, options, onSelect }
         aria-label={title}
         value={value}
         onChange={(e) => e.target.value && onSelect(e.target.value)}
-        className="mt-2 w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none"
+        className="mt-2 w-full rounded-md border border-stone-300 bg-stone-50 px-2 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none"
       >
         <option value="" disabled>
           Select...
@@ -1113,7 +1113,7 @@ export default function FlashTools() {
                 <li>Keep the USB cable connected until installation finishes.</li>
               </ol>
               <div className="mt-4">
-                <div className="rounded-xl bg-white p-5 ring-1 ring-stone-950/5">
+                <div className="rounded-sm bg-panel p-5 ring-1 ring-stone-200">
                   {/* CrossPoint panel */}
                   {fw === 'crosspoint' && (
                     <div>
@@ -1363,7 +1363,7 @@ export default function FlashTools() {
                             : 'Upload a .bin file to flash to the OTA partition.'}
                       </p>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <label className="flex min-w-0 flex-1 cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 items-center justify-center rounded-md border border-dashed border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
+                        <label className="flex min-w-0 flex-1 cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 items-center justify-center rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-2.5 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
                           <span className="break-all">{customFile ? customFile.name : 'Choose firmware file…'}</span>
                           <input
                             type="file"
@@ -1414,7 +1414,7 @@ export default function FlashTools() {
 
           {/* Progress Card */}
           {progress && (
-            <div ref={progressRef} className="scroll-mt-20 rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+            <div ref={progressRef} className="scroll-mt-20 rounded-sm bg-panel p-6 ring-1 ring-stone-200">
               <h2 className="text-lg font-semibold tracking-tight text-stone-900">
                 {progress.status?.kind === 'ok' ? 'Installation complete' : progress.status?.kind === 'err' ? 'Installation needs attention' : progress.title}
               </h2>

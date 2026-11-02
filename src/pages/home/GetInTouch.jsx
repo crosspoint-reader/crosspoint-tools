@@ -47,7 +47,7 @@ export default function GetInTouch() {
         <p className="mx-auto mt-6 max-w-[52ch] font-serif text-xl/9 text-pretty text-stone-600">{active.intro}</p>
 
         {/* Toggle */}
-        <div className="mx-auto mt-8 inline-flex rounded-full border border-stone-200 bg-white p-1 shadow-sm">
+        <div className="mx-auto mt-8 inline-flex rounded-full border border-stone-200 bg-stone-50 p-1 shadow-sm">
           {TABS.map((t) => (
             <button
               key={t.id}

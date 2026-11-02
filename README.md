@@ -229,6 +229,14 @@ Thanks to [daveallie](https://github.com/daveallie) for the original browser fla
 
 The SD-card font builder descends from the generator in the [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader) firmware repo (`lib/EpdFont/scripts/fontconvert_sdcard.py`). Kerning, ligature, and interval behavior now live here, so website-only font features can move without waiting on firmware-repo updates. The browser build uses [FreeType](https://freetype.org/) and [HarfBuzz](https://harfbuzz.github.io/) compiled to WebAssembly, and [fontkit](https://github.com/foliojs/fontkit) for OpenType table parsing.
 
+## Website screenshot pipeline
+
+Use `npm run screenshots:setup` then `npm run screenshots` to capture real firmware screens from a local EPUB library and export beige, 3× PNG/WebP assets. Edit [settings.json](scripts/screenshots/settings.json) to choose the EPUB folder, books, font sizes, and screen settings. See the [usage guide](scripts/screenshots/README.md) and [agent instructions](scripts/screenshots/AGENTS.md).
+
 ## License
 
 MIT
+
+### Contributor collage
+
+Run `npm run build:contributors` to refresh the homepage collage from all GitHub-listed CrossPoint Reader contributors. See the [contributor collage guide](scripts/contributors/README.md).

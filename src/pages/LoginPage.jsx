@@ -114,7 +114,7 @@ export default function LoginPage() {
             {/* Magic link form (hidden by default) */}
             {showLogin && (
               <div className="mt-6">
-                <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5">
+                <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200">
                   <p className="text-sm/6 text-stone-600">
                     Enter the email you subscribed with and we'll send you a login link.
                   </p>
@@ -150,7 +150,7 @@ export default function LoginPage() {
 
           {/* Changelog */}
           <div className="mt-10">
-            <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5">
+            <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-stone-900">
                   What's in the latest nightly

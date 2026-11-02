@@ -4,12 +4,12 @@
 export function Button({ as = 'a', variant = 'outline', className = '', children, ...props }) {
   const Tag = as
   const base =
-    'inline-flex items-center justify-center gap-x-2 rounded-md px-3.5 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
+    'inline-flex items-center justify-center gap-x-2 rounded-sm px-4 py-3 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
   const variants = {
     primary:
-      'bg-brand-500 text-white shadow-sm hover:bg-brand-600 focus-visible:outline-brand-500',
+      'bg-brand-700 text-white hover:bg-brand-800 focus-visible:outline-brand-500',
     outline:
-      'bg-white text-stone-700 shadow-sm ring-1 ring-stone-950/10 hover:bg-stone-50 hover:text-stone-900 focus-visible:outline-stone-400',
+      'bg-stone-50 text-stone-900 ring-1 ring-stone-300 hover:bg-stone-50 hover:text-stone-900 focus-visible:outline-stone-400',
     royalty:
       'bg-royalty text-white shadow-sm hover:bg-royalty-dark focus-visible:outline-royalty',
   }
@@ -20,10 +20,10 @@ export function Button({ as = 'a', variant = 'outline', className = '', children
   )
 }
 
-// Handwritten margin-note eyebrow, matching the hero's hand-drawn annotations.
+// Small editorial labels shared across pages.
 export function Eyebrow({ children, className = '' }) {
   return (
-    <p className={`inline-block -rotate-1 font-hand text-xl/6 font-medium text-brand-600 ${className}`}>
+    <p className={`inline-block font-mono text-[10px]/6 font-medium tracking-[0.12em] uppercase text-brand-700 ${className}`}>
       {children}
     </p>
   )

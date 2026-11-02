@@ -12,6 +12,23 @@
   --font-eink: "Noto Serif", serif;
   --font-hand: "Caveat", cursive;
 
+  /* Light tan canvas with warm secondary surfaces, shared across the site. */
+  --color-stone-50: #faf8f3;
+  --color-panel: #e7e7dc;
+  --color-stone-100: #ebe7de;
+  --color-stone-200: #dfdfd2;
+  --color-stone-300: #c8c9bb;
+  --color-stone-400: #858a7d;
+  --color-stone-500: #62675d;
+  --color-stone-600: #555b50;
+  --color-stone-700: #41483d;
+  --color-stone-800: #33392f;
+  --color-stone-900: #242820;
+  --color-stone-950: #151a13;
+  --radius-xl: 0.375rem;
+  --radius-2xl: 0.375rem;
+  --radius-3xl: 0.5rem;
+
   /* Forest green — the single accent color */
   --color-brand-50: #f0f5f3;
   --color-brand-100: #d6e5de;
@@ -213,4 +230,11 @@ html { color-scheme: light; }
   color: #8a8782;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/* Editorial headings across the site; technical UI keeps its own typography. */
+main :is(h1, h2, h3).font-display {
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
 }

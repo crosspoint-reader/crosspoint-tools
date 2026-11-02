@@ -160,3 +160,5 @@
 }
 
 .docs-prose strong { color: #1c1917; }
+
+.docs-prose #firmware-updates { scroll-margin-top: 6rem; }

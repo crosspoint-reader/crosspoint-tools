@@ -21,8 +21,8 @@ const QUOTES = [
 
 export default function PressQuotes() {
   return (
-    <section className="border-t border-stone-200/70 bg-white">
-      <div className="mx-auto max-w-7xl px-6 py-16 sm:py-20 lg:px-8">
+    <section aria-label="Press and partner quotes" className="bg-stone-50">
+      <div className="mx-auto max-w-7xl px-6 pt-8 pb-16 sm:pt-10 sm:pb-20 lg:px-8">
         <div className="grid gap-12 sm:grid-cols-3 sm:gap-10">
           {QUOTES.map((q) => (
             <figure key={q.alt} className="flex flex-col items-center text-center sm:items-start sm:text-left">

@@ -19,7 +19,7 @@ export default function Modal({ open, onClose, title, children }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 py-8" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative max-h-[calc(100vh-4rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl ring-1 ring-stone-950/5">
+      <div className="relative max-h-[calc(100vh-4rem)] w-full max-w-lg overflow-y-auto rounded-sm bg-panel shadow-xl ring-1 ring-stone-200">
         <div className="flex items-start justify-between gap-4 border-b border-stone-100 px-6 py-4">
           <h2 className="font-display text-xl font-semibold tracking-tight text-stone-900">{title}</h2>
           <button

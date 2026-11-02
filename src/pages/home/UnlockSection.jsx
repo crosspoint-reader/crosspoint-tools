@@ -91,7 +91,7 @@ export default function UnlockSection() {
         </div>
 
         {/* Primary path: SD card flashing */}
-        {showSd ? <div className="rounded-2xl bg-white p-6 text-left shadow-sm ring-1 ring-stone-950/5 sm:p-7">
+        {showSd ? <div className="rounded-2xl bg-stone-50 p-6 text-left shadow-sm ring-1 ring-stone-950/5 sm:p-7">
           <h2 className="text-lg font-semibold text-stone-900">Flash from SD card</h2>
           <p className="mt-1 text-xs text-stone-400">Recommended for X3 and X4, even on stock firmware.</p>
           <ol className="mt-5 space-y-4">
@@ -130,7 +130,7 @@ export default function UnlockSection() {
             </a>
             . Flashing unapproved firmware can <span className="font-semibold">permanently brick your device</span>.
           </p>
-        </div> : <div className="rounded-2xl bg-white p-6 text-left shadow-sm ring-1 ring-stone-950/5 sm:p-7">
+        </div> : <div className="rounded-2xl bg-stone-50 p-6 text-left shadow-sm ring-1 ring-stone-950/5 sm:p-7">
           <h2 className="text-lg font-semibold text-stone-900">Install over WiFi</h2>
           <p className="mt-3 text-sm/6 text-stone-700">The OTA Unlocker installs CrossPoint through your reader’s WiFi update feature. Download the tool for your computer and choose {device.name} inside it.</p>
           <Link to={unlockerPath} className="mt-5 inline-flex min-h-11 items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">Get the OTA Unlocker</Link>

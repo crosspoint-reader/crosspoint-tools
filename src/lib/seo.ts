@@ -43,10 +43,6 @@ const PAGES: Record<string, PageMeta> = {
     title: 'Font Downloader & Builder',
     description: 'Download ready-made font families for CrossPoint, or convert your own TrueType and OpenType fonts in the browser.',
   },
-  '/theme-builder': {
-    title: 'SD Theme Builder',
-    description: 'Visually build a CrossPoint SD theme and preview it on a simulated device screen.',
-  },
   '/debug': {
     title: 'Advanced Flash Controls',
     description: 'Serial monitor, partition table inspection, and advanced flashing tools for CrossPoint devices.',

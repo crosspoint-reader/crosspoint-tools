@@ -55,8 +55,8 @@ const DEBUG_DEVICES = {
 
 function ToolCard({ title, children }) {
   return (
-    <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5">
-      <h2 className="font-display text-base font-semibold tracking-tight text-stone-900">{title}</h2>
+    <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200">
+      <h2 className="font-display text-xl font-semibold tracking-tight text-stone-900">{title}</h2>
       {children}
     </div>
   )
@@ -68,16 +68,16 @@ function Mono({ children }) {
 
 const btnBase =
   'inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
-const btnPrimary = `${btnBase} bg-brand-500 text-white shadow-sm hover:bg-brand-600 focus-visible:outline-brand-500`
+const btnPrimary = `${btnBase} bg-brand-700 text-white hover:bg-brand-800 focus-visible:outline-brand-500`
 const btnDark = `${btnBase} bg-stone-900 text-white shadow-sm hover:bg-stone-700 focus-visible:outline-stone-900`
-const btnOutline = `${btnBase} bg-white text-stone-700 shadow-sm ring-1 ring-stone-950/10 hover:bg-stone-50`
+const btnOutline = `${btnBase} bg-stone-50 text-stone-700 ring-1 ring-stone-300 hover:bg-stone-50`
 
 const inputClass =
-  'min-w-0 flex-1 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 file:mr-3 file:rounded file:border-0 file:bg-stone-100 file:px-2 file:py-1 file:font-mono file:text-xs file:text-stone-600'
+  'min-w-0 flex-1 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 file:mr-3 file:rounded file:border-0 file:bg-stone-100 file:px-2 file:py-1 file:font-mono file:text-xs file:text-stone-600'
 
 function PartitionTable({ partitions, title, highlight = false }) {
   return (
-    <div className={`overflow-hidden rounded-xl bg-white ${highlight ? 'ring-2 ring-brand-500' : 'ring-1 ring-stone-200'}`}>
+    <div className={`overflow-hidden rounded-sm bg-panel ${highlight ? 'ring-2 ring-brand-500' : 'ring-1 ring-stone-200'}`}>
       <div className="bg-stone-50 px-3 py-2 font-mono text-xs font-semibold text-stone-700">{title}</div>
       <table className="w-full">
         <thead>
@@ -164,7 +164,7 @@ function OtaResult({ data, onDownloadRaw }) {
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {slots.map(({ label, index, details }) => (
-          <div key={label} className="rounded-xl bg-white ring-1 ring-stone-200">
+          <div key={label} className="rounded-sm bg-panel ring-1 ring-stone-200">
             <div className="bg-stone-50 px-3 py-2 font-mono text-xs font-semibold text-stone-700">{label}</div>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 p-3 text-xs">
               <dt className="text-stone-400">Boot partition</dt>
@@ -342,7 +342,7 @@ function SerialMonitorCard() {
           ref={baudRef}
           defaultValue="115200"
           disabled={connected}
-          className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
+          className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
         >
           {MONITOR_BAUD_RATES.map((rate) => (
             <option key={rate} value={rate}>
@@ -770,7 +770,7 @@ export default function DebugPage() {
                   ? 'bg-amber-50 text-amber-700'
                   : 'bg-brand-50 text-brand-700'
             return (
-              <div key={label} className="rounded-xl bg-white p-4 ring-1 ring-stone-200">
+              <div key={label} className="rounded-sm bg-panel p-4 ring-1 ring-stone-200">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="font-mono text-sm font-semibold text-stone-900">{label}</h3>
                   {identified.currentBoot === label && (
@@ -916,7 +916,7 @@ export default function DebugPage() {
                     value={repairDeviceId}
                     onChange={(e) => setRepairDeviceId(e.target.value)}
                     disabled={busy}
-                    className="mt-2 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
+                    className="mt-2 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
                   >
                     {Object.entries(DEBUG_DEVICES).map(([id, item]) => (
                       <option key={id} value={id}>
@@ -939,7 +939,7 @@ export default function DebugPage() {
                       aria-label="Partition layout"
                       defaultValue={defaultRepairLayout.value}
                       disabled={busy}
-                      className="mt-2 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
+                      className="mt-2 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
                     >
                       {repairDevice.layouts.map((layout) => (
                         <option key={layout.value} value={layout.value}>
@@ -1029,7 +1029,7 @@ export default function DebugPage() {
                     value={restoreDeviceId}
                     onChange={(e) => setRestoreDeviceId(e.target.value)}
                     disabled={busy}
-                    className="rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
+                    className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 disabled:opacity-50"
                   >
                     {Object.entries(DEBUG_DEVICES).map(([id, item]) => (
                       <option key={id} value={id}>

@@ -74,7 +74,7 @@ export default function UnlockerPage() {
         </div>}
 
         {/* How it works */}
-        <div className="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+        <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200">
           <h2 className="font-display text-lg font-semibold tracking-tight text-stone-900 sm:text-base/6">
             How it works
           </h2>
@@ -99,7 +99,7 @@ export default function UnlockerPage() {
         </div>
 
         {/* Downloads */}
-        <div className="mt-4 rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+        <div className="mt-4 rounded-sm bg-panel p-6 ring-1 ring-stone-200">
           <h2 className="font-display text-lg font-semibold tracking-tight text-stone-900 sm:text-base/6">
             Download the Unlocker
           </h2>

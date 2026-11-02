@@ -45,7 +45,7 @@ const COLUMNS = [
 
 export default function Footer() {
   return (
-    <footer className="border-t border-stone-200 bg-stone-100/50">
+    <footer className="border-t border-stone-200 bg-stone-50">
       <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
         <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 lg:grid-cols-6">
           <div className="col-span-2">
@@ -56,14 +56,14 @@ export default function Footer() {
               </span>
             </Link>
             <p className="mt-4 max-w-[34ch] text-sm/6 text-stone-500">
-              E-reader software built in the open. Get it for Xteink X3 and X4, reTerminal
-              Sticky, M5Paper, LilyGo T5, and more.
+              Free reading software for a growing family of e-readers. Built in the open,
+              by the people who use it.
             </p>
           </div>
 
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <h3 className="text-xs font-semibold tracking-[0.15em] text-stone-400 uppercase">
+              <h3 className="font-mono text-[10px] font-medium tracking-[0.12em] text-stone-600 uppercase">
                 {col.title}
               </h3>
               <ul role="list" className="mt-4 space-y-3">

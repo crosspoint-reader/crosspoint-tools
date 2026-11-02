@@ -79,7 +79,7 @@ function NavDropdown({ item }) {
       </button>
       {open && (
         <div className="absolute top-full left-0 pt-2 w-44">
-          <div className="rounded-xl bg-white p-1.5 shadow-lg ring-1 ring-stone-950/5">
+          <div className="rounded-sm bg-panel p-1.5 shadow-lg ring-1 ring-stone-200">
             {item.items.map((sub) => (
               <Link
                 key={sub.name}
@@ -123,7 +123,7 @@ export default function Header() {
   const [open, setOpen] = useState(false)
 
   return (
-    <header className="sticky top-0 z-40 border-b border-stone-200/80 bg-stone-50/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-stone-300 bg-stone-50/95 backdrop-blur-md">
       <nav className="mx-auto flex max-w-7xl items-center justify-between gap-x-4 px-4 py-3.5 sm:px-6 lg:px-8">
         <Link to="/" aria-label="Homepage" className="flex min-w-0 shrink-0 items-center gap-x-2.5">
           <img src="/logo.png" alt="" className="size-7 shrink-0 rounded-md" />

@@ -3,7 +3,7 @@ import { Button } from '../../components/ui.jsx'
 import SerialCapture from './SerialCapture.jsx'
 
 const inputCls =
-  'w-full rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20'
+  'w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20'
 
 const TURNSTILE_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 
@@ -303,7 +303,7 @@ export default function ReportIssueForm() {
             href={GITHUB_NEW_ISSUE_URL}
             target="_blank"
             rel="noreferrer"
-            className="group flex flex-col rounded-xl border border-stone-200 bg-white p-5 text-left shadow-sm transition hover:border-brand-400 hover:shadow"
+            className="group flex flex-col rounded-xl border border-stone-200 bg-stone-50 p-5 text-left shadow-sm transition hover:border-brand-400 hover:shadow"
           >
             <span className="text-sm font-semibold text-stone-900">I have a GitHub account</span>
             <span className="mt-1 text-xs/5 text-stone-500">
@@ -314,7 +314,7 @@ export default function ReportIssueForm() {
           <button
             type="button"
             onClick={() => setMode('form')}
-            className="group flex flex-col rounded-xl border border-stone-200 bg-white p-5 text-left shadow-sm transition hover:border-brand-400 hover:shadow"
+            className="group flex flex-col rounded-xl border border-stone-200 bg-stone-50 p-5 text-left shadow-sm transition hover:border-brand-400 hover:shadow"
           >
             <span className="text-sm font-semibold text-stone-900">I don&rsquo;t have a GitHub account</span>
             <span className="mt-1 text-xs/5 text-stone-500">
@@ -348,7 +348,7 @@ export default function ReportIssueForm() {
               className={
                 type === t.value
                   ? 'rounded-xl border-2 border-brand-500 bg-brand-50/40 px-4 py-2.5 text-sm font-semibold text-stone-900'
-                  : 'rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm font-medium text-stone-700 hover:border-stone-300'
+                  : 'rounded-sm border border-stone-200 bg-panel px-4 py-2.5 text-sm font-medium text-stone-700 hover:border-stone-300'
               }
             >
               {t.label}
@@ -438,7 +438,7 @@ export default function ReportIssueForm() {
                   : { text: 'Closed', cls: 'bg-stone-200 text-stone-700' }
                 : null
               return (
-              <div key={m.number} className="rounded-lg border border-amber-200 bg-white p-2.5">
+              <div key={m.number} className="rounded-lg border border-amber-200 bg-stone-50 p-2.5">
                 <div className="flex items-baseline justify-between gap-2">
                   <a
                     href={m.url}
@@ -522,7 +522,7 @@ export default function ReportIssueForm() {
                   className={
                     on
                       ? 'rounded-full border-2 border-brand-500 bg-brand-50/60 px-3 py-1 text-xs font-semibold text-brand-700'
-                      : 'rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-medium text-stone-600 hover:border-stone-300'
+                      : 'rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-medium text-stone-600 hover:border-stone-300'
                   }
                 >
                   {t.label}

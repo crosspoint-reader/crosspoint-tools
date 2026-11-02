@@ -1,0 +1,4 @@
+{
+  "firmware": {"url": "https://github.com/crosspoint-reader/crosspoint-reader.git", "ref": "51e0baa2c3ebc10bdd2e4ef3218d8dd76f8d72fa"},
+  "simulator": {"url": "https://github.com/crosspoint-reader/crosspoint-simulator.git", "ref": "8dcf00b08fa264a10517d427143923a7492a04fc"}
+}

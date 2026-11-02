@@ -61,7 +61,7 @@ function NumberChip({ n, dark = false }) {
   return (
     <span
       className={`flex size-7 items-center justify-center rounded-md font-mono text-xs font-bold ${
-        dark ? 'bg-white text-stone-900' : 'bg-brand-500 text-white'
+        dark ? 'bg-stone-50 text-stone-900' : 'bg-brand-500 text-white'
       }`}
     >
       {n}
@@ -76,7 +76,7 @@ export default function RoadmapPage() {
   return (
     <Layout>
       {/* HERO */}
-      <section className="relative overflow-hidden border-b border-stone-200 bg-white">
+      <section className="relative overflow-hidden border-b border-stone-200 bg-stone-50">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 dot-field text-stone-900/[0.05] [mask-image:radial-gradient(80%_100%_at_50%_0%,black,transparent_75%)]"
@@ -136,7 +136,7 @@ export default function RoadmapPage() {
             </a>
             <a
               href="#scope"
-              className="rounded-md bg-white px-4 py-2 font-semibold text-stone-700 ring-1 ring-stone-950/10 no-underline hover:bg-stone-50"
+              className="rounded-md bg-stone-50 px-4 py-2 font-semibold text-stone-700 ring-1 ring-stone-950/10 no-underline hover:bg-stone-50"
             >
               View Scope
             </a>
@@ -167,7 +167,7 @@ export default function RoadmapPage() {
             <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-brand-500 text-white sm:size-12">
               <CheckIcon className="size-5 sm:size-6" />
             </div>
-            <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.18)] sm:p-8">
+            <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200 transition sm:p-8">
               <PhaseBadges status="Complete" phase="Phase 0" />
               <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
                 Close Out Legacy Scope Items
@@ -251,7 +251,7 @@ export default function RoadmapPage() {
             <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-brand-500 text-white sm:size-12">
               <CheckIcon className="size-5 sm:size-6" />
             </div>
-            <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.18)] sm:p-8">
+            <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200 transition sm:p-8">
               <PhaseBadges status="Complete" phase="Phase 1" />
               <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
                 Consolidation, Footprint &amp; Multi-Device Support
@@ -277,10 +277,10 @@ export default function RoadmapPage() {
                 <span className="font-mono text-xs font-semibold tracking-wide text-stone-700 uppercase">
                   Closed during phase
                 </span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-stone-700 ring-1 ring-stone-300 line-through decoration-stone-400">
+                <span className="rounded-full bg-stone-50 px-2 py-0.5 text-xs font-medium text-stone-700 ring-1 ring-stone-300 line-through decoration-stone-400">
                   New built-in themes
                 </span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-stone-700 ring-1 ring-stone-300 line-through decoration-stone-400">
+                <span className="rounded-full bg-stone-50 px-2 py-0.5 text-xs font-medium text-stone-700 ring-1 ring-stone-300 line-through decoration-stone-400">
                   New network connectors
                 </span>
               </div>
@@ -300,21 +300,20 @@ export default function RoadmapPage() {
             <div className="absolute top-0 left-0 flex size-10 items-center justify-center rounded-full bg-brand-500 font-mono text-sm font-bold text-white ring-4 ring-brand-100 sm:size-12 sm:text-base">
               2
             </div>
-            <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5 transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_-16px_rgba(0,0,0,0.18)] sm:p-8">
+            <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200 transition sm:p-8">
               <PhaseBadges status="In progress" phase="Phase 2" live />
               <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight text-stone-900">
-                SD Plugins, SD Themes, Clippings &amp; CJK
+                SD Plugins, Clippings &amp; CJK
               </h3>
               <p className="mt-2 text-stone-600">
                 <span className="font-semibold text-stone-900">Goal:</span> With the codebase smaller and portable,
-                extend CrossPoint from the SD card instead of the firmware: plugins and themes loaded as SD assets so
+                extend CrossPoint from the SD card instead of the firmware: plugins loaded as SD assets so
                 they don't consume flash, clippings for saving passages from your books, and full CJK localization.
               </p>
 
               <FocusGrid
                 items={[
                   { label: 'SD-loaded plugins', done: true },
-                  'SD-loaded themes',
                   { label: 'Clippings', done: true },
                   'CJK localization',
                 ]}
@@ -335,7 +334,7 @@ export default function RoadmapPage() {
                 book catalogs, downloads, and web-interface tools, and{' '}
                 <strong className="font-semibold">highlights and clippings</strong> with optional sync. 2.0 also
                 brought Bluetooth page turners, OPDS 2.0, richer EPUB rendering, an Azerbaijani UI, and support for
-                the Metalio E-Ink 4, EEGO A4, and BOOX Picco. SD-loaded themes and CJK localization remain open.
+                the Metalio E-Ink 4, EEGO A4, and BOOX Picco. CJK localization remains open.
               </p>
             </div>
           </li>
@@ -371,7 +370,7 @@ export default function RoadmapPage() {
             ].map((item) => (
               <span
                 key={item}
-                className="rounded-full bg-white px-3 py-1 text-xs font-medium text-stone-600 ring-1 ring-stone-200"
+                className="rounded-full bg-stone-50 px-3 py-1 text-xs font-medium text-stone-600 ring-1 ring-stone-200"
               >
                 {item}
               </span>
@@ -380,7 +379,7 @@ export default function RoadmapPage() {
         </div>
 
         {/* How this changes */}
-        <div className="mt-8 rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+        <div className="mt-8 rounded-sm bg-panel p-6 ring-1 ring-stone-200">
           <h3 className="font-display text-lg font-semibold tracking-tight text-stone-900">
             How this roadmap changes
           </h3>
@@ -402,7 +401,7 @@ export default function RoadmapPage() {
       </section>
 
       {/* SCOPE */}
-      <section id="scope" className="relative border-t border-stone-200 bg-white">
+      <section id="scope" className="relative border-t border-stone-200 bg-stone-50">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-64 blueprint-grid text-stone-900/[0.03] [mask-image:linear-gradient(to_bottom,black,transparent)]"
@@ -462,7 +461,7 @@ export default function RoadmapPage() {
             <div className="flex items-center gap-2">
               <NumberChip n="3" />
               <h3 className="font-display text-lg font-semibold tracking-tight text-stone-900">Current Focus</h3>
-              <span className="rounded-full bg-white px-2.5 py-0.5 font-mono text-xs font-semibold text-brand-700 ring-1 ring-brand-200">
+              <span className="rounded-full bg-stone-50 px-2.5 py-0.5 font-mono text-xs font-semibold text-brand-700 ring-1 ring-brand-200">
                 Until further notice
               </span>
             </div>
@@ -477,13 +476,13 @@ export default function RoadmapPage() {
                 ['Code cleanup', 'Refactors, dead code, tighter abstractions.'],
                 ['Reading experience', 'EPUB, typography, hyphenation, legibility.'],
               ].map(([title, body]) => (
-                <div key={title} className="rounded-lg bg-white p-4 ring-1 ring-brand-200/70">
+                <div key={title} className="rounded-lg bg-stone-50 p-4 ring-1 ring-brand-200/70">
                   <p className="font-semibold text-stone-900">{title}</p>
                   <p className="mt-1 text-xs text-stone-600">{body}</p>
                 </div>
               ))}
             </div>
-            <div className="mt-5 rounded-lg bg-white px-4 py-3 ring-1 ring-stone-300">
+            <div className="mt-5 rounded-lg bg-stone-50 px-4 py-3 ring-1 ring-stone-300">
               <p className="font-mono text-xs font-semibold tracking-wide text-stone-700 uppercase">
                 Temporarily closed
               </p>
@@ -505,7 +504,7 @@ export default function RoadmapPage() {
             </div>
             <div className="mt-5 grid gap-5 lg:grid-cols-2">
               {/* In-Scope */}
-              <div className="rounded-2xl bg-white p-6 ring-1 ring-brand-200/60 sm:p-7">
+              <div className="rounded-sm bg-panel p-6 ring-1 ring-brand-200/60 sm:p-7">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 font-mono text-xs font-semibold text-brand-700 ring-1 ring-brand-200">
                     <svg className="size-3" fill="none" viewBox="0 0 24 24" strokeWidth="3" stroke="currentColor">
@@ -536,7 +535,7 @@ export default function RoadmapPage() {
               </div>
 
               {/* Out-of-Scope */}
-              <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-300/70 sm:p-7">
+              <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-300/70 sm:p-7">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-2.5 py-0.5 font-mono text-xs font-semibold text-stone-700 ring-1 ring-stone-300">
                     <svg className="size-3" fill="none" viewBox="0 0 24 24" strokeWidth="3" stroke="currentColor">
@@ -637,17 +636,17 @@ export default function RoadmapPage() {
             </p>
 
             <div className="mt-6 grid gap-5 md:grid-cols-2">
-              <div className="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+              <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200">
                 <div className="flex items-start justify-between gap-3">
                   <h4 className="font-display font-semibold text-stone-900">
-                    Themes &amp; Plugins: Move Them Off-Firmware
+                    SD Plugins: Add More Book Sources
                   </h4>
                   <span className="shrink-0 rounded-full bg-brand-100 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wide text-brand-700 uppercase">
                     Plugins shipped in 2.0
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-stone-600">
-                  Abstract themes and plugins out of firmware so they load from SD card instead of consuming flash.
+                  Build book catalogs, downloads, and web-interface tools as plugins that load from the SD card.
                 </p>
                 <p className="mt-3 text-xs text-stone-500">
                   <strong className="font-semibold text-stone-700">Status:</strong> The SD card plugin system,
@@ -660,11 +659,11 @@ export default function RoadmapPage() {
                   >
                     @itsthisjustin
                   </a>
-                  , shipped in 2.0. SD-loaded themes are still help wanted.
+                  , shipped in 2.0.
                 </p>
               </div>
 
-              <div className="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+              <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200">
                 <div className="flex items-start justify-between gap-3">
                   <h4 className="font-display font-semibold text-stone-900">
                     SDK Abstraction for All ESP32 E-Readers
@@ -685,7 +684,7 @@ export default function RoadmapPage() {
                 </p>
               </div>
 
-              <div className="rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+              <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200">
                 <div className="flex items-start justify-between gap-3">
                   <h4 className="font-display font-semibold text-stone-900">
                     Identifying Other Stock-Firmware Gaps

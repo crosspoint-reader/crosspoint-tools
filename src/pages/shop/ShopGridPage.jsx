@@ -85,7 +85,7 @@ export function ProductCard({ item, ctaLabel, children }) {
   )
 
   const cardCls =
-    'flex flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-stone-950/5'
+    'flex flex-col overflow-hidden rounded-sm bg-panel ring-1 ring-stone-200'
 
   if (!clickable) {
     return <div className={cardCls}>{body}</div>
@@ -168,7 +168,7 @@ export default function ShopGridPage({
               onChange={(e) => setQuery(e.target.value)}
               placeholder={'Search ' + title.toLowerCase() + '...'}
               aria-label={'Search ' + title.toLowerCase()}
-              className="w-full rounded-lg border border-stone-300 bg-white py-2.5 pr-3 pl-9 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
+              className="w-full rounded-lg border border-stone-300 bg-stone-50 py-2.5 pr-3 pl-9 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none"
             />
           </div>
         )}

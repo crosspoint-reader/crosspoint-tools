@@ -69,7 +69,7 @@ export default function KosyncPage() {
               </p>
             </div>
 
-            <div className="mt-8 rounded-xl bg-white p-6 ring-1 ring-stone-950/5">
+            <div className="mt-8 rounded-sm bg-panel p-6 ring-1 ring-stone-200">
               <form onSubmit={onSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="username" className="block text-sm font-medium text-stone-700">

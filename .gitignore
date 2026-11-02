@@ -20,3 +20,6 @@ unlocker-tool/X4PRO-API-REFERENCE.md
 scripts/font-builder/wasm/.build/
 .vercel
 deck/open-source-money/
+
+# Local screenshot builds, raw captures, logs and review galleries
+.screenshots/

@@ -1,0 +1,239 @@
+{
+  "booksDirectory": "/Users/jmitch/Books/Common Stacks",
+  "fontsDirectory": "fonts",
+  "books": [
+    "112263 - Stephen King.epub",
+    "A Court of Thorns and Roses eBook Bundle - Sarah J. Maas.epub",
+    "A Parade of Horribles - Matt Dinniman.epub",
+    "Annihilation - Jeff VanderMeer.epub",
+    "Dark Matter - Blake Crouch.epub",
+    "Dead Moon - Clines, Peter.epub",
+    "Dungeon Crawler Carl - Matt Dinniman.epub",
+    "Fourth Wing - Rebecca Yarros.epub",
+    "From Below - Darcy Coates.epub",
+    "How To Win Friends and Influence People - Dale Carnegie.epub",
+    "Iron Flame - Rebecca Yarros.epub",
+    "Kaiju Preservation Society - Scalzi, John.epub",
+    "Neuromancer - William Gibson.epub",
+    "Of Monsters and Mainframes - Barbara Truelove.epub",
+    "Outlander - Diana Gabaldon.epub",
+    "Paradox Bound - Peter Clines.epub",
+    "Project Hail Mary - Andy Weir.epub",
+    "Replay - Ken Grimwood.epub",
+    "Rivers of London - Ben Aaronovitch.epub",
+    "Silvers [01] The Flight of the Silvers - Daniel Price.epub",
+    "Silvers [02] The Song of the Orphans - Daniel Price.epub",
+    "Silvers [03] The War of the Givens - Daniel Price.epub",
+    "The Fold A Novel - Peter Clines.epub",
+    "The Invisible Life of Addie LaRue - V.E. Schwab.epub",
+    "The Seven Husbands of Evelyn Hugo - Taylor Jenkins Reid.epub",
+    "The Three-Body Problem - Cixin Liu.epub",
+    "There Is No Antimemetics Division - qntm.epub",
+    "Vibe Coding The Future of Programming (for \u200b \u200b) - Addy Osmani.epub",
+    "We'll Prescribe You a Cat - Syou Ishida.epub",
+    "Wool Omnibus - Hugh Howey.epub"
+  ],
+  "palette": {
+    "paper": "#f4f1e9",
+    "ink": "#242820"
+  },
+  "settings": {
+    "uiTheme": 1,
+    "fontSize": 12,
+    "screenMargin": 20,
+    "paragraphAlignment": 0,
+    "textAntiAliasing": 1,
+    "hyphenationEnabled": 1,
+    "sdFontFamilyName": "Libron"
+  },
+  "scenes": [
+    {
+      "name": "hero-home",
+      "at": 14000,
+      "book": "Project Hail Mary - Andy Weir.epub",
+      "position": [
+        19,
+        1
+      ],
+      "inputs": [
+        [
+          8000,
+          "BACK"
+        ]
+      ]
+    },
+    {
+      "name": "hero-reader",
+      "book": "Project Hail Mary - Andy Weir.epub",
+      "inputs": [],
+      "at": 12000,
+      "position": [
+        19,
+        1
+      ]
+    },
+    {
+      "name": "feature-reader",
+      "book": "Annihilation - Jeff VanderMeer.epub",
+      "inputs": [],
+      "at": 12000,
+      "position": [
+        6,
+        1
+      ]
+    },
+    {
+      "name": "reader-large-type",
+      "book": "Project Hail Mary - Andy Weir.epub",
+      "settings": {
+        "fontSize": 14,
+        "lineHeight": 3,
+        "screenMargin": 24
+      },
+      "inputs": [],
+      "at": 12000,
+      "position": [
+        19,
+        1
+      ]
+    },
+    {
+      "name": "reader-menu",
+      "book": "Project Hail Mary - Andy Weir.epub",
+      "inputs": [
+        [
+          8000,
+          "ENTER"
+        ]
+      ],
+      "at": 12000,
+      "position": [
+        19,
+        1
+      ]
+    },
+    {
+      "name": "hero-settings",
+      "inputs": [
+        [
+          6000,
+          "UP"
+        ],
+        [
+          7000,
+          "ENTER"
+        ]
+      ],
+      "at": 11000
+    },
+    {
+      "name": "feature-library",
+      "inputs": [
+        [
+          6000,
+          "DOWN"
+        ],
+        [
+          7000,
+          "ENTER"
+        ],
+        [
+          14000,
+          "ENTER"
+        ],
+        [
+          16000,
+          "ENTER"
+        ]
+      ],
+      "at": 20000
+    },
+    {
+      "name": "feature-transfer",
+      "inputs": [
+        [
+          6000,
+          "DOWN"
+        ],
+        [
+          7000,
+          "DOWN"
+        ],
+        [
+          8000,
+          "ENTER"
+        ]
+      ],
+      "at": 12000
+    },
+    {
+      "name": "feature-focus-reading",
+      "book": "Project Hail Mary - Andy Weir.epub",
+      "position": [
+        19,
+        1
+      ],
+      "settings": {
+        "focusReadingEnabled": 1,
+        "fontSize": 12
+      },
+      "at": 12000
+    },
+    {
+      "name": "feature-settings",
+      "inputs": [
+        [
+          6000,
+          "UP"
+        ],
+        [
+          7000,
+          "ENTER"
+        ],
+        [
+          8000,
+          "DOWN"
+        ],
+        [
+          9000,
+          "DOWN"
+        ],
+        [
+          10000,
+          "ENTER"
+        ]
+      ],
+      "at": 13000
+    },
+    {
+      "name": "feature-settings-font-selection",
+      "inputs": [
+        [
+          6000,
+          "UP"
+        ],
+        [
+          7000,
+          "ENTER"
+        ],
+        [
+          8000,
+          "DOWN"
+        ],
+        [
+          9000,
+          "DOWN"
+        ],
+        [
+          10000,
+          "ENTER"
+        ],
+        [
+          12000,
+          "ENTER"
+        ]
+      ],
+      "at": 16000
+    }
+  ]
+}

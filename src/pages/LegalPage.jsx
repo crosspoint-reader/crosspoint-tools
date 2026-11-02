@@ -16,7 +16,7 @@ export default function LegalPage({ doc }) {
   const { title, html } = DOCS[doc]
   return (
     <Layout>
-      <section className="border-b border-stone-200 bg-white">
+      <section className="border-b border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-3xl px-6 py-12 sm:py-16 lg:px-8">
           <header>
             <h1 className="font-display text-3xl font-semibold tracking-tight text-stone-900 sm:text-4xl">

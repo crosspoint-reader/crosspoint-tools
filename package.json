@@ -20,7 +20,12 @@
     "test:theme-builder": "node scripts/test-theme-builder.cjs",
     "test:cpfont": "node --test src/lib/cpfont/cpfont.test.mjs",
     "test:cpfont-parity": "node scripts/font-builder/parity.mjs",
-    "build:cpfont-wasm": "scripts/font-builder/wasm/build.sh"
+    "build:cpfont-wasm": "scripts/font-builder/wasm/build.sh",
+    "screenshots:setup": "python3 scripts/screenshots/setup.py",
+    "screenshots": "python3 scripts/screenshots/pipeline.py",
+    "test:screenshots": "python3 -m unittest discover -s scripts/screenshots -p 'test_*.py'",
+    "build:contributors": "python3 scripts/contributors/generate.py",
+    "test:contributors": "python3 -m unittest discover -s scripts/contributors -p 'test_*.py'"
   },
   "dependencies": {
     "dompurify": "^3.2.0",

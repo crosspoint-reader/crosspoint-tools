@@ -155,11 +155,11 @@ const COLUMNS = [
 
 function CompareTable({ rows }) {
   return (
-    <div className="overflow-x-auto rounded-2xl bg-white ring-1 ring-stone-950/5">
+    <div className="overflow-x-auto rounded-sm bg-panel ring-1 ring-stone-200">
       <table className="w-full text-left text-sm">
         <thead className="border-b border-stone-200 text-xs text-stone-500">
           <tr>
-            <th scope="col" className="sticky left-0 bg-white px-4 py-3 font-semibold">Device</th>
+            <th scope="col" className="sticky left-0 bg-stone-50 px-4 py-3 font-semibold">Device</th>
             {COLUMNS.map(([h]) => (
               <th key={h} scope="col" className="px-3 py-3 font-semibold whitespace-nowrap">{h}</th>
             ))}
@@ -168,7 +168,7 @@ function CompareTable({ rows }) {
         <tbody className="divide-y divide-stone-100">
           {rows.map(({ item, spec }) => (
             <tr key={item.id}>
-              <th scope="row" className="sticky left-0 bg-white px-4 py-3 font-semibold whitespace-nowrap text-stone-900">
+              <th scope="row" className="sticky left-0 bg-stone-50 px-4 py-3 font-semibold whitespace-nowrap text-stone-900">
                 {item.link ? (
                   <a href={item.link} target="_blank" rel="noopener noreferrer" className="hover:text-brand-600">
                     {item.title}
@@ -257,7 +257,7 @@ export default function DevicesPage() {
   )
 
   const selectCls =
-    'rounded-lg border border-stone-300 bg-white py-2 pr-8 pl-3 text-sm text-stone-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none'
+    'rounded-lg border border-stone-300 bg-stone-50 py-2 pr-8 pl-3 text-sm text-stone-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 focus:outline-none'
 
   return (
     <Layout>
@@ -291,7 +291,7 @@ export default function DevicesPage() {
               <button
                 onClick={() => setShowFilters((v) => !v)}
                 aria-expanded={showFilters}
-                className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-stone-700 ring-1 ring-stone-950/10 lg:hidden"
+                className="rounded-lg bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700 ring-1 ring-stone-950/10 lg:hidden"
               >
                 Filters{activeCount ? ` (${activeCount})` : ''}
               </button>
@@ -305,7 +305,7 @@ export default function DevicesPage() {
                     <option key={s.value} value={s.value}>{s.label}</option>
                   ))}
                 </select>
-                <div className="flex rounded-lg bg-white p-0.5 ring-1 ring-stone-950/10" role="group" aria-label="View">
+                <div className="flex rounded-lg bg-stone-50 p-0.5 ring-1 ring-stone-950/10" role="group" aria-label="View">
                   {['grid', 'table'].map((v) => (
                     <button
                       key={v}
@@ -321,7 +321,7 @@ export default function DevicesPage() {
             </div>
 
             {showFilters && (
-              <div className="mt-4 rounded-2xl bg-white p-5 ring-1 ring-stone-950/5 lg:hidden">
+              <div className="mt-4 rounded-sm bg-panel p-5 ring-1 ring-stone-200 lg:hidden">
                 {filters}
                 {activeCount > 0 && (
                   <button onClick={clearAll} className="mt-2 text-sm font-medium text-brand-600 hover:text-brand-700">

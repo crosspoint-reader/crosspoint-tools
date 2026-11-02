@@ -471,7 +471,7 @@ export default function InsiderPage() {
         )}
 
         {/* Device Selector */}
-        <div className="mb-4 rounded-2xl bg-white p-5 ring-1 ring-stone-950/5">
+        <div className="mb-4 rounded-sm bg-panel p-5 ring-1 ring-stone-200">
           <h3 className="text-sm font-semibold text-stone-900">Select your device</h3>
           <div className="mt-3 grid grid-cols-2 gap-3">
             {MODELS.map((m) => (
@@ -509,7 +509,7 @@ export default function InsiderPage() {
         ) : (
           <div className="space-y-4 pb-16">
             {/* Build Status Card */}
-            <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5">
+            <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200">
               <div className="flex items-center justify-between">
                 <h2 className="flex items-center gap-2 font-display text-lg font-semibold tracking-tight text-stone-900 sm:text-base/6">
                   <span className={`size-2 shrink-0 rounded-full ${status.dot}`} />
@@ -582,7 +582,7 @@ export default function InsiderPage() {
                   <button
                     type="button"
                     onClick={() => setDownloadOpen(true)}
-                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
                   >
                     <svg
                       className="size-4 shrink-0"
@@ -628,7 +628,7 @@ export default function InsiderPage() {
 
             {/* Progress Card */}
             {flashVisible && (
-              <div ref={progressCardRef} className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5">
+              <div ref={progressCardRef} className="rounded-sm bg-panel p-6 ring-1 ring-stone-200">
                 <h2 className="font-display text-lg font-semibold tracking-tight text-stone-900 sm:text-base/6">
                   Flashing Nightly Build...
                 </h2>
@@ -652,7 +652,7 @@ export default function InsiderPage() {
             )}
 
             {/* Restart Instructions */}
-            <div className="rounded-2xl bg-white p-6 ring-1 ring-stone-950/5">
+            <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200">
               <h2 className="font-display text-lg font-semibold tracking-tight text-stone-900 sm:text-base/6">
                 Device Restart Instructions
               </h2>
@@ -667,7 +667,7 @@ export default function InsiderPage() {
             </div>
 
             {/* Custom Font Build (hidden for now, matching the original page) */}
-            <div className="hidden rounded-2xl bg-white p-6 ring-1 ring-stone-950/5">
+            <div className="hidden rounded-sm bg-panel p-6 ring-1 ring-stone-200">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-lg font-semibold tracking-tight text-stone-900 sm:text-base/6">
                   Custom Font Build
@@ -732,7 +732,7 @@ export default function InsiderPage() {
                                     setCfLabels((prev) => ({ ...prev, [family]: e.target.value }))
                                   }
                                   placeholder={family}
-                                  className="flex-1 rounded border border-stone-200 bg-white px-2.5 py-1 text-xs text-stone-700 placeholder:text-stone-400 focus:border-brand-300 focus:ring-1 focus:ring-brand-500/20 focus:outline-none"
+                                  className="flex-1 rounded border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs text-stone-700 placeholder:text-stone-400 focus:border-brand-300 focus:ring-1 focus:ring-brand-500/20 focus:outline-none"
                                 />
                               </div>
                             )}
@@ -760,7 +760,7 @@ export default function InsiderPage() {
                                               return { ...prev, [family]: next }
                                             })
                                           }
-                                          className="w-full rounded border border-stone-200 bg-white px-1.5 py-1 text-center text-xs text-stone-700 tabular-nums focus:border-brand-300 focus:ring-1 focus:ring-brand-500/20 focus:outline-none"
+                                          className="w-full rounded border border-stone-200 bg-stone-50 px-1.5 py-1 text-center text-xs text-stone-700 tabular-nums focus:border-brand-300 focus:ring-1 focus:ring-brand-500/20 focus:outline-none"
                                         />
                                       </div>
                                     ))}
@@ -878,7 +878,7 @@ export default function InsiderPage() {
                   <button
                     type="button"
                     onClick={clearCustomBuild}
-                    className="mt-3 rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-stone-500 ring-1 ring-stone-200 hover:bg-stone-50 hover:text-stone-700"
+                    className="mt-3 rounded-lg bg-stone-50 px-4 py-2.5 text-sm font-medium text-stone-500 ring-1 ring-stone-200 hover:bg-stone-50 hover:text-stone-700"
                   >
                     Cancel Build
                   </button>
@@ -911,7 +911,7 @@ export default function InsiderPage() {
                     <button
                       type="button"
                       onClick={handleCfDownload}
-                      className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50"
+                      className="rounded-lg bg-stone-50 px-4 py-2.5 text-sm font-semibold text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50"
                     >
                       Download .bin
                     </button>
@@ -935,7 +935,7 @@ export default function InsiderPage() {
                   <button
                     type="button"
                     onClick={clearCustomBuild}
-                    className="mt-3 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50"
+                    className="mt-3 rounded-lg bg-stone-50 px-4 py-2.5 text-sm font-semibold text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50"
                   >
                     Try Again
                   </button>
@@ -946,7 +946,7 @@ export default function InsiderPage() {
               {cfFlashVisible && (
                 <div
                   ref={cfProgressCardRef}
-                  className="mt-4 rounded-2xl bg-white p-6 ring-1 ring-stone-950/5"
+                  className="mt-4 rounded-sm bg-panel p-6 ring-1 ring-stone-200"
                 >
                   <h2 className="font-display text-lg font-semibold tracking-tight text-stone-900 sm:text-base/6">
                     Flashing Custom Build...
@@ -972,7 +972,7 @@ export default function InsiderPage() {
             </div>
 
             {/* Changelog Card */}
-            <div id="changelog" className="scroll-mt-20 rounded-2xl bg-white p-6 ring-1 ring-stone-950/5">
+            <div id="changelog" className="scroll-mt-20 rounded-sm bg-panel p-6 ring-1 ring-stone-200">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-lg font-semibold tracking-tight text-stone-900 sm:text-base/6">
                   Changelog

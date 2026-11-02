@@ -10,7 +10,7 @@ const btnBase =
   'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2'
 const btnPrimary = `${btnBase} bg-brand-500 text-white hover:bg-brand-600 focus-visible:outline-brand-500`
 const btnDark = `${btnBase} bg-stone-900 text-white hover:bg-stone-700 focus-visible:outline-stone-900`
-const btnOutline = `${btnBase} bg-white text-stone-700 ring-1 ring-stone-950/10 hover:bg-stone-50 disabled:opacity-50`
+const btnOutline = `${btnBase} bg-stone-50 text-stone-700 ring-1 ring-stone-950/10 hover:bg-stone-50 disabled:opacity-50`
 
 export default function SerialCapture({ onData, onConnectedChange }) {
   const supported = typeof navigator !== 'undefined' && 'serial' in navigator

@@ -11,7 +11,7 @@ const STORAGE_KEY = 'crosspoint-admin-secret'
 
 function Card({ children, className = '' }) {
   return (
-    <div className={`rounded-2xl bg-white p-5 ring-1 ring-stone-950/5 ${className}`}>
+    <div className={`rounded-sm bg-panel p-5 ring-1 ring-stone-200 ${className}`}>
       {children}
     </div>
   )
@@ -1073,7 +1073,7 @@ function BetaCard({ secret, log }) {
   }
 
   const modeBtnBase = 'flex-1 rounded-md px-3 py-1.5'
-  const modeActive = 'bg-white shadow-sm text-stone-900'
+  const modeActive = 'bg-stone-50 shadow-sm text-stone-900'
   const modeInactive = 'text-stone-600'
 
   return (
@@ -1327,7 +1327,7 @@ function BetaCard({ secret, log }) {
                       rows={2}
                       className={`${inputCls} resize-none`}
                     />
-                    <div className="space-y-2 rounded-md border border-stone-200 bg-white p-2.5">
+                    <div className="space-y-2 rounded-md border border-stone-200 bg-stone-50 p-2.5">
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-xs font-medium text-stone-600">Replace firmware (optional)</div>
                         <span className="font-mono text-[10px] uppercase tracking-wide text-stone-400">
@@ -2158,7 +2158,7 @@ export default function AdminPage() {
         </div>
 
         {!authed ? (
-          <div className="mt-8 rounded-2xl bg-white p-6 ring-1 ring-stone-950/5">
+          <div className="mt-8 rounded-sm bg-panel p-6 ring-1 ring-stone-200">
             <label htmlFor="secret-input" className="text-sm font-medium text-stone-700">
               Secret
             </label>

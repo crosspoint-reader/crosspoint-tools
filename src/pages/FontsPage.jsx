@@ -15,13 +15,13 @@ import {
 } from './fonts/fontBuilder.js'
 
 const textInputCls =
-  'mt-1.5 block w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 shadow-sm placeholder:text-stone-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none'
+  'mt-1.5 block w-full rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none'
 const fileInputBrandCls =
   'mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100'
 const fileInputStoneCls =
   'mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-200'
 const fileInputWhiteCls =
-  'mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-100'
+  'mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-stone-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-100'
 
 const LOG_COLORS = { info: 'text-stone-500', success: 'text-brand-600', error: 'text-red-600' }
 
@@ -422,11 +422,7 @@ export default function FontsPage() {
     <Layout>
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 dot-field text-stone-300/60 [mask-image:radial-gradient(110%_100%_at_50%_0%,black,transparent_70%)]"
-        />
-        <div className="relative mx-auto max-w-3xl px-6 pt-16 pb-8 sm:pt-20 sm:pb-10">
+        <div className="relative mx-auto max-w-5xl px-6 pt-16 pb-8 sm:pt-20 sm:pb-10">
           <Eyebrow>CrossPoint Fonts</Eyebrow>
           <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight text-balance text-stone-900 sm:text-5xl">
             Font Downloader &amp; Builder
@@ -449,7 +445,7 @@ export default function FontsPage() {
               Includes kerning and ligature support. No tools to install.
             </p>
           </div>
-          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-950/5 sm:p-8">
+          <div className="rounded-sm bg-panel p-6 ring-1 ring-stone-200 sm:p-8">
             {/* Family name */}
             <div className="mb-6">
               <label htmlFor="familyName" className="block text-sm/6 font-medium text-stone-700">
@@ -506,7 +502,7 @@ export default function FontsPage() {
                 <div className="w-full border-t border-stone-200" />
               </div>
               <div className="relative flex justify-center">
-                <span className="bg-white px-3 font-mono text-xs tracking-wide text-stone-400 uppercase">
+                <span className="bg-panel px-3 font-mono text-xs tracking-wide text-stone-400 uppercase">
                   or pick individually
                 </span>
               </div>
@@ -569,7 +565,7 @@ export default function FontsPage() {
                 <h2 className="font-display text-sm font-semibold tracking-tight text-stone-900">
                   Fallback Font Families
                 </h2>
-                <span className="inline-flex items-center rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-medium text-stone-500 ring-1 ring-stone-200 ring-inset">
+                <span className="inline-flex items-center rounded-full bg-stone-50 px-2 py-0.5 font-mono text-[11px] font-medium text-stone-500 ring-1 ring-stone-200 ring-inset">
                   Optional uploads
                 </span>
               </div>
@@ -579,7 +575,7 @@ export default function FontsPage() {
                 safety-net font.
               </p>
 
-              <div className="mt-4 rounded-xl border border-stone-200 bg-white p-4">
+              <div className="mt-4 rounded-sm border border-stone-200 bg-stone-50 p-4">
                 <label
                   htmlFor="fallbackFamilyName"
                   className="block text-sm/6 font-medium text-stone-700"
@@ -622,7 +618,7 @@ export default function FontsPage() {
                     className={fileInputBrandCls}
                   />
                   {fallbackAutoDetectResult !== null && (
-                    <div className="mt-2 rounded-lg bg-white px-3 py-2 font-mono text-xs whitespace-pre-wrap text-stone-600 ring-1 ring-stone-200 ring-inset">
+                    <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-stone-600 ring-1 ring-stone-200 ring-inset">
                       {fallbackAutoDetectResult}
                     </div>
                   )}
@@ -645,7 +641,7 @@ export default function FontsPage() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-xl border border-stone-200 bg-white p-4">
+              <div className="mt-4 rounded-sm border border-stone-200 bg-stone-50 p-4">
                 <label
                   htmlFor="fallback2FamilyName"
                   className="block text-sm/6 font-medium text-stone-700"
@@ -686,7 +682,7 @@ export default function FontsPage() {
                     className={fileInputBrandCls}
                   />
                   {fallback2AutoDetectResult !== null && (
-                    <div className="mt-2 rounded-lg bg-white px-3 py-2 font-mono text-xs whitespace-pre-wrap text-stone-600 ring-1 ring-stone-200 ring-inset">
+                    <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-stone-600 ring-1 ring-stone-200 ring-inset">
                       {fallback2AutoDetectResult}
                     </div>
                   )}
@@ -811,7 +807,7 @@ export default function FontsPage() {
                     value={customIntervals}
                     onChange={(e) => setCustomIntervals(e.target.value)}
                     placeholder="(0x2900-0x29FF),(0x2E00-0x2EFF)"
-                    className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 font-mono text-sm text-stone-900 shadow-sm placeholder:text-stone-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
+                    className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-2 font-mono text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                   />
                   {(() => {
                     const check = normalizeCustomIntervals(customIntervals)
@@ -857,7 +853,7 @@ export default function FontsPage() {
                           return next
                         })
                       }
-                      className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 shadow-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
+                      className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                     />
                   </div>
                 ))}
@@ -896,7 +892,7 @@ export default function FontsPage() {
                               return next
                             })
                           }
-                          className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 shadow-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
+                          className="mt-1 block w-full rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none"
                         />
                       </div>
                     ))}
@@ -911,7 +907,7 @@ export default function FontsPage() {
                 id="buildBtn"
                 onClick={startBuild}
                 disabled={building}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-brand-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <svg
                   className="size-4 shrink-0"
@@ -1015,7 +1011,7 @@ export default function FontsPage() {
           </div>
 
           {/* Instructions */}
-          <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-stone-950/5 sm:p-8">
+          <div className="mt-8 rounded-sm bg-panel p-6 ring-1 ring-stone-200 sm:p-8">
             <h2 className="font-display text-lg font-semibold tracking-tight text-stone-900">
               How to install
             </h2>
@@ -1089,7 +1085,7 @@ export default function FontsPage() {
                 return (
                   <li
                     key={family.name}
-                    className="flex items-center justify-between gap-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-stone-950/5"
+                    className="flex items-center justify-between gap-4 rounded-sm bg-panel p-4 ring-1 ring-stone-200"
                   >
                     <div className="min-w-0">
                       <h3 className="font-display font-semibold text-stone-900">{family.name}</h3>
@@ -1102,7 +1098,7 @@ export default function FontsPage() {
                       type="button"
                       onClick={() => downloadPrebuiltFont(family)}
                       disabled={prebuiltDownloading !== null}
-                      className="shrink-0 rounded-md bg-brand-500 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="shrink-0 rounded-md bg-brand-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {downloading ? 'Zipping…' : 'Download ZIP'}
                     </button>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '../../components/ui.jsx'
 
 const inputCls =
-  'w-full rounded-lg border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20'
+  'w-full rounded-lg border border-stone-200 bg-stone-50 px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20'
 
 export default function CollaborateForm() {
   const [name, setName] = useState('')

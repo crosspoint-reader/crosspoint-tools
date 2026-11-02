@@ -27,7 +27,7 @@ export default function DeviceComparisonPage() {
 
   return (
     <Layout>
-      <section className="border-b border-stone-200 bg-white">
+      <section className="border-b border-stone-200 bg-stone-50">
         <div className="mx-auto max-w-5xl px-6 py-12 sm:py-16 lg:px-8">
           <header className="mx-auto max-w-3xl">
             <Eyebrow>Find your next reader</Eyebrow>

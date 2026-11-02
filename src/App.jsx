@@ -7,7 +7,6 @@ const DocsPage = lazy(() => import('./pages/DocsPage.jsx'))
 const InstallPage = lazy(() => import('./pages/InstallPage.jsx'))
 const RoadmapPage = lazy(() => import('./pages/RoadmapPage.jsx'))
 const FontsPage = lazy(() => import('./pages/FontsPage.jsx'))
-const ThemeBuilderPage = lazy(() => import('./pages/ThemeBuilderPage.jsx'))
 const DebugPage = lazy(() => import('./pages/DebugPage.jsx'))
 const AdminPage = lazy(() => import('./pages/AdminPage.jsx'))
 const InsiderPage = lazy(() => import('./pages/InsiderPage.jsx'))
@@ -31,7 +30,6 @@ const HTML_REDIRECTS = {
   '/docs.html': '/docs',
   '/roadmap.html': '/roadmap',
   '/fonts.html': '/fonts',
-  '/theme-builder.html': '/theme-builder',
   '/debug.html': '/debug',
   '/admin.html': '/admin',
   '/insider.html': '/insider',
@@ -94,7 +92,6 @@ export default function App() {
           <Route path="/docs" element={<DocsPage />} />
           <Route path="/roadmap" element={<RoadmapPage />} />
           <Route path="/fonts" element={<FontsPage />} />
-          <Route path="/theme-builder" element={<ThemeBuilderPage />} />
           <Route path="/debug" element={<DebugPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/insider" element={<InsiderPage />} />

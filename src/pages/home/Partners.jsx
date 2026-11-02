@@ -9,10 +9,10 @@ const PARTNERS = [
 
 export default function Partners() {
   return (
-    <section className="border-t border-stone-200/70 bg-white">
-      <div className="mx-auto max-w-7xl px-6 py-10 sm:py-12 lg:px-8">
-        <p className="text-center text-xs font-semibold tracking-[0.2em] text-stone-400 uppercase">
-          Official partners of
+    <section aria-label="Official partners" className="col-span-full pt-8">
+      <div>
+        <p className="text-center text-xs text-stone-500 uppercase">
+          Official partners
         </p>
         <div className="mt-7 grid grid-cols-[auto_auto] items-center justify-center justify-items-center gap-x-10 gap-y-7 lg:flex lg:gap-x-10 xl:gap-x-16">
           {PARTNERS.map((p) => (
