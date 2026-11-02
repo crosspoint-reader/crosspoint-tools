@@ -25,7 +25,7 @@ export default function HomePage() {
             </div>
             <figure className="home-remote-photo">
               <a href="https://link.amazon/B0apXLA2b" target="_blank" rel="noopener noreferrer" aria-label="Shop the Bluetooth page turner on Amazon">
-                <img src="/accessories/page-turner-reading.png" alt="An orange two-button page turner beside a silver e-reader and a stack of Hardy Boys books" width="924" height="703" loading="lazy" />
+                <img src="/accessories/page-turner-reading.webp" alt="An orange two-button page turner beside a silver e-reader showing “Just one more chapter,” with a stack of Hardy Boys books" width="806" height="605" loading="lazy" />
               </a>
             </figure>
           </div>
@@ -33,7 +33,7 @@ export default function HomePage() {
 
         <section className="home-community home-wrap">
           <div className="home-community-photo"><img src="/community/contributors.webp" alt="Avatars of CrossPoint Reader’s GitHub contributors" width="2400" height="1600" loading="lazy" /></div>
-          <div><h2>Made by people<br />who actually use it.</h2><p>CrossPoint grows through bug reports, translations, code, and conversations about what would make reading better. There’s room for you here.</p><Button href="https://github.com/crosspoint-reader/crosspoint-reader" variant="primary">See the project on GitHub ↗</Button><img className="home-community-badge" src="/community/octoverse-2026.png" alt="GitHub Octoverse 2026 recognition: CrossPoint Reader was a top open source project on GitHub" width="1920" height="1080" loading="lazy" /></div>
+          <div><h2>Made by people<br />who actually use it.</h2><p>CrossPoint grows through bug reports, translations, code, and conversations about what would make reading better. There’s room for you here.</p><Button href="https://github.com/crosspoint-reader/crosspoint-reader" variant="primary">See the project on GitHub ↗</Button><img className="home-community-badge" src="/community/octoverse-2026.webp" alt="GitHub Octoverse 2026 recognition: CrossPoint Reader was a top open source project on GitHub" width="1280" height="720" loading="lazy" /></div>
         </section>
 
         <section className="home-wrap" aria-label="CrossPoint community statistics">

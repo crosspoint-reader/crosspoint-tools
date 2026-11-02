@@ -9,7 +9,7 @@ function Story({ title, image, alt, children, to, link }) {
         {children}
         <Link className="home-text-link" to={to}>{link} →</Link>
       </div>
-      <ReaderScreenshot src={`/screenshots/${image}.png`} alt={alt} />
+      <ReaderScreenshot src={`/screenshots/${image}.webp`} alt={alt} />
     </article>
   )
 }

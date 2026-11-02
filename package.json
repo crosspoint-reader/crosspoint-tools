@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node scripts/gen-blog-meta.mjs && vite",
     "dev:web": "node scripts/gen-blog-meta.mjs && WEB_ONLY=1 vite",
-    "build": "node scripts/gen-blog-meta.mjs && vite build",
+    "build": "node scripts/gen-blog-meta.mjs && vite build && node scripts/prerender-home.mjs",
     "preview": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
     "tunnel": "node scripts/tunnel.js",
@@ -25,7 +25,9 @@
     "screenshots": "python3 scripts/screenshots/pipeline.py",
     "test:screenshots": "python3 -m unittest discover -s scripts/screenshots -p 'test_*.py'",
     "build:contributors": "python3 scripts/contributors/generate.py",
-    "test:contributors": "python3 -m unittest discover -s scripts/contributors -p 'test_*.py'"
+    "test:contributors": "python3 -m unittest discover -s scripts/contributors -p 'test_*.py'",
+    "test:seo": "node --experimental-strip-types --test src/lib/seo.test.mjs",
+    "build:og": "sh scripts/og/generate.sh"
   },
   "dependencies": {
     "dompurify": "^3.2.0",

@@ -6,7 +6,7 @@ github: Uri-Tauber
 date: 2026-10-29
 ---
 
-![GitHub Octoverse 2026 graphic recognizing crosspoint-reader/crosspoint-reader as a top open source project.](/blog/octoverse-2026.png)
+![GitHub Octoverse 2026 graphic recognizing crosspoint-reader/crosspoint-reader as a top open source project.](/blog/octoverse-2026.webp)
 
 I got a nice email from GitHub: CrossPoint Reader is featured in the Octoverse 2026 report as one of the year's top open source projects. 
 

@@ -16,8 +16,8 @@ export default function Hero() {
         <p className="home-opening-note">Buying through our shop links helps fund development.</p>
       </div>
       <div className="home-opening-screens">
-        <figure><ReaderScreenshot src="/screenshots/hero-reader.png" alt="A book open in CrossPoint’s reading view" eager /></figure>
-        <figure><ReaderScreenshot src="/screenshots/hero-home.png" alt="CrossPoint home screen with recent books" eager /></figure>
+        <figure><ReaderScreenshot src="/screenshots/hero-reader.webp" alt="A book open in CrossPoint’s reading view" eager /></figure>
+        <figure><ReaderScreenshot src="/screenshots/hero-home.webp" alt="CrossPoint home screen with recent books" eager /></figure>
       </div>
       <Partners />
     </section>

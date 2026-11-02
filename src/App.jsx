@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { lazy, Suspense, useEffect } from 'react'
 import HomePage from './pages/HomePage.jsx'
-import { pageMeta } from './lib/seo.ts'
+import { pageHead, SEO_SELECTOR } from './lib/seo.ts'
 
 const DocsPage = lazy(() => import('./pages/DocsPage.jsx'))
 const InstallPage = lazy(() => import('./pages/InstallPage.jsx'))
@@ -59,9 +59,9 @@ function ScrollManager() {
   const navigate = useNavigate()
   useEffect(() => {
     // Same per-route metadata the worker injects on first load.
-    const meta = pageMeta(pathname)
-    document.title = meta.title
-    document.querySelector('meta[name="description"]')?.setAttribute('content', meta.description)
+    const head = new DOMParser().parseFromString(pageHead(pathname), 'text/html').head
+    document.head.querySelectorAll(SEO_SELECTOR).forEach((tag) => tag.remove())
+    document.head.append(...Array.from(head.children))
   }, [pathname])
   useEffect(() => {
     if (hash) {

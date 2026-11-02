@@ -1,7 +1,7 @@
 import type { Env, BuildMetadata, CustomBuildMetadata, ThemeBuildMetadata, FontTree, FontFile, BetaBuild, BetaSource, PrDeviceBuild, Accessory, FirmwareDevice, ReleaseVisibility } from './types';
 import { betaDevices, betaDisplayName, normalizeBetaBuildList } from './betas';
 import { PR_ARTIFACTS_MARKER, parseArtifactComment, parsePrUrl, unzipFirstBin } from './github-pr';
-import { pageMeta, SITE } from '../src/lib/seo';
+import { isPage, pageHead, sitemapXml, SITE, SEO_SELECTOR } from '../src/lib/seo';
 import { DEVICES } from '../src/lib/devices.ts';
 import { isAccessoryType } from '../src/lib/accessories.ts';
 import { getPrebuiltFontAssetUrl, getPrebuiltFontManifest } from './prebuilt-fonts';
@@ -119,8 +119,28 @@ export default {
       return Response.redirect(newUrl.toString(), 301);
     }
 
-    // Let static assets handle everything else (SPA fallback serves index.html)
-    return withPageMeta(url, await env.ASSETS.fetch(request));
+    if (url.pathname === '/robots.txt') {
+      return new Response(`User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${SITE}/sitemap.xml\n`, {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
+      });
+    }
+    if (url.pathname === '/sitemap.xml') {
+      return new Response(sitemapXml(), {
+        headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
+      });
+    }
+    if (url.pathname.length > 1 && url.pathname.endsWith('/') && isPage(url.pathname)) {
+      const target = new URL(url);
+      target.pathname = target.pathname.replace(/\/+$/, '');
+      return Response.redirect(target.toString(), 301);
+    }
+    const res = await env.ASSETS.fetch(request);
+    if (res.headers.get('Content-Type')?.includes('text/html') && !isPage(url.pathname)) {
+      return new Response('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex"><title>Page not found — CrossPoint Reader</title></head><body><h1>Page not found</h1><p><a href="/">Return to CrossPoint Reader</a></p></body></html>', {
+        status: 404, headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
+    return withPageMeta(url, res);
   },
 
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
@@ -171,32 +191,13 @@ const escapeHtml = (s: string) =>
 // og:image stays the site-wide card.
 function withPageMeta(url: URL, res: Response): Response {
   if (!res.headers.get('Content-Type')?.includes('text/html')) return res;
-  const meta = pageMeta(url.pathname);
-  const canonical = SITE + (url.pathname === '/' ? '' : url.pathname.replace(/\/+$/, ''));
-  const t = escapeHtml(meta.title);
-  const d = escapeHtml(meta.description);
-  const ogT = escapeHtml(meta.ogTitle || meta.title);
-  const ogD = escapeHtml(meta.ogDescription || meta.description);
-  const tags = [
-    `<title>${t}</title>`,
-    `<meta name="description" content="${d}" />`,
-    `<link rel="canonical" href="${canonical}" />`,
-    `<meta property="og:type" content="${meta.type || 'website'}" />`,
-    `<meta property="og:url" content="${canonical}" />`,
-    `<meta property="og:title" content="${ogT}" />`,
-    `<meta property="og:description" content="${ogD}" />`,
-    `<meta name="twitter:title" content="${ogT}" />`,
-    `<meta name="twitter:description" content="${ogD}" />`,
-    meta.published ? `<meta property="article:published_time" content="${escapeHtml(meta.published)}" />` : '',
-    meta.noindex ? '<meta name="robots" content="noindex" />' : '',
-  ].join('');
   const remove = { element: (el: Element) => { el.remove(); } };
-  return new HTMLRewriter()
-    .on('title', remove)
-    .on('meta[name="description"], meta[name="twitter:title"], meta[name="twitter:description"]', remove)
-    .on('meta[property="og:type"], meta[property="og:url"], meta[property="og:title"], meta[property="og:description"]', remove)
-    .on('head', { element: (el) => { el.append(tags, { html: true }); } })
-    .transform(res);
+  const rewriter = new HTMLRewriter()
+    .on(SEO_SELECTOR, remove)
+    .on('head', { element: (el) => { el.append(pageHead(url.pathname), { html: true }); } });
+  // index.html contains the prerendered homepage; other routes render their own UI.
+  if (url.pathname !== '/') rewriter.on('#root', { element: (el) => { el.setInnerContent(''); } });
+  return rewriter.transform(res);
 }
 
 const LEGACY_HTML_ROUTES: Record<string, string> = {
@@ -204,7 +205,9 @@ const LEGACY_HTML_ROUTES: Record<string, string> = {
   '/docs.html': '/docs',
   '/roadmap.html': '/roadmap',
   '/fonts.html': '/fonts',
-  '/theme-builder.html': '/theme-builder',
+  '/theme-builder.html': '/',
+  '/theme-builder': '/',
+  '/sticky': '/install',
   '/debug.html': '/debug',
   '/admin.html': '/admin',
   '/login.html': '/login',

@@ -229,6 +229,14 @@ Thanks to [daveallie](https://github.com/daveallie) for the original browser fla
 
 The SD-card font builder descends from the generator in the [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader) firmware repo (`lib/EpdFont/scripts/fontconvert_sdcard.py`). Kerning, ligature, and interval behavior now live here, so website-only font features can move without waiting on firmware-repo updates. The browser build uses [FreeType](https://freetype.org/) and [HarfBuzz](https://harfbuzz.github.io/) compiled to WebAssembly, and [fontkit](https://github.com/foliojs/fontkit) for OpenType table parsing.
 
+## Search and social previews
+
+Route titles, descriptions, canonical URLs, indexing rules, and sitemap entries live in `src/lib/seo.ts`. Keep its public routes aligned with `src/App.jsx`. The Worker serves this metadata in the initial HTML, and the client updates it during navigation.
+
+`npm run build` prerenders the actual homepage and emits `robots.txt` and `sitemap.xml`. Other pages still render their content with JavaScript; their metadata is server-rendered. Unknown URLs return 404, and private routes are excluded from the sitemap and marked noindex.
+
+The social card is `public/og-home.png`, generated from `scripts/og/og.html`. Run `npm run build:og` on macOS with Google Chrome installed after changing the card; inspect the result before committing. Run `npm run test:seo` to check metadata, sitemap exclusions, and structured data. After deployment, submit `https://crosspointreader.com/sitemap.xml` in Google Search Console.
+
 ## Website screenshot pipeline
 
 Use `npm run screenshots:setup` then `npm run screenshots` to capture real firmware screens from a local EPUB library and export beige, 3× PNG/WebP assets. Edit [settings.json](scripts/screenshots/settings.json) to choose the EPUB folder, books, font sizes, and screen settings. See the [usage guide](scripts/screenshots/README.md) and [agent instructions](scripts/screenshots/AGENTS.md).

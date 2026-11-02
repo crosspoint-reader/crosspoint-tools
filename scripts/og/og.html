@@ -1,115 +1,38 @@
 <!doctype html>
-<!-- Source for public/og.png. Regenerate with scripts/og/generate.sh -->
+<!-- Source for public/og-home.png. Regenerate with scripts/og/generate.sh. -->
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Caveat:wght@500;600&display=swap" rel="stylesheet" />
+<title>CrossPoint Reader social preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
-  :root {
-    --stone-50: #fafaf9;
-    --stone-200: #e7e5e4;
-    --stone-600: #57534e;
-    --stone-900: #1c1917;
-    --brand-50: #f0f5f3;
-    --brand-600: #3d6652;
-    --eink-scale: 0.66;
-  }
   * { margin: 0; box-sizing: border-box; }
   html, body { width: 1200px; height: 630px; overflow: hidden; }
-  body {
-    position: relative;
-    font-family: "Lora", serif;
-    background: linear-gradient(to bottom right, var(--stone-50), #ffffff 50%, rgba(240, 245, 243, 0.5));
-    -webkit-font-smoothing: antialiased;
-  }
-  .grain {
-    position: absolute; inset: 0; pointer-events: none; opacity: 0.05;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: 160px 160px;
-  }
-  .wordmark {
-    position: absolute; top: 48px; left: 64px;
-    display: flex; align-items: center; gap: 14px;
-  }
-  .wordmark img { width: 44px; height: 44px; border-radius: 9px; }
-  .wordmark span {
-    font-family: "Lora", serif; font-size: 30px; font-weight: 600;
-    letter-spacing: -0.01em; color: var(--stone-900);
-  }
-  .wordmark span b { font-weight: 600; color: var(--brand-600); }
-  .copy {
-    position: absolute; top: 158px; left: 64px; width: 660px;
-  }
-  .eyebrow {
-    display: inline-block; transform: rotate(-1deg);
-    font-family: "Caveat", cursive; font-size: 32px; font-weight: 500;
-    color: var(--brand-600);
-  }
-  h1 {
-    margin-top: 10px;
-    font-family: "Lora", serif; font-size: 88px; font-weight: 600;
-    letter-spacing: -0.025em; line-height: 1.05; color: var(--stone-900);
-  }
-  .body {
-    margin-top: 30px; max-width: 620px;
-    font-family: "Lora", serif; font-size: 27px; line-height: 1.55;
-    color: var(--stone-600);
-  }
-  .body strong { font-weight: 500; color: var(--stone-900); }
-
-  /* E-ink device frame, X3 variant (528x792 panel), same recipe as index.css */
-  .device {
-    position: absolute; top: 47px; right: 56px;
-    width: calc(544px * var(--eink-scale));
-    height: calc(812px * var(--eink-scale));
-    background: #f6f4ef;
-    border-radius: calc(10px * var(--eink-scale));
-    padding: calc(10px * var(--eink-scale));
-    box-shadow:
-      0 0 0 1px rgba(0,0,0,0.06),
-      0 20px 40px -16px rgba(0,0,0,0.15),
-      0 50px 80px -30px rgba(0,0,0,0.18);
-  }
-  .screen {
-    position: relative; overflow: hidden;
-    width: calc(528px * var(--eink-scale));
-    height: calc(792px * var(--eink-scale));
-    background: #f6f4ef;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
-  }
-  .screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .screen::after {
-    content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.6;
-    mix-blend-mode: multiply;
-    background-image:
-      radial-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
-      radial-gradient(rgba(0,0,0,0.02) 1px, transparent 1px);
-    background-size: calc(3px * var(--eink-scale)) calc(3px * var(--eink-scale)),
-                     calc(7px * var(--eink-scale)) calc(7px * var(--eink-scale));
-  }
+  body { background: #faf8f3; color: #242820; font-family: Inter, sans-serif; -webkit-font-smoothing: antialiased; }
+  .brand { position: absolute; top: 46px; left: 56px; display: flex; align-items: center; gap: 12px; font: 600 26px Lora, serif; }
+  .brand img { width: 36px; height: 36px; }
+  .brand b { color: #3d6652; font-weight: 600; }
+  .copy { position: absolute; left: 56px; top: 150px; width: 535px; }
+  h1 { font: 400 83px/1.05 Lora, serif; letter-spacing: -.045em; }
+  p { max-width: 470px; margin-top: 28px; font-size: 23px; line-height: 1.55; color: #555b50; }
+  .tag { display: inline-block; margin-top: 28px; color: #315243; font-size: 16px; font-weight: 600; }
+  .screens { position: absolute; top: 50px; right: 48px; width: 480px; height: 530px; padding: 34px; background: #e7e7dc; display: flex; align-items: flex-start; gap: 24px; }
+  .screens img { width: 194px; height: auto; border: 6px solid #33372f; border-radius: 11px; box-shadow: 8px 12px 0 #d4d5c7; }
+  .screens img:first-child { margin-top: 78px; }
+  .url { position: absolute; bottom: 48px; left: 56px; font-size: 16px; color: #62675d; }
 </style>
 </head>
 <body>
-  <div class="grain"></div>
-
-  <div class="wordmark">
-    <img src="../../public/logo.png" alt="" />
-    <span>CrossPoint <b>Reader</b></span>
-  </div>
-
+  <div class="brand"><img src="../../public/logo.png" alt="" /><span>CrossPoint <b>Reader</b></span></div>
   <div class="copy">
-    <span class="eyebrow">built by readers, for readers</span>
-    <h1>Read without limits.</h1>
-    <p class="body">
-      CrossPoint is <strong>the best way to read on the go</strong>, built in the
-      open, by the community.
-    </p>
+    <h1>Read without<br />limits.</h1>
+    <p>Your books, on a reader you can make your own.</p>
+    <span class="tag">Free, open source e-reader software</span>
   </div>
-
-  <div class="device">
-    <div class="screen"><img src="../../public/screenshots/hero-home.png" alt="" /></div>
+  <div class="screens">
+    <img src="../../public/screenshots/hero-reader.png" alt="CrossPoint reading view" />
+    <img src="../../public/screenshots/hero-home.png" alt="CrossPoint home screen" />
   </div>
+  <span class="url">crosspointreader.com</span>
 </body>
 </html>
