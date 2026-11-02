@@ -53,7 +53,7 @@ export default function HomePage() {
           </div>
           <figure className="home-lineup">
             <img src="/device-comparison/hero.webp" alt="Seven compact e-readers laid out among stacks of books" width="1600" height="739" loading="lazy" />
-            <Link className="home-lineup-link home-text-link home-hand" to="/device-comparison">Compare devices ↗</Link>
+            <Link className="home-lineup-link home-text-link home-hand" to="/device-comparison">Compare devices <svg aria-hidden="true" className="inline-block align-middle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7M7 7h10v10" /></svg></Link>
           </figure>
         </section>
 
