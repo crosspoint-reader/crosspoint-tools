@@ -3,6 +3,7 @@ import Layout from '../components/Layout.jsx'
 import { Button } from '../components/ui.jsx'
 import Hero from './home/Hero.jsx'
 import Features from './home/Features.jsx'
+import Community from './home/Community.jsx'
 import PressQuotes from './home/PressQuotes.jsx'
 import CommunityStats from './home/CommunityStats.jsx'
 import './home/home.css'
@@ -12,6 +13,7 @@ export default function HomePage() {
     <Layout>
       <div className="hardware-home">
         <Hero />
+        <Community />
         <Features />
 
         <section className="home-remote" id="page-turners">

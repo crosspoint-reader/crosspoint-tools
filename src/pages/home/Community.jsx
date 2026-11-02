@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
-import { Eyebrow } from '../../components/ui.jsx'
 
-const PHOTO_COUNT = 22
+const PHOTO_COUNT = 24
 
 export default function Community() {
   // Shuffle once per mount, exactly like the old inline script did.
@@ -15,24 +14,14 @@ export default function Community() {
   }, [])
 
   return (
-    <section className="relative border-t border-stone-200 bg-stone-50 py-16 sm:py-20">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8">
-        <Eyebrow>spotted in the wild</Eyebrow>
-        <h2 className="mt-2 max-w-[32ch] font-display text-3xl font-semibold tracking-tight text-balance text-stone-900 sm:text-4xl">
-          CrossPoint community shots.
-        </h2>
+    <section className="home-shots">
+      <div className="home-wrap">
+        <h2 className="home-hand home-shots-heading">Join the thousands of readers who love CrossPoint</h2>
       </div>
-      <div className="marquee mt-10">
-        <div className="marquee-track" aria-hidden="true">
-          {/* Duplicate set (required for seamless loop) */}
-          {[0, 1].map((pass) =>
-            order.map((n) => (
-              <div key={`${pass}-${n}`} className="marquee-item">
-                <img src={`/community/${n}.webp`} alt="" loading="lazy" />
-              </div>
-            ))
-          )}
-        </div>
+      <div className="home-wrap home-shots-grid" aria-hidden="true">
+        {order.map((n) => (
+          <img key={n} src={`/community/${n}.webp`} alt="" loading="lazy" />
+        ))}
       </div>
     </section>
   )

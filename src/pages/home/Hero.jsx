@@ -19,7 +19,6 @@ export default function Hero() {
       <div className="home-opening-screens">
         <figure><ReaderScreenshot src="/screenshots/hero-reader.webp" alt="A book open in CrossPoint’s reading view" eager /></figure>
         <figure><ReaderScreenshot src="/screenshots/hero-home.webp" alt="CrossPoint home screen with recent books" eager /></figure>
-        <p className="home-hand home-screen-note">Make it yours.</p>
       </div>
     </section>
   )
