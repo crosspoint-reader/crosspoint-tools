@@ -6,7 +6,7 @@ const FALLBACK_STATS = {
   contributors: 242,
   forks: 1947,
   changes: 126,
-  downloads: 198781,
+  downloads: 281736,
 }
 
 const STAT_LABELS = [

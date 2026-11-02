@@ -1653,8 +1653,10 @@ async function getSubscriberEmail(request: Request): Promise<string | null> {
 // Community stats (front page)
 // ---------------------------------------------------------------------------
 
-const STATS_CACHE_KEY = 'community-stats:v4';
-const STATS_LAST_GOOD_KEY = 'community-stats:last:v4';
+const STATS_CACHE_KEY = 'community-stats:v5';
+const STATS_LAST_GOOD_KEY = 'community-stats:last:v5';
+// Highest "devices running CrossPoint" figure ever served; never expires.
+const STATS_DOWNLOADS_PEAK_KEY = 'community-stats:downloads-peak';
 const STATS_TTL = 6 * 60 * 60; // 6 hours
 
 // Lifetime count of web-flasher flashes that GitHub's release download_count
@@ -1779,10 +1781,20 @@ async function computeCommunityStats(env: Env): Promise<CommunityStats> {
   // monthly releases stopped any one of them from out-growing 1.4.1.
   // Web flashes that bypass GitHub assets (nightly/beta/RC/device/custom) are
   // tracked in our own counter and added on top.
-  const downloads = releases
-    .slice(0, 3)
-    .reduce((total, r) => total + r.assets.reduce((sum, a) => sum + a.download_count, 0), 0)
-    + await getWebFlashCount(env);
+  //
+  // A new release pushes the oldest one out of the window before it has any
+  // downloads of its own, so the sum drops on every release. The figure on the
+  // site must never go down: compare against the previous window (what we
+  // showed just before the newest release) and a stored high-water mark.
+  const sumDownloads = (rs: GhRelease[]) =>
+    rs.reduce((total, r) => total + r.assets.reduce((sum, a) => sum + a.download_count, 0), 0);
+  const webFlashes = await getWebFlashCount(env);
+  const windowed = Math.max(sumDownloads(releases.slice(0, 3)), sumDownloads(releases.slice(1, 4))) + webFlashes;
+  const peak = parseInt((await env.BUILD_META.get(STATS_DOWNLOADS_PEAK_KEY)) || '0', 10) || 0;
+  const downloads = Math.max(windowed, peak);
+  if (downloads > peak) {
+    await env.BUILD_META.put(STATS_DOWNLOADS_PEAK_KEY, String(downloads));
+  }
 
   return {
     contributors,
