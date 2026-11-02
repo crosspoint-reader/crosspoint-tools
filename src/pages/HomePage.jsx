@@ -33,7 +33,7 @@ export default function HomePage() {
 
         <section className="home-community home-wrap">
           <div className="home-community-photo"><img src="/community/contributors.webp" alt="Avatars of CrossPoint Reader’s GitHub contributors" width="2400" height="1600" loading="lazy" /></div>
-          <div><h2>Made by people<br />who actually use it.</h2><p>CrossPoint grows through bug reports, translations, code, and conversations about what would make reading better. There’s room for you here.</p><Button href="https://github.com/crosspoint-reader/crosspoint-reader" variant="primary">See the project on GitHub ↗</Button><img className="home-community-badge" src="/community/octoverse-2026.webp" alt="GitHub Octoverse 2026 recognition: CrossPoint Reader was a top open source project on GitHub" width="1280" height="720" loading="lazy" /></div>
+          <div><h2>Made by people<br />who <span className="home-underline">actually use it.</span></h2><p>CrossPoint grows through bug reports, translations, code, and conversations about what would make reading better. There’s room for you here.</p><Button href="https://github.com/crosspoint-reader/crosspoint-reader" variant="primary">See the project on GitHub ↗</Button><img className="home-community-badge" src="/community/octoverse-2026.webp" alt="GitHub Octoverse 2026 recognition: CrossPoint Reader was a top open source project on GitHub" width="1280" height="720" loading="lazy" /></div>
         </section>
 
         <section className="home-wrap" aria-label="CrossPoint community statistics">
@@ -43,7 +43,7 @@ export default function HomePage() {
         <section className="home-hero home-wrap">
           <div className="home-hero-heading">
             <div>
-              <h2>A good book.<br />A little room for it.</h2>
+              <h2>A good book.<br />A <span className="home-underline">little room</span> for it.</h2>
             </div>
             <div className="home-hero-intro">
               <p>Find an e-reader you’ll want to take everywhere. Make it yours with CrossPoint, our free, open source reading software.</p>
@@ -53,7 +53,7 @@ export default function HomePage() {
           </div>
           <figure className="home-lineup">
             <img src="/device-comparison/hero.webp" alt="Seven compact e-readers laid out among stacks of books" width="1600" height="739" loading="lazy" />
-            <Link className="home-lineup-link home-text-link" to="/device-comparison">Compare devices ↗</Link>
+            <Link className="home-lineup-link home-text-link home-hand" to="/device-comparison">Compare devices ↗</Link>
           </figure>
         </section>
 
@@ -74,7 +74,7 @@ export default function HomePage() {
               </div>
               <div className="home-sync-actions">
                 <Button href="https://sync.crosspointreader.com/" variant="primary">Explore CrossPoint Sync <span aria-hidden="true">↗</span></Button>
-                <Link className="home-text-link" to="/docs#367-koreader-sync-quick-setup?doc=user_guide">Set up your reader →</Link>
+                <Link className="home-text-link home-hand" to="/docs#367-koreader-sync-quick-setup?doc=user_guide">Set up your reader →</Link>
               </div>
             </div>
           </div>

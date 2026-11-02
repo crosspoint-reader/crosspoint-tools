@@ -9,20 +9,17 @@ const PARTNERS = [
 
 export default function Partners() {
   return (
-    <section aria-label="Official partners" className="col-span-full pt-8">
-      <div>
-        <p className="text-center text-xs text-stone-500 uppercase">
-          Official partners
-        </p>
-        <div className="mt-7 grid grid-cols-[auto_auto] items-center justify-center justify-items-center gap-x-10 gap-y-7 lg:flex lg:gap-x-10 xl:gap-x-16">
-          {PARTNERS.map((p) => (
-            <img
-              key={p.name}
-              src={p.src}
-              alt={p.name}
-              className={`${p.className} w-auto min-w-0 object-contain opacity-45`}
-              loading="lazy"
-            />
+    <section aria-label="Official partners" className="home-partners">
+      <div className="home-partners-window">
+        <div className="home-partners-track">
+          {[false, true].map((duplicate) => (
+            <ul key={String(duplicate)} aria-hidden={duplicate || undefined}>
+              {PARTNERS.map((p) => (
+                <li key={p.name}>
+                  <img src={p.src} alt={duplicate ? '' : p.name} className={`${p.className} w-auto max-w-none object-contain opacity-45`} />
+                </li>
+              ))}
+            </ul>
           ))}
         </div>
       </div>

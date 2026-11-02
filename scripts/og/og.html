@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8" />
 <title>CrossPoint Reader social preview</title>
-<link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Lora:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
   * { margin: 0; box-sizing: border-box; }
   html, body { width: 1200px; height: 630px; overflow: hidden; }
@@ -12,26 +12,28 @@
   .brand { position: absolute; top: 46px; left: 56px; display: flex; align-items: center; gap: 12px; font: 600 26px Lora, serif; }
   .brand img { width: 36px; height: 36px; }
   .brand b { color: #3d6652; font-weight: 600; }
-  .copy { position: absolute; left: 56px; top: 150px; width: 535px; }
-  h1 { font: 400 83px/1.05 Lora, serif; letter-spacing: -.045em; }
-  p { max-width: 470px; margin-top: 28px; font-size: 23px; line-height: 1.55; color: #555b50; }
-  .tag { display: inline-block; margin-top: 28px; color: #315243; font-size: 16px; font-weight: 600; }
-  .screens { position: absolute; top: 50px; right: 48px; width: 480px; height: 530px; padding: 34px; display: flex; align-items: flex-start; gap: 24px; }
-  .screens img { width: 194px; height: auto; border: 6px solid #33372f; border-radius: 11px; box-shadow: 8px 12px 0 #d4d5c7; }
-  .screens img:first-child { margin-top: 78px; }
+  .copy { position: absolute; left: 56px; top: 175px; width: 610px; }
+  h1 { font: 400 64px/1.25 Lora, serif; white-space: nowrap; letter-spacing: -.045em; }
+  .underline { position: relative; }
+  .underline::after { content: ""; position: absolute; left: -2%; right: -2%; bottom: -.12em; height: .16em; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 12' preserveAspectRatio='none'%3E%3Cpath d='M2 8 C45 2 80 11 120 6 S188 3 198 7' stroke='%234a7a62' stroke-width='3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat; }
+  p { max-width: 535px; margin-top: 38px; font-size: 22px; line-height: 1.55; color: #555b50; }
+  .screens { position: absolute; top: 135px; right: 48px; width: 380px; display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 24px; }
+  .screens img { width: 100%; height: auto; border: 6px solid #33372f; border-radius: 11px; box-shadow: 8px 12px 0 #d4d5c7; }
+  .screens img:first-child { margin-top: 48px; }
+  .note { grid-column: 2; text-align: center; font: 600 25px/1.25 Caveat, cursive; color: #315243; transform: rotate(-2deg); }
   .url { position: absolute; bottom: 48px; left: 56px; font-size: 16px; color: #62675d; }
 </style>
 </head>
 <body>
   <div class="brand"><img src="../../public/logo.png" alt="" /><span>CrossPoint <b>Reader</b></span></div>
   <div class="copy">
-    <h1>Read without<br />limits.</h1>
-    <p>Your books, on a reader you can make your own.</p>
-    <span class="tag">Free, open source e-reader software</span>
+    <h1>Read <span class="underline">without limits.</span></h1>
+    <p>Your books, on a reader you can make your own. CrossPoint is free software for compact e-readers, built by the people who read on them.</p>
   </div>
   <div class="screens">
-    <img src="../../public/screenshots/hero-reader.png" alt="CrossPoint reading view" />
-    <img src="../../public/screenshots/hero-home.png" alt="CrossPoint home screen" />
+    <img src="../../public/screenshots/hero-reader.webp" alt="CrossPoint reading view" />
+    <img src="../../public/screenshots/hero-home.webp" alt="CrossPoint home screen" />
+    <span class="note">Make it yours.</span>
   </div>
   <span class="url">crosspointreader.com</span>
 </body>

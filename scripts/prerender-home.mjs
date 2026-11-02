@@ -22,7 +22,7 @@ try {
   const markup = renderToString(createElement(MemoryRouter, { initialEntries: ['/'] },
     createElement('div', { className: 'isolate min-h-dvh bg-stone-50 font-sans text-stone-900 antialiased' },
       createElement(HomePage))))
-  assert.match(markup, /<h1[^>]*>Read without/)
+  assert.match(markup, /<h1[^>]*>Read <span[^>]*>without limits\.<\/span><\/h1>/)
   assert.match(markup, /href="\/install"/)
   let html = await readFile(`${output}/index.html`, 'utf8')
   assert.ok(html.includes('<div id="root"></div>'))
