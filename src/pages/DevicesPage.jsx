@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import { Eyebrow } from '../components/ui.jsx'
 import { ProductCard, useShopItems } from './shop/ShopGridPage.jsx'
+import { getProductLinks } from '../lib/accessories.ts'
 import { specFor } from './shop/deviceSpecs.js'
 
 // --- Filter model -----------------------------------------------------------
@@ -169,13 +170,14 @@ function CompareTable({ rows }) {
           {rows.map(({ item, spec }) => (
             <tr key={item.id}>
               <th scope="row" className="sticky left-0 bg-stone-50 px-4 py-3 font-semibold whitespace-nowrap text-stone-900">
-                {item.link ? (
-                  <a href={item.link} target="_blank" rel="noopener noreferrer" className="hover:text-brand-600">
-                    {item.title}
-                  </a>
-                ) : (
-                  item.title
-                )}
+                {item.title}
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-normal">
+                  {getProductLinks(item).map((link, index) => (
+                    <a key={index} href={link.url} target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline">
+                      {link.label || 'Buy Now'}
+                    </a>
+                  ))}
+                </div>
               </th>
               {COLUMNS.map(([h, fmt]) => (
                 <td key={h} className="px-3 py-3 whitespace-nowrap text-stone-600 tabular-nums">

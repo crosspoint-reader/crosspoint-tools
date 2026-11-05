@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout.jsx'
 import { Eyebrow } from '../../components/ui.jsx'
-import { getAccessoryType } from '../../lib/accessories.ts'
+import { getAccessoryType, getProductLinks } from '../../lib/accessories.ts'
 
 export function accessoryImageUrl(a) {
   return a.imageUpdatedAt
@@ -35,8 +35,9 @@ function SearchIcon() {
 
 export function ProductCard({ item, ctaLabel, children }) {
   const imgUrl = accessoryImageUrl(item)
-  const clickable = !!item.link
-  const comingSoon = !!item.comingSoon || !item.link
+  const links = getProductLinks(item)
+  const clickable = links.length > 0
+  const comingSoon = !!item.comingSoon || !clickable
 
   const body = (
     <>
@@ -69,17 +70,21 @@ export function ProductCard({ item, ctaLabel, children }) {
           <p className="mt-1 text-xs/5 text-stone-500">{item.description}</p>
         )}
         {children}
-        <span
-          className={`mt-auto pt-3 text-xs font-medium ${clickable ? 'text-brand-600' : 'text-stone-400'}`}
-        >
-          {clickable ? (
-            <>
-              {comingSoon ? 'Learn More' : ctaLabel} <span aria-hidden="true">&rarr;</span>
-            </>
-          ) : (
-            'Coming soon'
-          )}
-        </span>
+        {links.length > 1 ? (
+          <div className="mt-auto flex flex-wrap gap-2 pt-3">
+            {links.map((link, index) => (
+              <a key={index} href={link.url} target="_blank" rel="noopener noreferrer" className="rounded-sm border border-stone-200 px-3 py-2 text-xs font-medium text-brand-600 hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-brand-600">
+                {comingSoon ? 'Learn More' : ctaLabel} · {link.label || new URL(link.url).hostname} <span aria-hidden="true">&rarr;</span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <span className={`mt-auto pt-3 text-xs font-medium ${clickable ? 'text-brand-600' : 'text-stone-400'}`}>
+            {clickable ? (
+              <>{comingSoon ? 'Learn More' : ctaLabel}{links[0].label ? ` · ${links[0].label}` : ''} <span aria-hidden="true">&rarr;</span></>
+            ) : 'Coming soon'}
+          </span>
+        )}
       </div>
     </>
   )
@@ -87,12 +92,12 @@ export function ProductCard({ item, ctaLabel, children }) {
   const cardCls =
     'flex flex-col overflow-hidden rounded-sm bg-panel ring-1 ring-stone-200'
 
-  if (!clickable) {
+  if (!clickable || links.length > 1) {
     return <div className={cardCls}>{body}</div>
   }
   return (
     <a
-      href={item.link}
+      href={links[0].url}
       target="_blank"
       rel="noopener noreferrer"
       className={`group ${cardCls} transition hover:shadow-md hover:ring-stone-950/10`}

@@ -3,7 +3,7 @@ import { betaDevices, betaDisplayName, normalizeBetaBuildList } from './betas';
 import { PR_ARTIFACTS_MARKER, parseArtifactComment, parsePrUrl, unzipFirstBin } from './github-pr';
 import { isPage, pageHead, sitemapXml, SITE, SEO_SELECTOR } from '../src/lib/seo';
 import { DEVICES } from '../src/lib/devices.ts';
-import { isAccessoryType } from '../src/lib/accessories.ts';
+import { isAccessoryType, readProductLinks } from '../src/lib/accessories.ts';
 import { getPrebuiltFontAssetUrl, getPrebuiltFontManifest } from './prebuilt-fonts';
 import {
   discardPendingBetaNotification,
@@ -2687,15 +2687,6 @@ async function saveAccessories(env: Env, list: Accessory[]): Promise<void> {
   await env.BUILD_META.put(ACCESSORIES_KEY, JSON.stringify(list));
 }
 
-function isValidHttpUrl(value: string): boolean {
-  try {
-    const u = new URL(value);
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
 function readAccessoryCategory(formData: FormData): 'device' | 'accessory' | null {
   const category = formData.get('category');
   if (category === 'device' || category === 'accessory') return category;
@@ -2739,15 +2730,15 @@ async function handleAccessoryCreate(
 
   const formData = await request.formData();
   const title = formData.get('title');
-  const link = formData.get('link');
+  let links;
+  try {
+    links = readProductLinks(formData);
+  } catch (error) {
+    return json({ error: (error as Error).message }, 400, headers);
+  }
 
   if (!title || typeof title !== 'string' || !title.trim()) {
     return json({ error: 'Title is required' }, 400, headers);
-  }
-  // Link is optional: items without one render as disabled "coming soon" cards.
-  const linkVal = typeof link === 'string' ? link.trim() : '';
-  if (linkVal && !isValidHttpUrl(linkVal)) {
-    return json({ error: 'Product link must be a valid http(s) URL' }, 400, headers);
   }
   const img = readAccessoryImage(formData);
   if (img && 'error' in img) {
@@ -2763,7 +2754,8 @@ async function handleAccessoryCreate(
   const accessory: Accessory = {
     id,
     title: title.trim(),
-    link: linkVal,
+    link: links?.[0]?.url || '',
+    links: links || [],
     description: typeof description === 'string' ? description.trim() : '',
     comingSoon: formData.get('comingSoon') === 'true',
     category: readAccessoryCategory(formData) || 'accessory',
@@ -2801,7 +2793,12 @@ async function handleAccessoryUpdate(
 
   const formData = await request.formData();
   const title = formData.get('title');
-  const link = formData.get('link');
+  let links;
+  try {
+    links = readProductLinks(formData);
+  } catch (error) {
+    return json({ error: (error as Error).message }, 400, headers);
+  }
 
   if (title !== null) {
     if (typeof title !== 'string' || !title.trim()) {
@@ -2809,12 +2806,9 @@ async function handleAccessoryUpdate(
     }
     accessory.title = title.trim();
   }
-  if (link !== null) {
-    const linkVal = typeof link === 'string' ? link.trim() : '';
-    if (linkVal && !isValidHttpUrl(linkVal)) {
-      return json({ error: 'Product link must be a valid http(s) URL' }, 400, headers);
-    }
-    accessory.link = linkVal;
+  if (links !== null) {
+    accessory.links = links;
+    accessory.link = links[0]?.url || '';
   }
   const description = formData.get('description');
   if (description !== null && typeof description === 'string') {

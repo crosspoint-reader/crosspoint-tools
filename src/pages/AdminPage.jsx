@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import { Button, Eyebrow } from '../components/ui.jsx'
 import { readJsonResponse, describeFailure, formatMB, inputCls, inputClsXs } from './admin/api.js'
-import { getAccessoryType } from '../lib/accessories.ts'
+import { getAccessoryType, getProductLinks } from '../lib/accessories.ts'
 
 const STORAGE_KEY = 'crosspoint-admin-secret'
 
@@ -398,17 +398,43 @@ function accessoryImageUrl(a) {
     : null
 }
 
+function ProductLinksEditor({ links, onChange }) {
+  function update(index, field, value) {
+    onChange(links.map((link, i) => i === index ? { ...link, [field]: value } : link))
+  }
+
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-sm font-medium text-stone-700">Product links</legend>
+      {links.map((link, index) => (
+        <div key={index} className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+          <label className="col-span-2 min-w-0 text-xs text-stone-600">
+            Link label (optional)
+            <input type="text" value={link.label} onChange={(e) => update(index, 'label', e.target.value)} placeholder="Amazon, AliExpress…" className={`${inputCls} mt-1`} />
+          </label>
+          <label className="min-w-0 text-xs text-stone-600">
+            URL
+            <input type="url" value={link.url} onChange={(e) => update(index, 'url', e.target.value)} placeholder="https://…" className={`${inputCls} mt-1`} />
+          </label>
+          <button type="button" aria-label={`Remove product link ${index + 1}`} onClick={() => onChange(links.filter((_, i) => i !== index))} className="rounded-lg px-2 py-2 text-xs text-stone-600 hover:bg-red-50 hover:text-red-600">Remove</button>
+        </div>
+      ))}
+      <button type="button" onClick={() => onChange([...links, { label: '', url: '' }])} className="rounded-lg py-2 text-xs font-medium text-brand-600 hover:text-brand-700">Add link</button>
+    </fieldset>
+  )
+}
+
 function AccessoriesCard({ secret, log }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [link, setLink] = useState('')
+  const [links, setLinks] = useState([{ label: '', url: '' }])
   const [comingSoon, setComingSoon] = useState(false)
   const [category, setCategory] = useState('accessory')
   const [accessoryType, setAccessoryType] = useState('ready-made')
   const [image, setImage] = useState(null)
   const [busy, setBusy] = useState(false)
   const [items, setItems] = useState([])
-  // Per-item edit panels: { [id]: { title, link, category, image } }
+  // Per-item edit panels: { [id]: { title, links, category, image } }
   const [edits, setEdits] = useState({})
   const imageInputRef = useRef(null)
 
@@ -436,7 +462,7 @@ function AccessoriesCard({ secret, log }) {
       const formData = new FormData()
       formData.append('title', title.trim())
       formData.append('description', description.trim())
-      formData.append('link', link.trim())
+      formData.append('links', JSON.stringify(links))
       formData.append('comingSoon', String(comingSoon))
       formData.append('category', category)
       if (category === 'accessory') formData.append('accessoryType', accessoryType)
@@ -453,7 +479,7 @@ function AccessoriesCard({ secret, log }) {
         log('Accessory added: ' + r.data.accessory.title)
         setTitle('')
         setDescription('')
-        setLink('')
+        setLinks([{ label: '', url: '' }])
         setComingSoon(false)
         setAccessoryType('ready-made')
         setImage(null)
@@ -524,7 +550,7 @@ function AccessoriesCard({ secret, log }) {
         next[a.id] = {
           title: a.title,
           description: a.description || '',
-          link: a.link || '',
+          links: getProductLinks(a),
           comingSoon: !!a.comingSoon,
           category: a.category || 'accessory',
           accessoryType: getAccessoryType(a),
@@ -547,7 +573,7 @@ function AccessoriesCard({ secret, log }) {
       const formData = new FormData()
       formData.append('title', edit.title.trim())
       formData.append('description', edit.description.trim())
-      formData.append('link', edit.link.trim())
+      formData.append('links', JSON.stringify(edit.links))
       formData.append('comingSoon', String(edit.comingSoon))
       formData.append('category', edit.category)
       if (edit.category === 'accessory') formData.append('accessoryType', edit.accessoryType)
@@ -588,7 +614,7 @@ function AccessoriesCard({ secret, log }) {
         <Link to="/accessories" className="font-medium text-brand-500 underline underline-offset-2">
           /accessories
         </Link>{' '}
-        pages. Leave the link empty to show an item as &ldquo;coming soon&rdquo;.
+        pages. Leave all links empty to show an item as &ldquo;coming soon&rdquo;.
       </p>
 
       <div className="mt-3 space-y-2">
@@ -624,13 +650,7 @@ function AccessoriesCard({ secret, log }) {
             </select>
           </label>
         )}
-        <input
-          type="url"
-          value={link}
-          onChange={(e) => setLink(e.target.value)}
-          placeholder="Product link (https://..., empty = coming soon)"
-          className={inputCls}
-        />
+        <ProductLinksEditor links={links} onChange={setLinks} />
         <label className="flex items-center gap-2 text-sm text-stone-700">
           <input
             type="checkbox"
@@ -638,7 +658,7 @@ function AccessoriesCard({ secret, log }) {
             onChange={(e) => setComingSoon(e.target.checked)}
             className="size-4 rounded border-stone-300 text-brand-500 focus:ring-brand-500/20"
           />
-          Coming soon (link shows as &ldquo;Learn More&rdquo;)
+          Coming soon (links show as &ldquo;Learn More&rdquo;)
         </label>
         <div className="flex gap-2">
           <label className="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
@@ -698,18 +718,11 @@ function AccessoriesCard({ secret, log }) {
                       </div>
                       <div className="truncate text-xs text-stone-400">
                         {a.comingSoon && <span className="text-amber-600">coming soon &middot; </span>}
-                        {a.link ? (
-                          <a
-                            href={a.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:text-stone-600"
-                          >
-                            {a.link}
+                        {getProductLinks(a).length ? getProductLinks(a).map((link, index) => (
+                          <a key={index} href={link.url} target="_blank" rel="noopener noreferrer" className="mr-3 hover:text-stone-600">
+                            {link.label || link.url}
                           </a>
-                        ) : (
-                          'No link — shown as coming soon'
-                        )}
+                        )) : 'No links — shown as coming soon'}
                       </div>
                     </div>
                   </div>
@@ -783,12 +796,7 @@ function AccessoriesCard({ secret, log }) {
                         </select>
                       </label>
                     )}
-                    <input
-                      type="url"
-                      value={edit.link}
-                      onChange={(e) => setEditField(a.id, 'link', e.target.value)}
-                      className={inputCls}
-                    />
+                    <ProductLinksEditor links={edit.links} onChange={(value) => setEditField(a.id, 'links', value)} />
                     <label className="flex items-center gap-2 text-sm text-stone-700">
                       <input
                         type="checkbox"
@@ -796,7 +804,7 @@ function AccessoriesCard({ secret, log }) {
                         onChange={(e) => setEditField(a.id, 'comingSoon', e.target.checked)}
                         className="size-4 rounded border-stone-300 text-brand-500 focus:ring-brand-500/20"
                       />
-                      Coming soon (link shows as &ldquo;Learn More&rdquo;)
+                      Coming soon (links show as &ldquo;Learn More&rdquo;)
                     </label>
                     <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-xs text-stone-500 hover:border-stone-400 hover:text-stone-700">
                       <span className="truncate">

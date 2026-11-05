@@ -1,4 +1,4 @@
-import type { AccessoryType } from '../src/lib/accessories.ts';
+import type { AccessoryType, ProductLink } from '../src/lib/accessories.ts';
 
 // Cloudflare Email Service binding (send-only). Kept as a local interface
 // until the installed workers-types ships an official one.
@@ -202,8 +202,10 @@ export interface ReleaseVisibility {
 export interface Accessory {
   id: string;
   title: string;
-  // Empty string = no purchase link yet; rendered as a "coming soon" card.
+  // First URL retained for older clients; empty when there are no links.
   link: string;
+  // Absent on legacy entries, which use link.
+  links?: ProductLink[];
   // Optional short blurb shown under the title on shop cards.
   description?: string;
   // Marks the item "coming soon" even when a link is set; the link then
