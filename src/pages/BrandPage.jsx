@@ -58,7 +58,7 @@ export default function BrandPage() {
                 <img
                   src={`/brand/${a.file}.svg`}
                   alt={`CrossPoint Reader ${a.name.toLowerCase()}`}
-                  className={a.wide ? 'h-auto max-h-24 w-full max-w-xl object-contain' : 'h-full w-auto'}
+                  className={a.wide ? 'h-auto max-h-24 w-full max-w-xl rounded-none object-contain' : 'h-full w-auto rounded-none'}
                 />
               </div>
               <div className="flex flex-wrap items-center justify-between gap-4 border-t border-stone-200 p-4">

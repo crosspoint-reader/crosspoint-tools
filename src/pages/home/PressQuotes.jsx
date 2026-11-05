@@ -33,7 +33,7 @@ export default function PressQuotes() {
                 <img
                   src={q.src}
                   alt={q.alt}
-                  className={`${q.className} w-auto opacity-45 [filter:brightness(0)]`}
+                  className={`${q.className} w-auto rounded-none opacity-45 [filter:brightness(0)]`}
                   loading="lazy"
                 />
               </figcaption>

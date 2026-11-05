@@ -25,6 +25,7 @@
   --color-stone-800: #33392f;
   --color-stone-900: #242820;
   --color-stone-950: #151a13;
+  --radius-image: 0.75rem;
   --radius-xl: 0.375rem;
   --radius-2xl: 0.375rem;
   --radius-3xl: 0.5rem;
@@ -48,6 +49,11 @@
 }
 
 html { color-scheme: light; }
+
+/* Shared photo/screenshot corners; logo and avatar utilities can override. */
+@layer base {
+  img { border-radius: var(--radius-image); }
+}
 
 /* Paper grain — subtle fractal-noise texture, the recurring Free-Ink surface.
    Apply with a low opacity utility (e.g. opacity-[0.05]). */
@@ -208,7 +214,7 @@ html { color-scheme: light; }
   flex-shrink: 0;
   width: clamp(240px, 32vw, 360px);
   aspect-ratio: 4 / 3;
-  border-radius: 12px;
+  border-radius: var(--radius-image);
   overflow: hidden;
   background: #ebe7dd;
   outline: 1px solid rgba(0,0,0,0.06);

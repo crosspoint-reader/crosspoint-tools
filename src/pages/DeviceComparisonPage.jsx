@@ -45,7 +45,7 @@ export default function DeviceComparisonPage() {
             width="1600"
             height="739"
             fetchPriority="high"
-            className="mt-8 w-full rounded-2xl border border-stone-200"
+            className="mt-8 w-full border border-stone-200"
           />
 
           <div className="mx-auto mt-10 max-w-3xl">

@@ -16,7 +16,7 @@ export default function Partners() {
             <ul key={String(duplicate)} aria-hidden={duplicate || undefined}>
               {PARTNERS.map((p) => (
                 <li key={p.name}>
-                  <img src={p.src} alt={duplicate ? '' : p.name} className={`${p.className} w-auto max-w-none object-contain opacity-45`} />
+                  <img src={p.src} alt={duplicate ? '' : p.name} className={`${p.className} w-auto max-w-none rounded-none object-contain opacity-45`} />
                 </li>
               ))}
             </ul>

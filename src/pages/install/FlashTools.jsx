@@ -1005,7 +1005,7 @@ export default function FlashTools() {
                   className={`${cardClass(model === m.id)} min-w-0 disabled:opacity-60`}
                 >
                   <span className="flex items-center gap-1.5">
-                    <img src={MODEL_BRANDS[m.id]} alt="" className="h-4 max-w-6 shrink-0 object-contain" />
+                    <img src={MODEL_BRANDS[m.id]} alt="" className="h-4 max-w-6 shrink-0 rounded-none object-contain" />
                     <span className="min-w-0 break-words text-sm font-semibold leading-5 text-stone-900">{m.name}</span>
                   </span>
                   <span className="mt-1 block text-xs text-stone-600">{m.width} × {m.height}</span>

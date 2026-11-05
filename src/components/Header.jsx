@@ -106,7 +106,7 @@ function FundButton({ className = '', compact = false, onClick }) {
       onClick={onClick}
       className={`inline-flex items-center justify-center gap-x-1.5 rounded-md bg-royalty px-3.5 py-2 text-sm font-semibold whitespace-nowrap text-white shadow-sm transition hover:bg-royalty-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-royalty ${className}`}
     >
-      <img src="/crown.svg" alt="" className="size-4 brightness-0 invert" />
+      <img src="/crown.svg" alt="" className="size-4 rounded-none brightness-0 invert" />
       {compact ? (
         <>
           <span className="lg:hidden">Fund</span>

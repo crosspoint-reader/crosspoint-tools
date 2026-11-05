@@ -676,7 +676,7 @@ function AccessoriesCard({ secret, log }) {
                       <img
                         src={imgUrl}
                         alt=""
-                        className="size-10 shrink-0 rounded-md bg-stone-100 object-cover ring-1 ring-stone-950/5"
+                        className="size-10 shrink-0 bg-stone-100 object-cover ring-1 ring-stone-950/5"
                       />
                     ) : (
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-stone-100 text-xs text-stone-400">

@@ -96,7 +96,7 @@ export default function LoginPage() {
                 href="https://app.royalty.dev/SoFriendly/crosspoint-tools/release"
                 className="flex w-full items-center justify-center gap-2.5 rounded-lg bg-royalty px-5 py-3 text-sm font-semibold text-white no-underline shadow-sm hover:bg-royalty-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-royalty"
               >
-                <img src="/crown.svg" alt="" className="size-5 brightness-0 invert" />
+                <img src="/crown.svg" alt="" className="size-5 rounded-none brightness-0 invert" />
                 Subscribe on Royalty.dev
               </a>
 
