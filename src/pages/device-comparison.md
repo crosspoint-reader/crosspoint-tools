@@ -160,7 +160,7 @@ It looks like an upgraded version of the Sticky. None of the Sticky issues I men
 
 There are two versions: the regular model and the Lite. The regular version includes several sensors and features that aren’t especially relevant to an e-reader, mainly NFC and LoRa. At $55 for the Lite version, you get a device nearly identical to the X4 Pro, with the main differences being a larger battery, USB-C, the absence of warm lighting, and a plastic body instead of aluminum.
 
-Unfortunately, my own experience with it hasn’t been especially good. On the day I received my unit, I dropped it about 10 cm onto a table, and something inside came loose. Now it works intermittently if I shake the device. It’s possible that my unit was simply faulty, but it doesn’t give me much confidence in the build quality, though it wouldn’t be fair to generalize based on a single case.
+Unfortunately, my first unit had some build quality issues. On the day it arrived, I dropped it just 10 cm onto a table, and something came loose inside. I later discovered that four internal magnets had slipped out of place, and the ribbon cable for the physical buttons had come loose as well. To M5Stack's credit, their support immediately sent me a replacement free of charge, which has been working perfectly. You can find the disassembly process, including my mistakes, in the [blog post](/blog/papermono-disassembly).
 
 The PaperMono also comes with no accessories.
 
