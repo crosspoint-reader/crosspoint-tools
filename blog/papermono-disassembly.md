@@ -61,9 +61,9 @@ M5Stack doesn't use a couple of tiny screws here. Instead, the PCB itself has fo
 ![pic9](./assets/papermono-disassembly/my_photo-11.jpg)
 
 
-The ESP32-S3 is there, along with several other chips I haven't identified. The board itself looks well made, with a clean, sensible layout.
+The ESP32-S3 is there, along with several other chips I haven't identified. The board itself looks well made. They did a neat job packing so many components onto such a small board.
 
-Putting it back should have been simple, and wasn't. Putting it back should have been simple, and wasn't. However I angled it, I couldn't get those PCB tabs back into their slots. Eventually I lost patience and cut the protruding tabs off the PCB itself. Problem solved. Elegant? No. Would I recommend it? Also no.
+Putting it back should have been simple, but it wasn't. However I angled it, I couldn't get those PCB tabs back into their slots. Eventually I lost patience and cut the protruding tabs off the PCB itself. Problem solved. Elegant? No. Would I recommend it? Also no.
 
 I reconnected the button ribbon cable and taped the connector down so it couldn't wander off again. The original adhesive around the front still held, so I didn't need new glue.
 
