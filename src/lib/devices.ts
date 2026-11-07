@@ -13,6 +13,7 @@ export const DEVICES = [
   { id: 'papermono', name: 'M5PaperMono', width: 480, height: 800, board: 'm5stack_paper_mono' },
   { id: 'lilygo', name: 'LilyGo T5', width: 540, height: 960, board: 'lilygo_t5s3' },
   { id: 'metalio', name: 'Metalio E-INK4', width: 480, height: 800, board: 'metalio_eink4' },
+  { id: 'metalio_plus', name: 'Metalio E-INK4 Plus', width: 684, height: 1216, board: 'metalio_eink4_plus' },
   { id: 'eego_a4', name: 'EEGO Reader A4', width: 552, height: 768, board: 'eego_a4' },
   { id: 'picco', name: 'BOOX Picco', width: 480, height: 800, board: 'picco' },
 ]

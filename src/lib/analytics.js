@@ -6,6 +6,7 @@ const DEVICE_LABELS = {
   papermono: 'M5PaperMono',
   lilygo: 'LilyGo T5',
   metalio: 'Metalio E-INK4',
+  metalio_plus: 'Metalio E-INK4 Plus',
   eego_a4: 'EEGO Reader A4',
   picco: 'BOOX Picco',
 }

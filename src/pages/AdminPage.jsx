@@ -2292,6 +2292,16 @@ export default function AdminPage() {
             <DeviceBuildCard
               secret={secret}
               log={log}
+              label="Metalio E-INK4 Plus"
+              namePlaceholder="Build name (e.g. Metalio E-INK4 Plus Beta v1)"
+              infoUrl="/api/device-build/metalio_plus/info"
+              uploadUrl="/api/device-build/metalio_plus/upload"
+              baseUrl="/api/device-build/metalio_plus"
+              description="Upload the Metalio E-INK4 Plus build offered in the homepage web flasher. Each upload is added alongside the existing builds."
+            />
+            <DeviceBuildCard
+              secret={secret}
+              log={log}
               label="EEGO A4"
               namePlaceholder="Build name (e.g. EEGO A4 Beta v1)"
               infoUrl="/api/device-build/eego_a4/info"

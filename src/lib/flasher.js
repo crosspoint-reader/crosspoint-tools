@@ -154,6 +154,7 @@ const ESP_IMAGE_CHIP_IDS = {
   'ESP32-S2': 0x0002,
   'ESP32-C3': 0x0005,
   'ESP32-S3': 0x0009,
+  'ESP32-S31': 0x0020,
 };
 
 export function imageChipName(data) {
@@ -746,7 +747,7 @@ export class CrossPointFlasher {
     const existingSector = otaRaw.subarray(sectorStart, sectorStart + OTA_SECTOR_BYTES);
     const newSector = buildNewOtadataSector(existingSector, ota.newSeq);
     await this.espLoader.writeFlash({
-      fileArray: [{ data: this.espLoader.ui8ToBstr(newSector), address: this.layout.otadataOffset + sectorStart }],
+      fileArray: [{ data: newSector, address: this.layout.otadataOffset + sectorStart }],
       flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep',
       eraseAll: false, compress: true,
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Update boot partition', written, total); },
@@ -802,7 +803,7 @@ export class CrossPointFlasher {
     }
 
     await this.espLoader.writeFlash({
-      fileArray: [{ data: this.espLoader.ui8ToBstr(firmwareData), address: destSlot.offset }],
+      fileArray: [{ data: firmwareData, address: destSlot.offset }],
       flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep',
       eraseAll: false, compress: true,
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Flash firmware', written, total); },
@@ -814,7 +815,7 @@ export class CrossPointFlasher {
     const existingSector = otaRaw.subarray(sectorStart, sectorStart + OTA_SECTOR_BYTES);
     const newSector = buildNewOtadataSector(existingSector, ota.newSeq);
     await this.espLoader.writeFlash({
-      fileArray: [{ data: this.espLoader.ui8ToBstr(newSector), address: this.layout.otadataOffset + sectorStart }],
+      fileArray: [{ data: newSector, address: this.layout.otadataOffset + sectorStart }],
       flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep',
       eraseAll: false, compress: true,
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Update boot partition', written, total); },
@@ -861,7 +862,7 @@ export class CrossPointFlasher {
 
     step(2, 'running');
     await this.espLoader.writeFlash({
-      fileArray: [{ data: this.espLoader.ui8ToBstr(firmwareData), address: target.offset }],
+      fileArray: [{ data: firmwareData, address: target.offset }],
       flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep',
       eraseAll: false, compress: true,
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Flash app partition', written, total); },
@@ -943,7 +944,7 @@ export class CrossPointFlasher {
 
     step(1, 'running');
     await this.espLoader.writeFlash({
-      fileArray: [{ data: this.espLoader.ui8ToBstr(data), address: 0 }],
+      fileArray: [{ data, address: 0 }],
       flashSize: 'keep', flashMode: 'keep', flashFreq: 'keep',
       eraseAll: false, compress: true,
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Write flash', written, total); },
@@ -1048,24 +1049,24 @@ export class CrossPointFlasher {
     step(1, 'running');
     const fileArray = [];
     if (bootloaderData) {
-      fileArray.push({ data: this.espLoader.ui8ToBstr(bootloaderData), address: bootloaderOffset });
+      fileArray.push({ data: bootloaderData, address: bootloaderOffset });
     }
     const partitionBinary = partitionTableData || buildPartitionTableBinary(table);
-    fileArray.push({ data: this.espLoader.ui8ToBstr(partitionBinary), address: 0x8000 });
+    fileArray.push({ data: partitionBinary, address: 0x8000 });
     // Repair flows normally blank NVS and otadata because erased flash is the
     // state firmware knows how to initialize from. A packaged install can
     // preserve NVS to reproduce an upstream four-part image exactly. An
     // explicit otadataData image (boot_app0.bin) overrides blank otadata.
     if (!preserveNvs) {
-      fileArray.push({ data: this.espLoader.ui8ToBstr(new Uint8Array(nvs.size).fill(0xFF)), address: nvs.offset });
+      fileArray.push({ data: new Uint8Array(nvs.size).fill(0xFF), address: nvs.offset });
     }
     if (otadataData) {
-      fileArray.push({ data: this.espLoader.ui8ToBstr(otadataData), address: otadata.offset });
+      fileArray.push({ data: otadataData, address: otadata.offset });
     } else {
-      fileArray.push({ data: this.espLoader.ui8ToBstr(new Uint8Array(otadata.size).fill(0xFF)), address: otadata.offset });
+      fileArray.push({ data: new Uint8Array(otadata.size).fill(0xFF), address: otadata.offset });
     }
     if (firmwareData) {
-      fileArray.push({ data: this.espLoader.ui8ToBstr(firmwareData), address: app0.offset });
+      fileArray.push({ data: firmwareData, address: app0.offset });
     }
     await this.espLoader.writeFlash({
       fileArray,

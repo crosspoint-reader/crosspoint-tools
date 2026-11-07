@@ -169,7 +169,7 @@ const BRANDS = [
   { id: 'm5stack', name: 'M5Stack', logo: '/brands/m5stack.png', models: ['m5paper', 'm5papers3', 'papermono'] },
   { id: 'seeed', name: 'Seeed', logo: '/brands/seeed.png', models: ['sticky'] },
   { id: 'lilygo', name: 'LilyGo', logo: '/brands/lilygo.png', models: ['lilygo'] },
-  { id: 'cloudzao', name: 'Metalio', logo: '/brands/cloudzao.png', models: ['metalio'] },
+  { id: 'cloudzao', name: 'Metalio', logo: '/brands/cloudzao.png', models: ['metalio', 'metalio_plus'] },
   { id: 'eego', name: 'EEGO', logo: '/brands/eego.png', logoClass: 'h-7', models: ['eego_a4'] },
   { id: 'boox', name: 'BOOX', logo: '/brands/boox.svg', logoClass: 'h-5', models: ['picco'] },
 ]
@@ -191,6 +191,7 @@ const MODEL_CHIPS = {
   papermono: 'ESP32-S3',
   lilygo: 'ESP32-S3',
   metalio: 'ESP32-S3',
+  metalio_plus: 'ESP32-S31',
   eego_a4: 'ESP32-S3',
   picco: 'ESP32-S3',
 }
@@ -269,6 +270,16 @@ const DEVICE_INSTALLS = {
     baudrate: 921600,
     after: 'Press the power button to boot the device.',
     note: 'NOTE: You must use a USB-A cable to flash',
+  },
+  metalio_plus: {
+    name: 'Metalio E-INK4 Plus',
+    // ESP32-S31 (freeink-sdk metalio_eink4_plus env): ROM loads the bootloader
+    // at 0x2000; flash settings are kept from its (QIO) header. The bootloader must come from the same ESP-IDF 6.1
+    // build as the app or the panel stream runs ~170x slower.
+    bootloader: '/firmware/metalio_plus-bootloader.bin',
+    bootloaderOffset: 0x2000,
+    baudrate: 921600,
+    after: 'Press the power button to boot the device.',
   },
   eego_a4: {
     name: 'EEGO Reader A4',
