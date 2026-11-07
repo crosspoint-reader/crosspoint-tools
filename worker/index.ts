@@ -297,8 +297,11 @@ async function handleApi(
       case '/api/contact':
         return handleContact(request, env, corsHeaders);
 
+      // Anonymous issue filing/commenting is disabled; the form now sends people
+      // to GitHub after the duplicate search. Handlers kept for a quick revert.
       case '/api/issues':
-        return handleCreateIssue(request, env, ctx, corsHeaders);
+      case '/api/issues/comment':
+        return json({ error: 'Anonymous issue submission is disabled. Please file on GitHub.' }, 410, corsHeaders);
 
       case '/api/issues/config':
         return handleIssueConfig(env, corsHeaders);
@@ -306,8 +309,6 @@ async function handleApi(
       case '/api/issues/similar':
         return handleSimilarIssues(request, env, corsHeaders);
 
-      case '/api/issues/comment':
-        return handleCreateIssueComment(request, env, corsHeaders);
 
       case '/api/issues/admin':
         return handleIssueAdminList(request, env, corsHeaders);

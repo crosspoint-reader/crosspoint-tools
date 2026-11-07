@@ -163,20 +163,17 @@ function StepsList({ steps, states, percent }) {
 
 const MODELS = DEVICES
 
-const MODEL_BRANDS = {
-  x4: '/brands/xteink.png',
-  x4pro: '/brands/xteink.png',
-  x4c: '/brands/xteink.png',
-  x3: '/brands/xteink.png',
-  sticky: '/brands/seeed.png',
-  m5paper: '/brands/m5stack.png',
-  m5papers3: '/brands/m5stack.png',
-  papermono: '/brands/m5stack.png',
-  lilygo: '/brands/lilygo.png',
-  metalio: '/brands/cloudzao.png',
-  eego_a4: '/brands/eego.png',
-  picco: '/brands/boox.svg',
-}
+// Step 1a of the picker: pick a brand, then one of its devices.
+const BRANDS = [
+  { id: 'xteink', name: 'Xteink', logo: '/brands/xteink.png', models: ['x4', 'x4pro', 'x4c', 'x3'] },
+  { id: 'm5stack', name: 'M5Stack', logo: '/brands/m5stack.png', models: ['m5paper', 'm5papers3', 'papermono'] },
+  { id: 'seeed', name: 'Seeed', logo: '/brands/seeed.png', models: ['sticky'] },
+  { id: 'lilygo', name: 'LilyGo', logo: '/brands/lilygo.png', models: ['lilygo'] },
+  { id: 'cloudzao', name: 'Metalio', logo: '/brands/cloudzao.png', models: ['metalio'] },
+  { id: 'eego', name: 'EEGO', logo: '/brands/eego.png', models: ['eego_a4'] },
+  { id: 'boox', name: 'BOOX', logo: '/brands/boox.svg', models: ['picco'] },
+]
+const brandOf = (modelId) => BRANDS.find((b) => b.models.includes(modelId))
 
 // esptool chip identity each device must report before we write anything.
 // Stops firmware for one board from landing on another (e.g. the Sticky's
@@ -334,6 +331,7 @@ export default function FlashTools() {
     const requested = searchParams.get('device')
     return MODELS.some((m) => m.id === requested) ? requested : null
   })
+  const [brand, setBrand] = useState(() => brandOf(model)?.id ?? null)
   const [fw, setFw] = useState(null)
   const [running, setRunning] = useState(false)
   const [customFile, setCustomFile] = useState(null)
@@ -563,6 +561,14 @@ export default function FlashTools() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progress?.title, running])
+
+  function selectBrand(id) {
+    if (running || brand === id) return
+    setBrand(id)
+    const models = BRANDS.find((b) => b.id === id).models
+    // Single-device brands skip straight to that device.
+    selectModel(models.length === 1 ? models[0] : null)
+  }
 
   function selectModel(id) {
     if (running || model === id) return
@@ -991,27 +997,47 @@ export default function FlashTools() {
               <h2 id="device-step" className="text-base font-semibold text-stone-900">Choose your device</h2>
             </div>
             <fieldset
-              id="device-picker"
-              aria-labelledby="device-step"
+              aria-label="Brand"
               disabled={running}
-              className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3"
+              className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4"
             >
-              {MODELS.map((m) => (
+              {BRANDS.map((b) => (
                 <button
-                  key={m.id}
+                  key={b.id}
                   type="button"
-                  onClick={() => selectModel(m.id)}
-                  aria-pressed={model === m.id}
-                  className={`${cardClass(model === m.id)} min-w-0 disabled:opacity-60`}
+                  onClick={() => selectBrand(b.id)}
+                  aria-pressed={brand === b.id}
+                  className={`${cardClass(brand === b.id)} flex min-w-0 flex-col items-center gap-2 disabled:opacity-60`}
                 >
-                  <span className="flex items-center gap-1.5">
-                    <img src={MODEL_BRANDS[m.id]} alt="" className="h-4 max-w-6 shrink-0 rounded-none object-contain" />
-                    <span className="min-w-0 break-words text-sm font-semibold leading-5 text-stone-900">{m.name}</span>
-                  </span>
-                  <span className="mt-1 block text-xs text-stone-600">{m.width} × {m.height}</span>
+                  <img src={b.logo} alt="" className="h-8 max-w-full rounded-none object-contain" />
+                  <span className="text-sm font-semibold text-stone-900">{b.name}</span>
                 </button>
               ))}
             </fieldset>
+            {brand && (
+              <fieldset
+                id="device-picker"
+                aria-labelledby="device-step"
+                disabled={running}
+                className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3"
+              >
+                {MODELS.filter((m) => brandOf(m.id)?.id === brand).map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => selectModel(m.id)}
+                    aria-pressed={model === m.id}
+                    className={`${cardClass(model === m.id)} min-w-0 disabled:opacity-60`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <img src={brandOf(m.id).logo} alt="" className="h-4 max-w-6 shrink-0 rounded-none object-contain" />
+                      <span className="min-w-0 break-words text-sm font-semibold leading-5 text-stone-900">{m.name}</span>
+                    </span>
+                    <span className="mt-1 block text-xs text-stone-600">{m.width} × {m.height}</span>
+                  </button>
+                ))}
+              </fieldset>
+            )}
           </div>
 
           {/* Step 2: Firmware */}

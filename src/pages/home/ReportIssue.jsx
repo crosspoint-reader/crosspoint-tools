@@ -13,8 +13,7 @@ export default function ReportIssue() {
           Found a bug or have a feature request?
         </h2>
         <p className="mx-auto mt-6 max-w-[52ch] font-serif text-xl/9 text-pretty text-stone-600">
-          File it directly on our issue tracker &mdash; <strong className="font-medium text-stone-900">no GitHub account needed</strong>.
-          We&rsquo;ll take it from there.
+          Check whether it&rsquo;s already been reported, then file it on our GitHub issue tracker.
         </p>
         <div className="mt-10">
           <ReportIssueForm />

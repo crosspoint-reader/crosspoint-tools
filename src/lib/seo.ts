@@ -75,7 +75,7 @@ const PAGES: Record<string, PageMeta> = {
   },
   '/report-issue': {
     title: 'Report an Issue',
-    description: 'Report a CrossPoint bug or request a feature. No GitHub account needed.',
+    description: 'Report a CrossPoint bug or request a feature on GitHub.',
   },
   '/accessories': {
     title: 'Accessories',

@@ -34,12 +34,7 @@ When you send a message, we receive your name, email address, and message. It's 
 
 ### Issue form
 
-The [Report an Issue](/report-issue) form creates a **public** GitHub issue from your title, description, and anything you attach, such as a serial log. Don't include anything you wouldn't want public.
-
-- If you give an email address, it **does not** go in the public issue. We keep it in a private admin log (the 500 most recent submissions) so we can follow up with you.
-- We use [Cloudflare Turnstile](https://www.cloudflare.com/products/turnstile/) to block bots. Turnstile may process information about your browser to make that check.
-- Your IP address is briefly stored for about two minutes to limit how often one person can submit.
-- Issue text is processed by an AI model on Cloudflare's network to spot duplicate reports.
+The [Report an Issue](/report-issue) page sends the title and description you type to an AI model on Cloudflare's network to find similar existing issues. It doesn't store them or create an issue. You file new issues yourself on GitHub, under GitHub's own privacy terms.
 
 ### Sync account sign-up page
 
