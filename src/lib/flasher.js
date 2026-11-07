@@ -584,6 +584,28 @@ export class CrossPointFlasher {
         'Wrong device selected? Flashing was aborted before anything was written.'
       );
     }
+    await this.disableS3UsbWatchdogs();
+  }
+
+  // Port of esptool.py's ESP32S3ROM.disable_watchdogs(), which esptool-js lacks.
+  // Over USB-Serial-JTAG nothing feeds the RTC WDT or super WDT in download
+  // mode, so if the previous firmware left them armed the chip resets mid-flash
+  // or mid-verify (seen on the Sticky). Registers from esptool/targets/esp32s3.py.
+  async disableS3UsbWatchdogs() {
+    if (this.espLoader.chip?.CHIP_NAME !== 'ESP32-S3') return;
+    const UARTDEV_BUF_NO = 0x3fcef14c;
+    const UARTDEV_BUF_NO_USB_JTAG_SERIAL = 4;
+    if (((await this.espLoader.readReg(UARTDEV_BUF_NO)) & 0xff) !== UARTDEV_BUF_NO_USB_JTAG_SERIAL) return;
+    const RTC = 0x60008000;
+    const WDTCONFIG0 = RTC + 0x98, WDTWPROTECT = RTC + 0xb0, WDT_WKEY = 0x50d83aa1;
+    const SWD_CONF = RTC + 0xb4, SWD_WPROTECT = RTC + 0xb8, SWD_WKEY = 0x8f1d312a;
+    const lo = this.espLoader;
+    await lo.writeReg(WDTWPROTECT, WDT_WKEY);
+    await lo.writeReg(WDTCONFIG0, 0);
+    await lo.writeReg(WDTWPROTECT, 0);
+    await lo.writeReg(SWD_WPROTECT, SWD_WKEY);
+    await lo.writeReg(SWD_CONF, ((await lo.readReg(SWD_CONF)) | 0x80000000) >>> 0);
+    await lo.writeReg(SWD_WPROTECT, 0);
   }
 
   async disconnect(skipReset = false) {

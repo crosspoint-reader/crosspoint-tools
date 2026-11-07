@@ -996,10 +996,11 @@ export default function FlashTools() {
               <StepBadge n={1} active={!!model} />
               <h2 id="device-step" className="text-base font-semibold text-stone-900">Choose your device</h2>
             </div>
+            <h3 id="brand-label" className="mt-4 text-xs font-semibold uppercase tracking-wide text-stone-500">Brand</h3>
             <fieldset
-              aria-label="Brand"
+              aria-labelledby="brand-label"
               disabled={running}
-              className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4"
+              className="mt-2 grid grid-cols-3 gap-3 sm:grid-cols-4"
             >
               {BRANDS.map((b) => (
                 <button
@@ -1015,11 +1016,13 @@ export default function FlashTools() {
               ))}
             </fieldset>
             {brand && (
+              <>
+              <h3 id="device-label" className="mt-5 text-xs font-semibold uppercase tracking-wide text-stone-500">Device</h3>
               <fieldset
                 id="device-picker"
-                aria-labelledby="device-step"
+                aria-labelledby="device-label"
                 disabled={running}
-                className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3"
+                className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3"
               >
                 {MODELS.filter((m) => brandOf(m.id)?.id === brand).map((m) => (
                   <button
@@ -1037,6 +1040,7 @@ export default function FlashTools() {
                   </button>
                 ))}
               </fieldset>
+              </>
             )}
           </div>
 
