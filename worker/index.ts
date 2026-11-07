@@ -24,6 +24,11 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.hostname === 'www.crosspointreader.com') {
+      url.hostname = 'crosspointreader.com';
+      return Response.redirect(url.toString(), 301);
+    }
+
     // API routes
     if (url.pathname.startsWith('/api/')) {
       return handleApi(request, url, env, ctx);

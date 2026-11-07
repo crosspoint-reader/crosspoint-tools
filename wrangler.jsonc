@@ -5,7 +5,8 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "routes": [
-    { "pattern": "crosspointreader.com", "custom_domain": true }
+    { "pattern": "crosspointreader.com", "custom_domain": true },
+    { "pattern": "www.crosspointreader.com", "custom_domain": true }
   ],
 
   // Persistent Worker Logs (viewable in the dashboard + `wrangler tail`). Lets
