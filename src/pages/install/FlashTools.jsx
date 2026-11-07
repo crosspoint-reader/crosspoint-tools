@@ -170,7 +170,7 @@ const BRANDS = [
   { id: 'seeed', name: 'Seeed', logo: '/brands/seeed.png', models: ['sticky'] },
   { id: 'lilygo', name: 'LilyGo', logo: '/brands/lilygo.png', models: ['lilygo'] },
   { id: 'cloudzao', name: 'Metalio', logo: '/brands/cloudzao.png', models: ['metalio'] },
-  { id: 'eego', name: 'EEGO', logo: '/brands/eego.png', models: ['eego_a4'] },
+  { id: 'eego', name: 'EEGO', logo: '/brands/eego.png', logoClass: 'h-7', models: ['eego_a4'] },
   { id: 'boox', name: 'BOOX', logo: '/brands/boox.svg', logoClass: 'h-5', models: ['picco'] },
 ]
 const brandOf = (modelId) => BRANDS.find((b) => b.models.includes(modelId))
