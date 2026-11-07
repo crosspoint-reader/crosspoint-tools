@@ -171,7 +171,7 @@ const BRANDS = [
   { id: 'lilygo', name: 'LilyGo', logo: '/brands/lilygo.png', models: ['lilygo'] },
   { id: 'cloudzao', name: 'Metalio', logo: '/brands/cloudzao.png', models: ['metalio'] },
   { id: 'eego', name: 'EEGO', logo: '/brands/eego.png', models: ['eego_a4'] },
-  { id: 'boox', name: 'BOOX', logo: '/brands/boox.svg', models: ['picco'] },
+  { id: 'boox', name: 'BOOX', logo: '/brands/boox.svg', logoClass: 'h-5', models: ['picco'] },
 ]
 const brandOf = (modelId) => BRANDS.find((b) => b.models.includes(modelId))
 
@@ -1010,7 +1010,9 @@ export default function FlashTools() {
                   aria-pressed={brand === b.id}
                   className={`${cardClass(brand === b.id)} flex min-w-0 flex-col items-center gap-2 disabled:opacity-60`}
                 >
-                  <img src={b.logo} alt="" className="h-8 max-w-full rounded-none object-contain" />
+                  <span className="flex h-8 items-center">
+                    <img src={b.logo} alt="" className={`${b.logoClass || 'h-8'} max-w-full rounded-none object-contain`} />
+                  </span>
                   <span className="text-sm font-semibold text-stone-900">{b.name}</span>
                 </button>
               ))}
