@@ -98,7 +98,7 @@ export function Done() {
       await api.cleanupAfterInstall();
       setCleanupMessage(
         isMac()
-          ? "Cleanup complete. Restart your Mac to fully remove the temporary \"Xteink Unlocker\" network interface from System Settings → Network. Then you can close Unlocker."
+          ? "Cleanup complete. If a temporary \"Xteink Unlocker\" entry is still listed in System Settings → Network, restart your Mac to clear it. Then you can close Unlocker."
           : "Cleanup complete. You can close Unlocker."
       );
     } catch (e) {
@@ -167,9 +167,11 @@ export function Done() {
                 <li>Turn Internet Sharing off in System Settings.</li>
                 <li>Click the button below to tear down Unlocker's local network changes.</li>
                 <li>
-                  Restart your Mac. This clears the temporary "Xteink Unlocker"
-                  entry from System Settings → Network. (Deleting it from the
-                  GUI can crash System Settings, so a reboot is the safe way.)
+                  If a temporary "Xteink Unlocker" entry remains in System
+                  Settings → Network (only created when no wired internet
+                  connection was available), restart your Mac to clear it.
+                  (Deleting it from the GUI can crash System Settings, so a
+                  reboot is the safe way.)
                 </li>
               </>
             ) : isLinux() ? (
