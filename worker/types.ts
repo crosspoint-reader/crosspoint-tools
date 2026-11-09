@@ -193,10 +193,11 @@ export type PrDeviceBuild = { device: string; id: string };
 
 // Per-device visibility for the fixed "official release" firmware buttons
 // (CrossPoint stable, Nightly, Stock English, Stock Chinese). Keyed by release
-// key; the value lists the devices on which that button is hidden. A missing
-// key or absent device means the button is shown.
+// key; the value lists the flasher device ids (any DEVICES id, not just
+// x3/x4) on which that button is hidden. A missing key or absent device means
+// the button is shown.
 export interface ReleaseVisibility {
-  hidden: Record<string, FirmwareDevice[]>;
+  hidden: Record<string, string[]>;
 }
 
 export interface Accessory {

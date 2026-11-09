@@ -1198,7 +1198,7 @@ export async function fetchBetaBuilds() {
 }
 
 // Per-device visibility for the fixed release buttons (crosspoint, nightly,
-// stock-en, stock-ch) on x3/x4. Returns { hidden: { [key]: ['x3'|'x4'] } }.
+// stock-en, stock-ch). Returns { hidden: { [key]: [deviceId, ...] } }.
 // Falls back to "nothing hidden" so a fetch failure never blanks the flasher.
 export async function fetchReleaseVisibility() {
   try {

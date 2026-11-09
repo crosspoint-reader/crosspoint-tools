@@ -4,6 +4,7 @@ import Layout from '../components/Layout.jsx'
 import { Button, Eyebrow } from '../components/ui.jsx'
 import { readJsonResponse, describeFailure, formatMB, inputCls, inputClsXs } from './admin/api.js'
 import { getAccessoryType, getProductLinks } from '../lib/accessories.ts'
+import { DEVICES } from '../lib/devices.ts'
 
 const STORAGE_KEY = 'crosspoint-admin-secret'
 
@@ -81,23 +82,28 @@ const FIRMWARE_DEVICES = [
   { id: 'x4', label: 'X4' },
 ]
 
-// The fixed release buttons the flasher renders for x3/x4. Keys match the
-// `action` ids in FlashTools.jsx and OFFICIAL_RELEASE_KEYS in the worker.
+// Every flasher device, for the stable/nightly release toggles. Hiding stable
+// on a device makes its newest beta the recommended build in the flasher.
+const ALL_FLASHER_DEVICES = DEVICES.map((d) => ({ id: d.id, label: d.name }))
+
+// The fixed release buttons the flasher renders. Keys match the `action` ids
+// in FlashTools.jsx and OFFICIAL_RELEASE_KEYS in the worker. Stock firmware
+// only exists for x3/x4, so those rows keep the default device pair.
 const OFFICIAL_RELEASES = [
-  { key: 'crosspoint', label: 'CrossPoint', sub: 'Community · stable release' },
-  { key: 'nightly', label: 'CrossPoint Nightly', sub: 'Insider' },
+  { key: 'crosspoint', label: 'CrossPoint', sub: 'Community · stable release', devices: ALL_FLASHER_DEVICES },
+  { key: 'nightly', label: 'CrossPoint Nightly', sub: 'Insider', devices: ALL_FLASHER_DEVICES },
   { key: 'stock-en', label: 'Stock English', sub: 'XTeink Factory' },
   { key: 'stock-ch', label: 'Stock Chinese', sub: 'XTeink Factory' },
 ]
 
 // Checkbox pair ("Show on X3 / X4") driven by a hiddenDevices list. Both
 // boxes checked = shown on both devices (empty hiddenDevices).
-function DeviceVisibilityToggles({ hiddenDevices, onChange }) {
+function DeviceVisibilityToggles({ hiddenDevices, onChange, devices = FIRMWARE_DEVICES }) {
   const hidden = hiddenDevices || []
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
       <span className="text-xs font-medium text-stone-500">Show on:</span>
-      {FIRMWARE_DEVICES.map((d) => {
+      {devices.map((d) => {
         const shown = !hidden.includes(d.id)
         return (
           <label key={d.id} className="flex items-center gap-1.5 text-sm text-stone-700">
@@ -1609,10 +1615,10 @@ function RcChannelCard({ secret, log }) {
   )
 }
 
-// --- Official release visibility (x3 / x4) -----------------------------------
-// Per-device show/hide for the fixed release buttons the flasher renders for
-// the Xteink X3 and X4. Betas are controlled individually in the Beta Testing
-// card above.
+// --- Official release visibility -----------------------------------------------
+// Per-device show/hide for the fixed release buttons the flasher renders.
+// Stable and nightly cover every device; stock covers X3 / X4. Betas are
+// controlled individually in the Beta Testing card above.
 
 function ReleaseVisibilityCard({ secret, log }) {
   const [hidden, setHidden] = useState({})
@@ -1678,18 +1684,20 @@ function ReleaseVisibilityCard({ secret, log }) {
         <Link to="/" className="font-medium text-brand-500 underline underline-offset-2">
           homepage flasher
         </Link>{' '}
-        per device (X3 / X4). Unchecking a box hides that option on that device. Individual betas
-        are controlled in the Beta Testing card above.
+        per device. Unchecking a box hides that option on that device. Hiding the stable release
+        makes the device's newest beta the recommended install. Individual betas are controlled in
+        the Beta Testing card above.
       </p>
 
       <div className="mt-3 divide-y divide-stone-100">
         {OFFICIAL_RELEASES.map((r) => (
-          <div key={r.key} className="flex items-center justify-between gap-3 py-2.5">
+          <div key={r.key} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium text-stone-700">{r.label}</div>
               <div className="text-xs text-stone-400">{r.sub}</div>
             </div>
             <DeviceVisibilityToggles
+              devices={r.devices}
               hiddenDevices={hidden[r.key]}
               onChange={(next) => setReleaseHidden(r.key, next)}
             />

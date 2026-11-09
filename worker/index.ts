@@ -3001,11 +3001,17 @@ const FIRMWARE_DEVICES: FirmwareDevice[] = ['x3', 'x4'];
 // Keys for the fixed release buttons the flasher renders for x3/x4. Kept in
 // sync with the `action` ids used in FlashTools.jsx.
 const OFFICIAL_RELEASE_KEYS = ['crosspoint', 'nightly', 'stock-en', 'stock-ch'];
+// Release visibility covers every flasher device (e.g. hiding stable so a
+// device's beta becomes the recommended build); betas stay x3/x4 only.
+const RELEASE_VISIBILITY_DEVICES: string[] = DEVICES.map((d) => d.id);
 
 // Coerce an arbitrary value into a clean list of known firmware devices.
 // Accepts an array (from JSON bodies) or a comma-separated string (from
 // multipart form fields). Unknown/duplicate entries are dropped.
-function parseHiddenDevices(value: unknown): FirmwareDevice[] {
+function parseHiddenDevices<T extends string = FirmwareDevice>(
+  value: unknown,
+  allowed: readonly string[] = FIRMWARE_DEVICES
+): T[] {
   let raw: unknown[] = [];
   if (Array.isArray(value)) {
     raw = value;
@@ -3019,11 +3025,11 @@ function parseHiddenDevices(value: unknown): FirmwareDevice[] {
       raw = trimmed.split(',');
     }
   }
-  const out: FirmwareDevice[] = [];
+  const out: T[] = [];
   for (const entry of raw) {
     const id = typeof entry === 'string' ? entry.trim() : '';
-    if (FIRMWARE_DEVICES.includes(id as FirmwareDevice) && !out.includes(id as FirmwareDevice)) {
-      out.push(id as FirmwareDevice);
+    if (allowed.includes(id) && !out.includes(id as T)) {
+      out.push(id as T);
     }
   }
   return out;
@@ -3032,10 +3038,10 @@ function parseHiddenDevices(value: unknown): FirmwareDevice[] {
 async function getReleaseVisibility(env: Env): Promise<ReleaseVisibility> {
   const raw = await env.BUILD_META.get(RELEASE_VISIBILITY_KEY);
   const parsed = raw ? (JSON.parse(raw) as Partial<ReleaseVisibility>) : null;
-  const hidden: Record<string, FirmwareDevice[]> = {};
+  const hidden: Record<string, string[]> = {};
   if (parsed && parsed.hidden && typeof parsed.hidden === 'object') {
     for (const key of OFFICIAL_RELEASE_KEYS) {
-      const devices = parseHiddenDevices((parsed.hidden as Record<string, unknown>)[key]);
+      const devices = parseHiddenDevices<string>((parsed.hidden as Record<string, unknown>)[key], RELEASE_VISIBILITY_DEVICES);
       if (devices.length) hidden[key] = devices;
     }
   }
@@ -3062,9 +3068,9 @@ async function handleReleaseVisibilityUpdate(
   const body = await request.json().catch(() => null) as { hidden?: Record<string, unknown> } | null;
   const incoming = body && body.hidden && typeof body.hidden === 'object' ? body.hidden : {};
 
-  const hidden: Record<string, FirmwareDevice[]> = {};
+  const hidden: Record<string, string[]> = {};
   for (const key of OFFICIAL_RELEASE_KEYS) {
-    const devices = parseHiddenDevices(incoming[key]);
+    const devices = parseHiddenDevices<string>(incoming[key], RELEASE_VISIBILITY_DEVICES);
     if (devices.length) hidden[key] = devices;
   }
 
