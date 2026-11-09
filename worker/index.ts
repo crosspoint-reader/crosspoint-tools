@@ -3035,6 +3035,20 @@ function parseHiddenDevices<T extends string = FirmwareDevice>(
   return out;
 }
 
+// Admin-picked recommended beta per device, as the flasher's firmware id
+// ('beta-<id>' on x3/x4, 'device-<id>' elsewhere). Unknown devices and
+// malformed ids are dropped.
+function parseRecommended(value: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!value || typeof value !== 'object') return out;
+  for (const [device, id] of Object.entries(value as Record<string, unknown>)) {
+    if (RELEASE_VISIBILITY_DEVICES.includes(device) && typeof id === 'string' && /^(beta|device)-[\w-]{1,100}$/.test(id)) {
+      out[device] = id;
+    }
+  }
+  return out;
+}
+
 async function getReleaseVisibility(env: Env): Promise<ReleaseVisibility> {
   const raw = await env.BUILD_META.get(RELEASE_VISIBILITY_KEY);
   const parsed = raw ? (JSON.parse(raw) as Partial<ReleaseVisibility>) : null;
@@ -3045,7 +3059,7 @@ async function getReleaseVisibility(env: Env): Promise<ReleaseVisibility> {
       if (devices.length) hidden[key] = devices;
     }
   }
-  return { hidden };
+  return { hidden, recommended: parseRecommended(parsed?.recommended) };
 }
 
 async function handleReleaseVisibilityGet(
@@ -3065,7 +3079,7 @@ async function handleReleaseVisibilityUpdate(
     return json({ error: 'Unauthorized' }, 401, headers);
   }
 
-  const body = await request.json().catch(() => null) as { hidden?: Record<string, unknown> } | null;
+  const body = await request.json().catch(() => null) as { hidden?: Record<string, unknown>; recommended?: unknown } | null;
   const incoming = body && body.hidden && typeof body.hidden === 'object' ? body.hidden : {};
 
   const hidden: Record<string, string[]> = {};
@@ -3074,7 +3088,7 @@ async function handleReleaseVisibilityUpdate(
     if (devices.length) hidden[key] = devices;
   }
 
-  const visibility: ReleaseVisibility = { hidden };
+  const visibility: ReleaseVisibility = { hidden, recommended: parseRecommended(body?.recommended) };
   await env.BUILD_META.put(RELEASE_VISIBILITY_KEY, JSON.stringify(visibility));
   return json(visibility, 200, headers);
 }

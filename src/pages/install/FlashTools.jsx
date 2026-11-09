@@ -964,10 +964,13 @@ export default function FlashTools() {
       : visibleBetas.map((b) => ({ id: `beta-${b.id}`, title: betaLabel(b), channel: 'Beta', available: true }))),
   ].filter(Boolean)
 
-  // Admin hid stable for this device: its newest beta takes the recommended
-  // slot (and default selection) instead of the "unavailable" note.
+  // Admin hid stable for this device: the admin-picked beta (else the newest)
+  // takes the recommended slot and default selection instead of the
+  // "unavailable" note.
+  const pickedBetaId = releaseVisibility.recommended?.[model]
   const recommendedBeta = !visibilityLoading && isReleaseHidden('crosspoint')
-    ? testBuilds.find((b) => b.channel === 'Beta') || null
+    ? testBuilds.find((b) => b.channel === 'Beta' && b.id === pickedBetaId) ||
+      testBuilds.find((b) => b.channel === 'Beta') || null
     : null
   const otherBuilds = testBuilds.filter((b) => b !== recommendedBeta)
 

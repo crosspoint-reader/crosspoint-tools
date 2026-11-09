@@ -198,6 +198,9 @@ export type PrDeviceBuild = { device: string; id: string };
 // the button is shown.
 export interface ReleaseVisibility {
   hidden: Record<string, string[]>;
+  // Device id -> flasher firmware id of the beta shown as recommended when
+  // stable is hidden on that device. Absent = newest beta.
+  recommended?: Record<string, string>;
 }
 
 export interface Accessory {

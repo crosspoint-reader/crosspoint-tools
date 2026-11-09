@@ -1198,14 +1198,15 @@ export async function fetchBetaBuilds() {
 }
 
 // Per-device visibility for the fixed release buttons (crosspoint, nightly,
-// stock-en, stock-ch). Returns { hidden: { [key]: [deviceId, ...] } }.
+// stock-en, stock-ch) plus the admin-picked recommended beta per device.
+// Returns { hidden: { [key]: [deviceId, ...] }, recommended: { [deviceId]: fwId } }.
 // Falls back to "nothing hidden" so a fetch failure never blanks the flasher.
 export async function fetchReleaseVisibility() {
   try {
     const res = await fetch('/api/release-visibility')
     if (!res.ok) return { hidden: {} }
     const data = await res.json()
-    return { hidden: data.hidden || {} }
+    return { hidden: data.hidden || {}, recommended: data.recommended || {} }
   } catch {
     return { hidden: {} }
   }
