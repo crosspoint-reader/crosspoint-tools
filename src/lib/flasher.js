@@ -658,6 +658,10 @@ export class CrossPointFlasher {
       // Match Seeed: begin draining the 115200-baud monitor before the final
       // reset and leave the connection open after the reset signal.
       startSerialMonitor(this.port);
+      // open() asserts DTR and RTS, so release both first: without a fresh
+      // RTS rising edge the Sticky never resets (Seeed's pulseReset does this).
+      await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+      await new Promise((resolve) => setTimeout(resolve, 50));
       await this.port.setSignals({ dataTerminalReady: false, requestToSend: true });
       await new Promise((resolve) => setTimeout(resolve, 100));
       await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
