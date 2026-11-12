@@ -243,6 +243,7 @@ const DEVICE_INSTALLS = {
     bootloader: '/firmware/m5papers3-bootloader.bin',
     bootloaderOffset: 0x0,
     baudrate: 921600,
+    resetAfterReconnect: true,
     after: 'Press and hold the power button to boot the device.',
   },
   papermono: {
@@ -252,6 +253,7 @@ const DEVICE_INSTALLS = {
     bootloader: '/firmware/papermono-bootloader.bin',
     bootloaderOffset: 0x0,
     baudrate: 921600,
+    resetAfterReconnect: true,
     after: 'Press the power button to boot the device.',
   },
   lilygo: {
@@ -259,6 +261,7 @@ const DEVICE_INSTALLS = {
     bootloader: '/firmware/lilygo-bootloader.bin',
     bootloaderOffset: 0x0,
     baudrate: 921600,
+    resetAfterReconnect: true,
     after: 'The device restarts on its own. If the screen stays blank, unplug and replug the USB cable.',
   },
   metalio: {
@@ -267,6 +270,7 @@ const DEVICE_INSTALLS = {
     bootloader: '/firmware/metalio-bootloader.bin',
     bootloaderOffset: 0x0,
     baudrate: 921600,
+    resetAfterReconnect: true,
     after: 'Press the power button to boot the device.',
     note: 'NOTE: You must use a USB-A cable to flash',
   },
@@ -277,6 +281,7 @@ const DEVICE_INSTALLS = {
     bootloader: '/firmware/papermono-bootloader.bin',
     bootloaderOffset: 0x0,
     baudrate: 921600,
+    resetAfterReconnect: true,
     after: 'Press the power button to boot the device.',
   },
 }

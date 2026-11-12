@@ -7,7 +7,7 @@ let ESPLoader, Transport;
 let activeSerialMonitor = null;
 
 function startSerialMonitor(port) {
-  if (!port.readable) throw new Error('Serial monitor stream is unavailable after reopening the Sticky.');
+  if (!port.readable) throw new Error('Serial monitor stream is unavailable after reopening the device.');
 
   const monitor = { port, reader: null, active: true, done: null };
   activeSerialMonitor = monitor;
@@ -649,7 +649,7 @@ export class CrossPointFlasher {
         await this.port.open({ baudRate: 115200 });
         opened = true;
       } catch (err) {
-        if (Date.now() >= deadline) throw new Error(`Firmware was written, but the Sticky could not be reopened for its final reset: ${err.message}`);
+        if (Date.now() >= deadline) throw new Error(`Firmware was written, but the device could not be reopened for its final reset: ${err.message}`);
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
     }
