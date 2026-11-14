@@ -42,9 +42,36 @@
 .home-shots-grid button:focus-visible { outline: 2px solid #8c6a2b; outline-offset: 3px; }
 .home-shots-grid img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; transition: transform .3s; }
 .home-shots-grid button:hover img { transform: scale(1.04); }
-.home-shots-dialog { margin: auto; max-width: 92vw; max-height: 90vh; padding: 0; border: 0; background: transparent; overflow: visible; }
+.home-shots-dialog { margin: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; padding: 0; border: 0; background: transparent; overflow: hidden; }
+.home-shots-dialog[open] { display: grid; place-items: center; }
 .home-shots-dialog::backdrop { background: rgb(20 22 18 / .88); }
-.home-shots-dialog > img { display: block; max-width: 92vw; max-height: 90vh; width: auto; height: auto; }
+.home-shots-stage { display: grid; place-items: center; width: 92vw; height: 90dvh; pointer-events: none; }
+.home-shots-stage img { grid-area: 1 / 1; display: block; max-width: 92vw; max-height: 90dvh; width: auto; height: auto; }
+.home-shots-current { pointer-events: auto; }
+.home-shots-dialog[data-motion="opening"] .home-shots-stage { animation: home-shots-zoom-in 320ms cubic-bezier(.16, 1, .3, 1) both; }
+.home-shots-dialog[data-motion="opening"]::backdrop { animation: home-shots-fade-in 240ms ease-out both; }
+.home-shots-dialog[data-motion="closing"] .home-shots-stage { animation: home-shots-zoom-out 200ms ease-in both; }
+.home-shots-dialog[data-motion="closing"]::backdrop { animation: home-shots-fade-out 200ms ease-in both; }
+.home-shots-dialog[data-motion="next"] { --shot-enter: 12vw; --shot-exit: -12vw; }
+.home-shots-dialog[data-motion="prev"] { --shot-enter: -12vw; --shot-exit: 12vw; }
+.home-shots-dialog:is([data-motion="next"], [data-motion="prev"]) .home-shots-current { animation: home-shots-slide-in 320ms cubic-bezier(.16, 1, .3, 1) both; }
+.home-shots-outgoing { animation: home-shots-slide-out 240ms ease-out both; }
+@keyframes home-shots-zoom-in { from { opacity: 0; transform: scale(.88); } to { opacity: 1; transform: scale(1); } }
+@keyframes home-shots-zoom-out { to { opacity: 0; transform: scale(.88); } }
+@keyframes home-shots-slide-in { from { opacity: 0; transform: translateX(var(--shot-enter)) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes home-shots-slide-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(var(--shot-exit)) scale(.97); } }
+@keyframes home-shots-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes home-shots-fade-out { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .home-shots-grid img { transition: none; }
+  .home-shots-grid button:hover img { transform: none; }
+  .home-shots-dialog[data-motion] .home-shots-stage,
+  .home-shots-dialog[data-motion] .home-shots-current,
+  .home-shots-dialog[data-motion]::backdrop { animation: home-shots-fade-in 100ms ease-out both; }
+  .home-shots-dialog[data-motion="closing"] .home-shots-stage,
+  .home-shots-dialog[data-motion="closing"]::backdrop,
+  .home-shots-dialog[data-motion] .home-shots-outgoing { animation: home-shots-fade-out 100ms ease-out both; }
+}
 .home-shots-close, .home-shots-nav { position: fixed; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 999px; background: rgb(255 255 255 / .12); color: #f5f2e9; font-size: 28px; line-height: 1; cursor: pointer; }
 .home-shots-close:hover, .home-shots-nav:hover { background: rgb(255 255 255 / .24); }
 .home-shots-close:focus-visible, .home-shots-nav:focus-visible { outline: 2px solid #f5f2e9; outline-offset: 2px; }

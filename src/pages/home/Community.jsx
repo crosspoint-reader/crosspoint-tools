@@ -15,6 +15,8 @@ export default function Community() {
 
   // Index into `order` of the photo shown full size, or null when closed.
   const [open, setOpen] = useState(null)
+  const [previous, setPrevious] = useState(null)
+  const [motion, setMotion] = useState('opening')
   const dialogRef = useRef(null)
 
   useEffect(() => {
@@ -23,11 +25,32 @@ export default function Community() {
     else if (!dialog.open) dialog.showModal()
   }, [open])
 
-  const step = (delta) => setOpen((i) => (i + delta + order.length) % order.length)
+  useEffect(() => {
+    if (open === null) return
+    for (const delta of [-1, 1]) {
+      const image = new Image()
+      image.src = `/community/${order[(open + delta + order.length) % order.length]}.webp`
+    }
+  }, [open, order])
+
+  const close = () => setMotion('closing')
+  const reset = () => {
+    setOpen(null)
+    setPrevious(null)
+    setMotion('opening')
+  }
+  const step = (delta) => {
+    if (open === null || motion === 'closing') return
+    setPrevious(open)
+    setMotion(delta > 0 ? 'next' : 'prev')
+    setOpen((open + delta + order.length) % order.length)
+  }
 
   const onKeyDown = (e) => {
-    if (e.key === 'ArrowRight') step(1)
-    else if (e.key === 'ArrowLeft') step(-1)
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault()
+      step(e.key === 'ArrowRight' ? 1 : -1)
+    }
   }
 
   return (
@@ -46,15 +69,24 @@ export default function Community() {
       <dialog
         ref={dialogRef}
         className="home-shots-dialog"
+        data-motion={motion}
         aria-label="Community photo"
-        onClose={() => setOpen(null)}
+        onClose={reset}
+        onCancel={(e) => { e.preventDefault(); close() }}
         onKeyDown={onKeyDown}
-        onClick={(e) => e.target === e.currentTarget && setOpen(null)}
+        onClick={(e) => e.target === e.currentTarget && close()}
       >
         {open !== null && (
           <>
-            <img src={`/community/${order[open]}.webp`} alt={`Community photo ${open + 1} of ${order.length}`} />
-            <button type="button" className="home-shots-close" onClick={() => setOpen(null)} aria-label="Close">×</button>
+            <div className="home-shots-stage" onAnimationEnd={(e) => {
+              if (e.target === e.currentTarget && motion === 'closing') setOpen(null)
+            }}>
+              {previous !== null && (
+                <img key={previous} className="home-shots-outgoing" src={`/community/${order[previous]}.webp`} alt="" aria-hidden="true" onAnimationEnd={() => setPrevious(null)} />
+              )}
+              <img key={open} className="home-shots-current" src={`/community/${order[open]}.webp`} alt={`Community photo ${open + 1} of ${order.length}`} />
+            </div>
+            <button type="button" className="home-shots-close" onClick={close} aria-label="Close">×</button>
             <button type="button" className="home-shots-nav home-shots-prev" onClick={() => step(-1)} aria-label="Previous photo">‹</button>
             <button type="button" className="home-shots-nav home-shots-next" onClick={() => step(1)} aria-label="Next photo">›</button>
           </>
