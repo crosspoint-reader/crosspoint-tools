@@ -8,6 +8,13 @@ import PressQuotes from './home/PressQuotes.jsx'
 import CommunityStats from './home/CommunityStats.jsx'
 import './home/home.css'
 
+// Services CrossPoint Sync connects to; icons are copied from the crosspoint-sync repo.
+const SYNC_SERVICES = [
+  ['hardcover', 'Hardcover'], ['bookfusion', 'BookFusion'], ['readwise', 'Readwise'], ['spotify', 'Spotify'],
+  ['microblog', 'Micro.blog'], ['audiobookshelf', 'Audiobookshelf'], ['jellyfin', 'Jellyfin'],
+  ['bookorbit', 'BookOrbit'], ['seekquel', 'Seekquel'], ['readest', 'Readest'],
+]
+
 export default function HomePage() {
   return (
     <Layout>
@@ -63,6 +70,17 @@ export default function HomePage() {
 
         <section className="home-sync home-wrap" id="crosspoint-sync">
           <h2>CrossPoint Sync</h2>
+          <div className="hub">
+            <div className="hub-track">
+              {[0, 1, 2].map((copy) => (
+                <ul key={copy} aria-hidden={copy ? 'true' : undefined}>
+                  {SYNC_SERVICES.map(([icon, name]) => (
+                    <li key={icon}><img src={`/sync/icons/${icon}.png`} alt={name} width="56" height="56" loading="lazy" /></li>
+                  ))}
+                </ul>
+              ))}
+            </div>
+          </div>
           <div className="home-sync-layout">
             <div className="home-sync-screens">
               <img className="reader-screenshot home-sync-library" src="/sync/library.webp" alt="CrossPoint Sync web library showing current books and reading progress" width="1600" height="1000" loading="lazy" />

@@ -187,3 +187,23 @@
 @media (min-width: 641px) {
   .home-opening h1 { margin-top: 24px; }
 }
+
+/* Integrations hub: a slow marquee of the service icons, shared with the
+   CrossPoint Sync landing page. Three copies of the list so the loop never shows a gap inside .home-wrap. */
+.hub { position: relative; margin-top: 36px; overflow: hidden; mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent); }
+.hub-track { display: flex; width: max-content; padding-block: 8px; animation: hub-drift 60s linear infinite; }
+.hub:hover .hub-track { animation-play-state: paused; }
+.hub ul { display: flex; gap: 16px; padding-right: 16px; flex: none; }
+.hub li { display: grid; place-items: center; width: 100px; height: 100px; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 1px var(--home-rule); }
+.hub li img { width: 56px; height: 56px; border-radius: 14px; }
+@keyframes hub-drift { to { transform: translateX(-33.3333%); } }
+@media (max-width: 640px) {
+  .hub li { width: 72px; height: 72px; }
+  .hub li img { width: 40px; height: 40px; border-radius: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hub { mask-image: none; }
+  .hub-track { animation: none; width: auto; }
+  .hub ul { flex-wrap: wrap; justify-content: center; padding: 0; flex: 1; }
+  .hub ul[aria-hidden] { display: none; }
+}
