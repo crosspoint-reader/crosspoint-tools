@@ -116,6 +116,13 @@ const SPECS = {
     connectors: ['usb-c'], mcu: 'ESP32-S31', psram: 16,
     battery: 2000, weight: 100, price: 118.99,
   },
+  // Waveshare ESP32-S3-ePaper-3.97 with battery (Waveshare SKU 33552).
+  'acc-mwmkhguc': {
+    screen: 3.97, resolution: [480, 800], ppi: 235, frontlight: 'none',
+    touch: false, frontButtons: false, sideButtons: true, homeButton: false, gyro: true, rtc: true,
+    connectors: ['usb-c'], mcu: 'ESP32-S3', psram: 8,
+    battery: 1500, weight: 108, price: 35,
+  },
 }
 
 export function specFor(item) {
