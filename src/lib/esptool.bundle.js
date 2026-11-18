@@ -6984,7 +6984,9 @@ var Transport = class {
    * @param {boolean} breakSignal break signal boolean state
    */
   async setSignals(dtr, rts, breakSignal) {
-    if (dtr) {
+    // Local patch (not upstream): cache an explicit false too, so a later
+    // setRTS() doesn't re-assert a DTR line that ClassicReset released.
+    if (dtr !== void 0) {
       this._DTR_state = dtr;
     }
     await this.device.setSignals({ dataTerminalReady: dtr, requestToSend: rts, break: breakSignal });
