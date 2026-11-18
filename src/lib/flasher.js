@@ -570,8 +570,12 @@ export class CrossPointFlasher {
     await stopSerialMonitor();
     await loadEsptool();
     const transport = new Transport(port, false);
+    // Web Serial's default 255-byte receive buffer silently drops most of a
+    // stub READ_FLASH packet (4 KB) on macOS USB-Serial-JTAG, so the first
+    // partition-table read never completes. 64 KB holds a whole packet.
     this.espLoader = new ESPLoader({
       transport, baudrate: this.baudrate, romBaudrate: 115200, enableTracing: false,
+      serialOptions: { bufferSize: 65536 },
     });
     await this.espLoader.main();
 
