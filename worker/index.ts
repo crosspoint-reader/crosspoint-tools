@@ -3654,7 +3654,7 @@ interface DeviceBuildConfig {
   defaultName: string;
   filename: string;
   label: string;
-  statusDevice: 'x4pro' | 'x4c' | 'sticky' | 'm5paper' | 'm5papers3' | 'lilygo' | 'papermono' | 'metalio' | 'eego_a4' | 'picco';
+  statusDevice: 'x4pro' | 'x4c' | 'sticky' | 'm5paper' | 'm5papers3' | 'lilygo' | 'papermono' | 'metalio' | 'metalio_plus' | 'eego_a4' | 'picco';
 }
 
 const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
@@ -3721,6 +3721,14 @@ const DEVICE_BUILDS: Record<string, DeviceBuildConfig> = {
     filename: 'metalio-firmware.bin',
     label: 'Metalio E-INK4',
     statusDevice: 'metalio',
+  },
+  metalio_plus: {
+    r2Key: 'builds/metalio_plus/firmware.bin',
+    metaKey: 'metalio_plus-build',
+    defaultName: 'Metalio E-INK4 Plus Beta',
+    filename: 'metalio_plus-firmware.bin',
+    label: 'Metalio E-INK4 Plus',
+    statusDevice: 'metalio_plus',
   },
   eego_a4: {
     r2Key: 'builds/eego_a4/firmware.bin',
