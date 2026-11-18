@@ -1085,10 +1085,15 @@ export class CrossPointFlasher {
     step(1, 'done');
 
     step(2, 'running');
-    const readBack = parsePartitionTable(await this.espLoader.readFlash(0x8000, 0x1000));
-    if (!matchesPartitionTable(readBack, table)) {
+    // Compare the device's MD5 of the written region instead of reading it
+    // back: a 4 KB stub READ_FLASH packet stalls on the Sticky over
+    // USB-Serial-JTAG, while the MD5 reply is 16 bytes. partitionBinary was
+    // already checked against (or built from) `table` above.
+    const flashMd5 = await this.espLoader.flashMd5sum(0x8000, partitionBinary.length);
+    if (flashMd5 !== this.espLoader.toHex(md5(partitionBinary))) {
       throw new Error('Partition table did not verify after write. Read it back on the debug page and retry.');
     }
+    const readBack = parsePartitionTable(partitionBinary);
     this.layout = extractLayout(readBack);
     step(2, 'done');
 

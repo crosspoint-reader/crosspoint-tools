@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createHash } from 'node:crypto'
 
 import {
+  CROSSPOINT_PARTITION_TABLE,
+  CrossPointFlasher,
   X4_PRO_PARTITION_TABLE,
   buildPartitionTableBinary,
   parsePartitionTable,
@@ -77,4 +80,28 @@ test('app-only flash targets the partition the bootloader boots', () => {
 
   assert.throws(() => pickBootAppPartition([{ type: 'data-nvs', offset: 0x9000, size: 0x5000 }]))
   assert.throws(() => pickBootAppPartition([{ type: 'app-factory', offset: 0x0, size: 0x100000 }]))
+})
+
+test('boot-region install verifies the partition table by MD5, without a bulk read', async () => {
+  const run = async (corrupt) => {
+    const flash = new Map()
+    const flasher = new CrossPointFlasher({})
+    flasher.connect = async () => {
+      flasher.espLoader = {
+        writeFlash: async ({ fileArray }) => {
+          for (const f of fileArray) flash.set(f.address, corrupt ? f.data.map((b) => b ^ 1) : f.data)
+        },
+        flashMd5sum: async (addr, size) =>
+          createHash('md5').update(flash.get(addr).subarray(0, size)).digest('hex'),
+        toHex: (b) => Buffer.from(b).toString('hex'),
+        readFlash: async () => { throw new Error('bulk read must not be used') },
+      }
+    }
+    flasher.disconnect = async () => {}
+    return flasher.repairBootRegion(CROSSPOINT_PARTITION_TABLE)
+  }
+
+  const { partitions } = await run(false)
+  assert.deepEqual(partitions, parsePartitionTable(buildPartitionTableBinary(CROSSPOINT_PARTITION_TABLE)))
+  await assert.rejects(run(true), /did not verify/)
 })
