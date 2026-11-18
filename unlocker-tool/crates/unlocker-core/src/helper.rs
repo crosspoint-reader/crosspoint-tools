@@ -4,7 +4,7 @@
 //! (WaitManifest / WaitFirmware) don't tie up other RPCs.
 
 use crate::transport;
-use crate::types::ArmServerSpec;
+use crate::types::{ArmServerSpec, HotspotSetup};
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -89,13 +89,17 @@ impl Helper {
             .map(|s| s.to_string()))
     }
 
-    pub async fn is_enable(&self, ssid: &str, psk: &str) -> Result<()> {
-        self.one_shot(Request::IsEnable {
-            ssid: ssid.into(),
-            psk: psk.into(),
-        })
-        .await
-        .map(|_| ())
+    /// Prepare the hotspot. On macOS the result names the upstream to pick
+    /// in System Settings; older helpers reply `{ssid}`, which decodes to
+    /// defaults.
+    pub async fn is_enable(&self, ssid: &str, psk: &str) -> Result<HotspotSetup> {
+        let v = self
+            .one_shot(Request::IsEnable {
+                ssid: ssid.into(),
+                psk: psk.into(),
+            })
+            .await?;
+        Ok(serde_json::from_value(v).unwrap_or_default())
     }
 
     pub async fn is_disable(&self) -> Result<()> {
