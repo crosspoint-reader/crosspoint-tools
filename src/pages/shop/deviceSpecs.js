@@ -95,6 +95,27 @@ const SPECS = {
     connectors: ['usb-c'], mcu: 'ESP32-S3', psram: 8,
     battery: 2000, weight: 78, price: 65.99,
   },
+  // Metalio E-Ink 4. Not in the sheet: Amazon listing B0HR7DW14F (3.97", 235 PPI,
+  // 70 g, 1000 mAh, $88.99). No frontlight, N16R8, PCF8563 RTC, SC7A20H
+  // accelerometer (no gyro, so gyro: false) from SDK metalio-eink4-support.md. Side = volume +/-;
+  // Home = the capacitive cover key. USB-C on both Metalio devices per the site owner.
+  'acc-mwmglkib': {
+    screen: 3.97, resolution: [480, 800], ppi: 235, frontlight: 'none',
+    touch: true, frontButtons: false, sideButtons: true, homeButton: true, gyro: false, rtc: true,
+    connectors: ['usb-c'], mcu: 'ESP32-S3', psram: 8,
+    battery: 1000, weight: 70, price: 88.99,
+  },
+  // Metalio E-Ink 4 Plus. Amazon listing B0HR7W5LFS (4.7", 684×1216, 297 PPI,
+  // 2000 mAh, 100 g, $118.99). ESP32-S31 with 16 MB PSRAM, warm/cool
+  // frontlight, PCF8563 RTC, SC7A20H accelerometer (no gyro), USB-C from SDK
+  // branch feat/metalio-eink4-plus-s31, metalio-eink4-plus-support.md.
+  // Side = volume +/-; Home = the capacitive bezel key.
+  'acc-mwmgkmze': {
+    screen: 4.7, resolution: [684, 1216], ppi: 297, frontlight: 'warm-cool',
+    touch: true, frontButtons: false, sideButtons: true, homeButton: true, gyro: false, rtc: true,
+    connectors: ['usb-c'], mcu: 'ESP32-S31', psram: 16,
+    battery: 2000, weight: 100, price: 118.99,
+  },
 }
 
 export function specFor(item) {
