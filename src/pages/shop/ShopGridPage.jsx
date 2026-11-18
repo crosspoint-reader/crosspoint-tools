@@ -196,6 +196,7 @@ export default function ShopGridPage({
                       </ProductCard>
                     ))}
                   </div>
+                  {section.footer}
                 </section>
               )
             })}

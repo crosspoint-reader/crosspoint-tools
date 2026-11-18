@@ -7,7 +7,7 @@ let ESPLoader, Transport;
 let activeSerialMonitor = null;
 
 function startSerialMonitor(port) {
-  if (!port.readable) throw new Error('Serial monitor stream is unavailable after reopening the Sticky.');
+  if (!port.readable) throw new Error('Serial monitor stream is unavailable after reopening the device.');
 
   const monitor = { port, reader: null, active: true, done: null };
   activeSerialMonitor = monitor;
@@ -650,7 +650,7 @@ export class CrossPointFlasher {
         await this.port.open({ baudRate: 115200 });
         opened = true;
       } catch (err) {
-        if (Date.now() >= deadline) throw new Error(`Firmware was written, but the Sticky could not be reopened for its final reset: ${err.message}`);
+        if (Date.now() >= deadline) throw new Error(`Firmware was written, but the device could not be reopened for its final reset: ${err.message}`);
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
     }
@@ -659,6 +659,10 @@ export class CrossPointFlasher {
       // Match Seeed: begin draining the 115200-baud monitor before the final
       // reset and leave the connection open after the reset signal.
       startSerialMonitor(this.port);
+      // open() asserts DTR and RTS, so release both first: without a fresh
+      // RTS rising edge the Sticky never resets (Seeed's pulseReset does this).
+      await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+      await new Promise((resolve) => setTimeout(resolve, 50));
       await this.port.setSignals({ dataTerminalReady: false, requestToSend: true });
       await new Promise((resolve) => setTimeout(resolve, 100));
       await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
@@ -1199,14 +1203,15 @@ export async function fetchBetaBuilds() {
 }
 
 // Per-device visibility for the fixed release buttons (crosspoint, nightly,
-// stock-en, stock-ch) on x3/x4. Returns { hidden: { [key]: ['x3'|'x4'] } }.
+// stock-en, stock-ch) plus the admin-picked recommended beta per device.
+// Returns { hidden: { [key]: [deviceId, ...] }, recommended: { [deviceId]: fwId } }.
 // Falls back to "nothing hidden" so a fetch failure never blanks the flasher.
 export async function fetchReleaseVisibility() {
   try {
     const res = await fetch('/api/release-visibility')
     if (!res.ok) return { hidden: {} }
     const data = await res.json()
-    return { hidden: data.hidden || {} }
+    return { hidden: data.hidden || {}, recommended: data.recommended || {} }
   } catch {
     return { hidden: {} }
   }

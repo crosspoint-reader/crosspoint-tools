@@ -244,6 +244,7 @@ const DEVICE_INSTALLS = {
     bootloader: '/firmware/m5papers3-bootloader.bin',
     bootloaderOffset: 0x0,
     baudrate: 921600,
+    resetAfterReconnect: true,
     after: 'Press and hold the power button to boot the device.',
   },
   papermono: {
@@ -253,6 +254,7 @@ const DEVICE_INSTALLS = {
     bootloader: '/firmware/papermono-bootloader.bin',
     bootloaderOffset: 0x0,
     baudrate: 921600,
+    resetAfterReconnect: true,
     after: 'Press the power button to boot the device.',
   },
   lilygo: {
@@ -260,6 +262,7 @@ const DEVICE_INSTALLS = {
     bootloader: '/firmware/lilygo-bootloader.bin',
     bootloaderOffset: 0x0,
     baudrate: 921600,
+    resetAfterReconnect: true,
     after: 'The device restarts on its own. If the screen stays blank, unplug and replug the USB cable.',
   },
   metalio: {
@@ -268,6 +271,7 @@ const DEVICE_INSTALLS = {
     bootloader: '/firmware/metalio-bootloader.bin',
     bootloaderOffset: 0x0,
     baudrate: 921600,
+    resetAfterReconnect: true,
     after: 'Press the power button to boot the device.',
     note: 'NOTE: You must use a USB-A cable to flash',
   },
@@ -288,6 +292,7 @@ const DEVICE_INSTALLS = {
     bootloader: '/firmware/papermono-bootloader.bin',
     bootloaderOffset: 0x0,
     baudrate: 921600,
+    resetAfterReconnect: true,
     after: 'Press the power button to boot the device.',
   },
 }
@@ -943,9 +948,9 @@ export default function FlashTools() {
     setRunning(false)
   }
 
-  // Per-device visibility (only x3/x4 carry admin-controlled hiding). Betas
-  // hide via their own hiddenDevices list; the fixed release buttons hide via
-  // the release-visibility config keyed by action id.
+  // Per-device visibility. Betas hide via their own hiddenDevices list (x3/x4);
+  // the fixed release buttons hide via the release-visibility config keyed by
+  // action id (stable/nightly on any device, stock on x3/x4).
   const visibleBetas = betaBuilds.filter((b) => !(b.hiddenDevices || []).includes(model))
   const isReleaseHidden = (key) => (releaseVisibility.hidden?.[key] || []).includes(model)
 
@@ -974,6 +979,20 @@ export default function FlashTools() {
       ? deviceBuilds.slice().reverse().map((b) => ({ id: `device-${b.id}`, title: b.name, channel: 'Beta', available: true }))
       : visibleBetas.map((b) => ({ id: `beta-${b.id}`, title: betaLabel(b), channel: 'Beta', available: true }))),
   ].filter(Boolean)
+
+  // Admin hid stable for this device: the admin-picked beta (else the newest)
+  // takes the recommended slot and default selection instead of the
+  // "unavailable" note.
+  const pickedBetaId = releaseVisibility.recommended?.[model]
+  const recommendedBeta = !visibilityLoading && isReleaseHidden('crosspoint')
+    ? testBuilds.find((b) => b.channel === 'Beta' && b.id === pickedBetaId) ||
+      testBuilds.find((b) => b.channel === 'Beta') || null
+    : null
+  const otherBuilds = testBuilds.filter((b) => b !== recommendedBeta)
+
+  useEffect(() => {
+    if (recommendedBeta) setFw((current) => current || recommendedBeta.id)
+  }, [model, recommendedBeta?.id])
 
   return (
     <section id="flash-tools" className="relative py-12 sm:py-16">
@@ -1082,16 +1101,24 @@ export default function FlashTools() {
                     </span>
                     <span className="mt-1 block text-sm/6 text-stone-600">The latest stable release for {MODELS.find((m) => m.id === model)?.name}. Ready for everyday reading.</span>
                   </button>
+                ) : recommendedBeta ? (
+                  <button type="button" disabled={running} onClick={() => selectFw(recommendedBeta.id)} aria-pressed={fw === recommendedBeta.id} className={`${cardClass(fw === recommendedBeta.id)} w-full`}>
+                    <span className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold text-stone-900">{recommendedBeta.title}</span>
+                      <span className="text-sm font-medium text-brand-700">Beta · Recommended</span>
+                    </span>
+                    <span className="mt-1 block text-sm/6 text-stone-600">The recommended build for {MODELS.find((m) => m.id === model)?.name} while a stable release is on hold.</span>
+                  </button>
                 ) : (
                   <p className="text-sm/6 text-stone-600">A stable release is currently unavailable for this reader. Other available firmware is listed below.</p>
                 )}
               </div>
-              {(testBuilds.length > 0 || hasFactoryFirmware) && (
+              {(otherBuilds.length > 0 || hasFactoryFirmware) && (
                 <fieldset disabled={running} className="mt-5">
                   <legend className="text-sm font-medium text-stone-700">Other firmware</legend>
                   <p className="mt-1 text-sm/6 text-stone-600">Try upcoming changes or restore your reader’s factory firmware.</p>
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {testBuilds.map((build) => (
+                    {otherBuilds.map((build) => (
                       <button
                         key={build.id}
                         type="button"

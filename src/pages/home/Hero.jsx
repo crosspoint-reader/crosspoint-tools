@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '../../components/ui.jsx'
 import ReaderScreenshot from './ReaderScreenshot.jsx'
 import Partners from './Partners.jsx'
+import ShopSupportNote from '../../components/ShopSupportNote.jsx'
 
 export default function Hero() {
   return (
@@ -9,11 +10,13 @@ export default function Hero() {
       <h1>Read <span className="home-underline">without limits.</span></h1>
       <div className="home-opening-copy">
         <p>Your books, on a reader you can make your own. CrossPoint is free software for compact e-readers, built by the people who read on them.</p>
-        <div className="home-opening-actions">
-          <Button as={Link} to="/install" variant="primary">Install CrossPoint <span aria-hidden="true">→</span></Button>
-          <Button as={Link} to="/devices" variant="outline">Shop devices <span aria-hidden="true">↗</span></Button>
+        <div className="home-opening-shop">
+          <div className="home-opening-actions">
+            <Button as={Link} to="/install" variant="primary">Install CrossPoint <span aria-hidden="true">→</span></Button>
+            <Button as={Link} to="/devices" variant="outline">Shop devices <span aria-hidden="true">↗</span></Button>
+          </div>
+          <ShopSupportNote className="home-opening-note">Buying through our shop links helps fund development.</ShopSupportNote>
         </div>
-        <p className="home-opening-note">Buying through our shop links helps fund development.</p>
         <Partners />
       </div>
       <div className="home-opening-screens">
