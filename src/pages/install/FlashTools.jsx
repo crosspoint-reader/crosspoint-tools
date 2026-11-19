@@ -732,6 +732,7 @@ export default function FlashTools() {
 
     const analyticsDetails = firmwareAnalyticsDetails(action)
 
+    let flasher = null
     try {
       let firmware
       if (action === 'crosspoint') {
@@ -755,7 +756,7 @@ export default function FlashTools() {
 
       setProgress((p) => ({ ...p, status: null }))
 
-      const flasher = new CrossPointFlasher(serialPort, {
+      flasher = new CrossPointFlasher(serialPort, {
         expectedChip: MODEL_CHIPS[model],
         deviceName: MODELS.find((m) => m.id === model)?.name,
       })
@@ -780,6 +781,9 @@ export default function FlashTools() {
         },
       }))
     } catch (err) {
+      // A failed flash leaves the port open with esptool's read loop holding
+      // it, so "Try again" would fail with "port is already open".
+      try { await flasher?.disconnect(true) } catch {}
       const stockPartitionMismatch =
         (action === 'stock-en' || action === 'stock-ch') &&
         /^Firmware too large: .* won't fit in app\d+ \(\d+ bytes\)\.$/.test(err.message || '') &&
@@ -816,6 +820,7 @@ export default function FlashTools() {
 
     const analyticsDetails = firmwareAnalyticsDetails(action)
 
+    let flasher = null
     try {
       let firmware
       if (action === 'custom') {
@@ -833,7 +838,7 @@ export default function FlashTools() {
 
       setProgress((p) => ({ ...p, status: null }))
 
-      const flasher = new CrossPointFlasher(serialPort, {
+      flasher = new CrossPointFlasher(serialPort, {
         expectedChip: MODEL_CHIPS[model],
         deviceName: appOnly.name,
       })
@@ -851,6 +856,7 @@ export default function FlashTools() {
 
       setProgress((p) => ({ ...p, status: { kind: 'ok', text: 'Firmware installed. Follow the restart steps below.' } }))
     } catch (err) {
+      try { await flasher?.disconnect(true) } catch {}
       setProgress((p) => ({ ...p, status: { kind: 'err', text: err.message } }))
     }
 
@@ -891,6 +897,7 @@ export default function FlashTools() {
 
     const analyticsDetails = firmwareAnalyticsDetails(action)
 
+    let flasher = null
     try {
       let firmware
       if (action === 'custom') {
@@ -913,7 +920,7 @@ export default function FlashTools() {
 
       setProgress((p) => ({ ...p, status: null }))
 
-      const flasher = new CrossPointFlasher(serialPort, {
+      flasher = new CrossPointFlasher(serialPort, {
         baudrate: install.baudrate,
         expectedChip: MODEL_CHIPS[model],
         deviceName: install.name,
@@ -942,6 +949,7 @@ export default function FlashTools() {
 
       setProgress((p) => ({ ...p, status: { kind: 'ok', text: 'Firmware installed. Follow the restart steps below.' } }))
     } catch (err) {
+      try { await flasher?.disconnect(true) } catch {}
       setProgress((p) => ({ ...p, status: { kind: 'err', text: err.message } }))
     }
 

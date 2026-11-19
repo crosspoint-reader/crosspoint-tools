@@ -299,6 +299,9 @@ function matchesPartitionTable(actual, expected) {
 // layout choice, so it's hardcoded rather than read from the PT.
 const OTA_SECTOR_BYTES = 0x1000;
 const OTADATA_BYTES = 2 * OTA_SECTOR_BYTES;
+// Stub READ_FLASH packet size and per-packet timeout; see readFlash().
+const READ_FLASH_BLOCK = 256;
+const READ_FLASH_PACKET_TIMEOUT_MS = 3000;
 
 const OTA_STATE = { NEW: 0, PENDING_VERIFY: 1, VALID: 2, INVALID: 3, ABORTED: 4, UNDEFINED: 0xFFFFFFFF };
 const INVALID_STATES = new Set([OTA_STATE.INVALID, OTA_STATE.ABORTED]);
@@ -613,6 +616,36 @@ export class CrossPointFlasher {
     await lo.writeReg(SWD_WPROTECT, 0);
   }
 
+  // Replacement for esptool-js readFlash(). Over USB-Serial-JTAG in Chrome,
+  // the 4 KB packets it requests intermittently lose bytes mid-packet with no
+  // error raised, so the read stalls until FLASH_READ_TIMEOUT (100 s); 256-byte
+  // packets with one in flight did not drop in testing (Picco, X4 Pro). The
+  // stub's trailing MD5 catches corruption, and filling a preallocated buffer
+  // avoids esptool-js re-copying everything read so far on every packet.
+  async readFlash(addr, size, onProgress) {
+    const lo = this.espLoader;
+    const words = (...values) => values.reduce((pkt, v) => lo._appendArray(pkt, lo._intToByteArray(v)), new Uint8Array(0));
+    await lo.checkCommand('read flash', lo.ESP_READ_FLASH, words(addr, size, READ_FLASH_BLOCK, 1));
+    const data = new Uint8Array(size);
+    let received = 0;
+    while (received < size) {
+      const packet = await lo.transport.read(READ_FLASH_PACKET_TIMEOUT_MS);
+      if (!packet.length) continue;
+      if (received + packet.length > size) {
+        throw new Error(`Flash read at 0x${addr.toString(16)} returned more data than requested.`);
+      }
+      data.set(packet, received);
+      received += packet.length;
+      await lo.transport.write(lo._intToByteArray(received));
+      if (onProgress) onProgress(packet, received, size);
+    }
+    const digest = await lo.transport.read(READ_FLASH_PACKET_TIMEOUT_MS);
+    if (lo.toHex(digest) !== lo.toHex(md5(data))) {
+      throw new Error(`MD5 mismatch reading flash at 0x${addr.toString(16)}`);
+    }
+    return data;
+  }
+
   async disconnect(skipReset = false) {
     if (!this.espLoader) return;
     // Keep GPIO0 high (DTR released), then drive EN low -> high with RTS. The
@@ -680,7 +713,7 @@ export class CrossPointFlasher {
     // PT lives in one 4 KB sector at 0x8000. parsePartitionTable stops on the
     // first all-0xFF chunk, well before the sector boundary, so one sector
     // is the whole table.
-    const data = await this.espLoader.readFlash(0x8000, 0x1000);
+    const data = await this.readFlash(0x8000, 0x1000);
     this.layout = extractLayout(parsePartitionTable(data));
   }
 
@@ -691,7 +724,7 @@ export class CrossPointFlasher {
   // Diagnostic-only: returns the raw PT plus which known layout it matches.
   // Does not set this.layout; flashFirmware calls readLayout() for that.
   async readPartitionTable() {
-    const data = await this.espLoader.readFlash(0x8000, 0x1000);
+    const data = await this.readFlash(0x8000, 0x1000);
     const partitions = parsePartitionTable(data);
     let matchedLayout = null;
     if (matchesPartitionTable(partitions, X4_PRO_PARTITION_TABLE)) matchedLayout = 'X4PRO';
@@ -703,7 +736,7 @@ export class CrossPointFlasher {
 
   async readOtadataPartition({ onProgress } = {}) {
     await this.ensureLayout();
-    const data = await this.espLoader.readFlash(this.layout.otadataOffset, OTADATA_BYTES, (_, p, t) => {
+    const data = await this.readFlash(this.layout.otadataOffset, OTADATA_BYTES, (_, p, t) => {
       if (onProgress) onProgress('Read OTA data', p, t);
     });
     return { data, ota: parseOtadata(data), offset: this.layout.otadataOffset };
@@ -713,7 +746,7 @@ export class CrossPointFlasher {
     await this.ensureLayout();
     const appIndex = partition === 'app1' ? 1 : 0;
     const slot = this.layout.appSlots[appIndex];
-    const data = await this.espLoader.readFlash(slot.offset, slot.size, (_, p, t) => {
+    const data = await this.readFlash(slot.offset, slot.size, (_, p, t) => {
       if (onProgress) onProgress(`Read ${partition}`, p, t);
     });
     return { data, offset: slot.offset, size: slot.size };
@@ -726,7 +759,7 @@ export class CrossPointFlasher {
     if (offset < 0 || readSize < 0 || offset + readSize > slot.size) {
       throw new Error(`Read range is outside ${partition}: offset ${offset}, size ${readSize}, partition size ${slot.size}.`);
     }
-    return this.espLoader.readFlash(slot.offset + offset, readSize, (_, p, t) => {
+    return this.readFlash(slot.offset + offset, readSize, (_, p, t) => {
       if (onProgress) onProgress(`Read ${partition}`, offset + p, offset + t);
     });
   }
@@ -744,7 +777,7 @@ export class CrossPointFlasher {
     step(1, 'done');
 
     step(2, 'running');
-    const otaRaw = await this.espLoader.readFlash(this.layout.otadataOffset, OTADATA_BYTES, (_, p, t) => {
+    const otaRaw = await this.readFlash(this.layout.otadataOffset, OTADATA_BYTES, (_, p, t) => {
       if (onProgress) onProgress('Read OTA data', p, t);
     });
     const ota = parseOtadata(otaRaw);
@@ -760,7 +793,7 @@ export class CrossPointFlasher {
       eraseAll: false, compress: true,
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Update boot partition', written, total); },
     });
-    const verifyRaw = await this.espLoader.readFlash(this.layout.otadataOffset, OTADATA_BYTES);
+    const verifyRaw = await this.readFlash(this.layout.otadataOffset, OTADATA_BYTES);
     const verify = parseOtadata(verifyRaw);
     assertOtadataSwitch(verify, ota.inactiveApp, ota.newSeq);
     step(3, 'done');
@@ -798,7 +831,7 @@ export class CrossPointFlasher {
     step(1, 'done');
 
     step(2, 'running');
-    const otaRaw = await this.espLoader.readFlash(this.layout.otadataOffset, OTADATA_BYTES, (_, p, t) => {
+    const otaRaw = await this.readFlash(this.layout.otadataOffset, OTADATA_BYTES, (_, p, t) => {
       if (onProgress) onProgress('Read OTA data', p, t);
     });
     const ota = parseOtadata(otaRaw);
@@ -829,7 +862,7 @@ export class CrossPointFlasher {
       reportProgress: (_, written, total) => { if (onProgress) onProgress('Update boot partition', written, total); },
     });
     const verifyOtadata = parseOtadata(
-      await this.espLoader.readFlash(this.layout.otadataOffset, OTADATA_BYTES)
+      await this.readFlash(this.layout.otadataOffset, OTADATA_BYTES)
     );
     assertOtadataSwitch(verifyOtadata, ota.inactiveApp, ota.newSeq);
     step(4, 'done');
@@ -857,10 +890,10 @@ export class CrossPointFlasher {
     step(0, 'done');
 
     step(1, 'running');
-    const partitions = parsePartitionTable(await this.espLoader.readFlash(0x8000, 0x1000));
+    const partitions = parsePartitionTable(await this.readFlash(0x8000, 0x1000));
     const otadata = partitions.find((p) => p.type === 'data-ota');
     const otadataRaw = otadata && otadata.size >= OTADATA_BYTES
-      ? await this.espLoader.readFlash(otadata.offset, OTADATA_BYTES)
+      ? await this.readFlash(otadata.offset, OTADATA_BYTES)
       : null;
     const target = pickBootAppPartition(partitions, otadataRaw);
     if (firmwareData.length > target.size) {
@@ -895,11 +928,8 @@ export class CrossPointFlasher {
     step(0, 'done');
 
     step(1, 'running');
-    // One readFlash command per 1 MB chunk instead of a single 16 MB read.
-    // esptool-js accumulates the response with a full re-copy per 4 KB packet,
-    // so a 16 MB read degrades quadratically until the ack loop falls behind
-    // the stub and the transfer dies on FLASH_READ_TIMEOUT. Chunking bounds
-    // the copies and gives each chunk its own retry + MD5 check.
+    // One readFlash command per 1 MB chunk instead of a single 16 MB read, so
+    // a failed transfer only retries its own chunk, with its own MD5 check.
     const FLASH_SIZE = 0x1000000;
     const CHUNK_SIZE = 0x100000;
     const data = new Uint8Array(FLASH_SIZE);
@@ -908,7 +938,7 @@ export class CrossPointFlasher {
       let attempt = 0;
       for (;;) {
         try {
-          const chunk = await this.espLoader.readFlash(offset, size, (_, p) => {
+          const chunk = await this.readFlash(offset, size, (_, p) => {
             if (onProgress) onProgress('Read flash', offset + p, FLASH_SIZE);
           });
           const expected = await this.espLoader.flashMd5sum(offset, size);

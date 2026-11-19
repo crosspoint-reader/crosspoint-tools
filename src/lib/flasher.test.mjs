@@ -105,3 +105,106 @@ test('boot-region install verifies the partition table by MD5, without a bulk re
   assert.deepEqual(partitions, parsePartitionTable(buildPartitionTableBinary(CROSSPOINT_PARTITION_TABLE)))
   await assert.rejects(run(true), /did not verify/)
 })
+
+// Fake esptool-js loader whose transport replays `packets` (data packets, then
+// the stub's MD5 digest) and records what the flasher sends back.
+function fakeReadFlashLoader(packets) {
+  const queue = [...packets]
+  const loader = {
+    ESP_READ_FLASH: 0xd2,
+    commands: [],
+    acks: [],
+    _intToByteArray: (i) => new Uint8Array([i & 0xff, (i >> 8) & 0xff, (i >> 16) & 0xff, (i >>> 24) & 0xff]),
+    _appendArray: (a, b) => {
+      const out = new Uint8Array(a.length + b.length)
+      out.set(a)
+      out.set(b, a.length)
+      return out
+    },
+    toHex: (b) => Buffer.from(b).toString('hex'),
+    checkCommand: async (desc, op, data) => { loader.commands.push({ op, data: [...new Uint32Array(data.buffer)] }) },
+    readFlash: async () => { throw new Error('esptool-js readFlash must not be used') },
+    transport: {
+      read: async (timeout) => {
+        if (!queue.length) throw new Error(`No serial data received. (timeout ${timeout})`)
+        return queue.shift()
+      },
+      write: async (data) => { loader.acks.push(new DataView(data.buffer).getUint32(0, true)) },
+    },
+  }
+  return loader
+}
+
+const md5Of = (data) => new Uint8Array(createHash('md5').update(data).digest())
+const flashBytes = (size) => Uint8Array.from({ length: size }, (_, i) => (i * 7 + 3) & 0xff)
+const splitPackets = (data, size) => {
+  const out = []
+  for (let i = 0; i < data.length; i += size) out.push(data.subarray(i, i + size))
+  return out
+}
+
+test('readFlash requests 256-byte packets, one in flight, and acks each one', async () => {
+  const data = flashBytes(0x1000)
+  const loader = fakeReadFlashLoader([...splitPackets(data, 256), md5Of(data)])
+  const flasher = new CrossPointFlasher({})
+  flasher.espLoader = loader
+  const progress = []
+
+  const result = await flasher.readFlash(0x8000, 0x1000, (_, received, total) => progress.push([received, total]))
+
+  assert.deepEqual(result, data)
+  assert.deepEqual(loader.commands, [{ op: 0xd2, data: [0x8000, 0x1000, 256, 1] }])
+  assert.deepEqual(loader.acks, Array.from({ length: 16 }, (_, i) => (i + 1) * 256))
+  assert.deepEqual(progress.at(-1), [0x1000, 0x1000])
+  assert.equal(progress.length, 16)
+})
+
+test('readFlash skips empty packets', async () => {
+  const data = flashBytes(512)
+  const [a, b] = splitPackets(data, 256)
+  const loader = fakeReadFlashLoader([a, new Uint8Array(0), b, md5Of(data)])
+  const flasher = new CrossPointFlasher({})
+  flasher.espLoader = loader
+
+  assert.deepEqual(await flasher.readFlash(0, 512), data)
+  assert.deepEqual(loader.acks, [256, 512])
+})
+
+test('readFlash rejects data that does not match the stub MD5', async () => {
+  const data = flashBytes(512)
+  const corrupted = data.slice()
+  corrupted[100] ^= 0xff
+  const flasher = new CrossPointFlasher({})
+  flasher.espLoader = fakeReadFlashLoader([...splitPackets(corrupted, 256), md5Of(data)])
+
+  await assert.rejects(flasher.readFlash(0x8000, 512), /MD5 mismatch reading flash at 0x8000/)
+})
+
+test('readFlash rejects more data than requested', async () => {
+  const flasher = new CrossPointFlasher({})
+  flasher.espLoader = fakeReadFlashLoader([flashBytes(300)])
+
+  await assert.rejects(flasher.readFlash(0x8000, 256), /more data than requested/)
+})
+
+test('readFlash fails when the device stops sending instead of hanging', async () => {
+  // Bytes lost mid-transfer: the transport's per-packet timeout must surface.
+  const data = flashBytes(0x1000)
+  const flasher = new CrossPointFlasher({})
+  flasher.espLoader = fakeReadFlashLoader(splitPackets(data, 256).slice(0, 5))
+
+  await assert.rejects(flasher.readFlash(0x8000, 0x1000), /No serial data received\. \(timeout 3000\)/)
+})
+
+test('partition table and app-only flash reads go through readFlash', async () => {
+  const table = buildPartitionTableBinary(CROSSPOINT_PARTITION_TABLE)
+  const pt = new Uint8Array(0x1000).fill(0xff)
+  pt.set(table)
+  const flasher = new CrossPointFlasher({})
+  flasher.espLoader = fakeReadFlashLoader([...splitPackets(pt, 256), md5Of(pt)])
+
+  await flasher.readLayout()
+
+  assert.deepEqual(flasher.espLoader.commands[0].data, [0x8000, 0x1000, 256, 1])
+  assert.ok(flasher.layout.appSlots.length >= 1)
+})
