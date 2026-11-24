@@ -1046,7 +1046,7 @@ export default function FlashTools() {
   const offeredFwKey = offeredFw.join('|')
   useEffect(() => {
     if (running || visibilityLoading || !fw || offeredFw.includes(fw)) return
-    setFw(recommendedBeta?.id ?? (stableAvailable ? 'crosspoint' : null))
+    selectFw(recommendedBeta?.id ?? (stableAvailable ? 'crosspoint' : null))
   }, [fw, offeredFwKey, running, visibilityLoading])
 
   return (
