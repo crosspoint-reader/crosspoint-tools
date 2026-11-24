@@ -1033,6 +1033,22 @@ export default function FlashTools() {
     if (recommendedBeta) setFw((current) => current || recommendedBeta.id)
   }, [model, recommendedBeta?.id])
 
+  // Drop a selection the current device no longer offers (e.g. a build id
+  // picked from the previous device's list before the new list loaded), so
+  // step 3 never renders an empty panel.
+  const offeredFw = [
+    stableAvailable && 'crosspoint',
+    ...testBuilds.map((b) => b.id),
+    (XTEINK_PRO_MODELS.has(model) || (!DEVICE_BUILD_MODELS.includes(model) && !isReleaseHidden('stock-en'))) && 'stock-en',
+    !DEVICE_BUILD_MODELS.includes(model) && !isReleaseHidden('stock-ch') && 'stock-ch',
+    'custom',
+  ].filter(Boolean)
+  const offeredFwKey = offeredFw.join('|')
+  useEffect(() => {
+    if (running || visibilityLoading || !fw || offeredFw.includes(fw)) return
+    setFw(recommendedBeta?.id ?? (stableAvailable ? 'crosspoint' : null))
+  }, [fw, offeredFwKey, running, visibilityLoading])
+
   return (
     <section id="flash-tools" className="relative py-12 sm:py-16">
       <div className="mx-auto max-w-3xl px-6">
