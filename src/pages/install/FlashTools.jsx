@@ -74,21 +74,35 @@ function DropdownCard({ active, title, sub, subClass, value, options, onSelect }
     <div className={cardClass(active)}>
       <div className="text-sm font-semibold text-stone-900">{title}</div>
       <div className={`mt-0.5 font-mono text-xs ${subClass}`}>{sub}</div>
-      <select
-        aria-label={title}
-        value={value}
-        onChange={(e) => e.target.value && onSelect(e.target.value)}
-        className="mt-2 w-full rounded-md border border-stone-300 bg-stone-50 px-2 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none"
-      >
-        <option value="" disabled>
-          Select...
-        </option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
+      <div className="relative mt-2">
+        <select
+          aria-label={title}
+          value={value}
+          onChange={(e) => e.target.value && onSelect(e.target.value)}
+          className="w-full appearance-none rounded-md border border-stone-300 bg-stone-50 py-1.5 pr-8 pl-2 text-sm text-stone-700 focus:border-brand-500 focus:outline-none"
+        >
+          <option value="" disabled>
+            Select...
           </option>
-        ))}
-      </select>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <svg
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 right-2 size-4 -translate-y-1/2 text-stone-500"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </div>
     </div>
   )
 }
