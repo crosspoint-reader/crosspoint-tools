@@ -351,6 +351,23 @@ export default function FlashTools() {
   const [fw, setFw] = useState(null)
   const [running, setRunning] = useState(false)
   const [customFile, setCustomFile] = useState(null)
+  const [dragOver, setDragOver] = useState(false)
+  const [dropError, setDropError] = useState(null)
+
+  const handleFirmwareDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (running) return
+    const files = [...e.dataTransfer.files]
+    if (files.length === 0) return
+    const file = files.find((f) => f.name.toLowerCase().endsWith('.bin'))
+    if (file) {
+      setCustomFile(file)
+      setDropError(null)
+    } else {
+      setDropError(`“${files[0].name}” is not a firmware file. Drop a .bin file.`)
+    }
+  }
 
   // Firmware version info (per selected device model)
   const [nightly, setNightly] = useState({ text: 'Loading...', enabled: false, version: null })
@@ -1441,15 +1458,31 @@ export default function FlashTools() {
                             : 'Upload a .bin file to flash to the OTA partition.'}
                       </p>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <label className="flex min-w-0 flex-1 cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 items-center justify-center rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-2.5 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
-                          <span className="break-all">{customFile ? customFile.name : 'Choose firmware file…'}</span>
+                        <label
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = running ? 'none' : 'copy'
+                            if (!running) setDragOver(true)
+                          }}
+                          onDragLeave={() => setDragOver(false)}
+                          onDrop={handleFirmwareDrop}
+                          className={`flex min-w-0 flex-1 cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 items-center justify-center rounded-md border border-dashed px-3 py-2.5 text-sm hover:border-stone-400 hover:text-stone-700 ${
+                            dragOver ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-stone-300 bg-stone-50 text-stone-500'
+                          }`}
+                        >
+                          <span className="break-all">
+                            {dragOver ? 'Drop firmware file' : customFile ? customFile.name : 'Choose or drop firmware file…'}
+                          </span>
                           <input
                             type="file"
                             aria-label="Choose firmware file"
                             disabled={running}
                             accept=".bin"
                             className="sr-only"
-                            onChange={(e) => setCustomFile(e.target.files[0] || null)}
+                            onChange={(e) => {
+                              setCustomFile(e.target.files[0] || null)
+                              setDropError(null)
+                            }}
                           />
                         </label>
                         <button
@@ -1462,6 +1495,11 @@ export default function FlashTools() {
                           Flash
                         </button>
                       </div>
+                      {dropError && (
+                        <p role="alert" className="mt-2 text-sm text-red-600">
+                          {dropError}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
