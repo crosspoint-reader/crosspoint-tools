@@ -19,6 +19,7 @@ import {
   fetchFlashAsset,
 } from '../../lib/flasher.js'
 import { createMarkdownRenderer } from '../../lib/markdown-full.js'
+import { pickRecommendedBuild } from '../../lib/recommended.js'
 
 // Release/beta/device notes are authored in full markdown (headings, lists,
 // code blocks), so render them with the same sanitized marked pipeline the
@@ -370,6 +371,7 @@ export default function FlashTools() {
   // Release-candidate channel (latest GitHub prerelease, admin-gated).
   // { enabled, release: { tag, version, publishedAt, notesUrl, assets } }
   const [rc, setRc] = useState({ enabled: false, release: null })
+  const [rcLoading, setRcLoading] = useState(true)
 
   // Admin-uploaded builds for DEVICE_BUILD_MODELS (sticky, m5paper, lilygo,
   // x4pro) — each device can carry several beta builds at once.
@@ -455,6 +457,9 @@ export default function FlashTools() {
         if (!cancelled && info) setRc(info)
       })
       .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setRcLoading(false)
+      })
     return () => {
       cancelled = true
     }
@@ -988,19 +993,25 @@ export default function FlashTools() {
       : visibleBetas.map((b) => ({ id: `beta-${b.id}`, title: betaLabel(b), channel: 'Beta', available: true }))),
   ].filter(Boolean)
 
-  // Admin hid stable for this device: the admin-picked beta (else the newest)
-  // takes the recommended slot and default selection instead of the
-  // "unavailable" note.
-  const pickedBetaId = releaseVisibility.recommended?.[model]
-  const recommendedBeta = !visibilityLoading && isReleaseHidden('crosspoint')
-    ? testBuilds.find((b) => b.channel === 'Beta' && b.id === pickedBetaId) ||
-      testBuilds.find((b) => b.channel === 'Beta') || null
-    : null
-  const otherBuilds = testBuilds.filter((b) => b !== recommendedBeta)
+  // Stable unavailable for this device (admin hid it, or it ships no asset for
+  // it): the admin-picked beta, else the release candidate, else the newest
+  // beta (hidden stable only) takes the recommended slot and default
+  // selection instead of the "unavailable" note. Waits for the RC info so a
+  // beta isn't auto-selected just before the RC arrives.
+  const recommendedBuild = visibilityLoading || rcLoading
+    ? null
+    : pickRecommendedBuild({
+        stableHidden: isReleaseHidden('crosspoint'),
+        stableMissing: !releaseLoading && !releaseError && !stableAvailable,
+        builds: testBuilds,
+        pickedBetaId: releaseVisibility.recommended?.[model],
+      })
+  const recommendedIsRc = recommendedBuild?.id === 'rc'
+  const otherBuilds = testBuilds.filter((b) => b !== recommendedBuild)
 
   useEffect(() => {
-    if (recommendedBeta) setFw((current) => current || recommendedBeta.id)
-  }, [model, recommendedBeta?.id])
+    if (recommendedBuild) setFw((current) => current || recommendedBuild.id)
+  }, [model, recommendedBuild?.id])
 
   return (
     <section id="flash-tools" className="relative py-12 sm:py-16">
@@ -1092,7 +1103,7 @@ export default function FlashTools() {
                 <h2 className="text-base font-semibold text-stone-900">Your CrossPoint release</h2>
               </div>
               <div className="mt-4" aria-live="polite">
-                {releaseLoading || visibilityLoading ? (
+                {releaseLoading || visibilityLoading || (rcLoading && !stableAvailable) ? (
                   <p className="text-sm/6 text-stone-600">Checking the latest stable release…</p>
                 ) : releaseError ? (
                   <div className="rounded-lg bg-amber-50 p-4 text-sm/6 text-amber-900">
@@ -1109,13 +1120,17 @@ export default function FlashTools() {
                     </span>
                     <span className="mt-1 block text-sm/6 text-stone-600">The latest stable release for {MODELS.find((m) => m.id === model)?.name}. Ready for everyday reading.</span>
                   </button>
-                ) : recommendedBeta ? (
-                  <button type="button" disabled={running} onClick={() => selectFw(recommendedBeta.id)} aria-pressed={fw === recommendedBeta.id} className={`${cardClass(fw === recommendedBeta.id)} w-full`}>
+                ) : recommendedBuild ? (
+                  <button type="button" disabled={running} onClick={() => selectFw(recommendedBuild.id)} aria-pressed={fw === recommendedBuild.id} className={`${cardClass(fw === recommendedBuild.id)} w-full`}>
                     <span className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-semibold text-stone-900">{recommendedBeta.title}</span>
-                      <span className="text-sm font-medium text-brand-700">Beta · Recommended</span>
+                      <span className="font-semibold text-stone-900">{recommendedBuild.title}</span>
+                      <span className="text-sm font-medium text-brand-700">{recommendedBuild.channel} · Recommended</span>
                     </span>
-                    <span className="mt-1 block text-sm/6 text-stone-600">The recommended build for {MODELS.find((m) => m.id === model)?.name} while a stable release is on hold.</span>
+                    <span className="mt-1 block text-sm/6 text-stone-600">
+                      {recommendedIsRc
+                        ? `The latest release candidate for ${MODELS.find((m) => m.id === model)?.name}, recommended until a stable release is available.`
+                        : `The recommended build for ${MODELS.find((m) => m.id === model)?.name} while a stable release is on hold.`}
+                    </span>
                   </button>
                 ) : (
                   <p className="text-sm/6 text-stone-600">A stable release is currently unavailable for this reader. Other available firmware is listed below.</p>
