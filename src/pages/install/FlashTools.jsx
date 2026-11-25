@@ -75,21 +75,35 @@ function DropdownCard({ active, title, sub, subClass, value, options, onSelect }
     <div className={cardClass(active)}>
       <div className="text-sm font-semibold text-stone-900">{title}</div>
       <div className={`mt-0.5 font-mono text-xs ${subClass}`}>{sub}</div>
-      <select
-        aria-label={title}
-        value={value}
-        onChange={(e) => e.target.value && onSelect(e.target.value)}
-        className="mt-2 w-full rounded-md border border-stone-300 bg-stone-50 px-2 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none"
-      >
-        <option value="" disabled>
-          Select...
-        </option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
+      <div className="relative mt-2">
+        <select
+          aria-label={title}
+          value={value}
+          onChange={(e) => e.target.value && onSelect(e.target.value)}
+          className="w-full appearance-none rounded-md border border-stone-300 bg-stone-50 py-1.5 pr-8 pl-2 text-sm text-stone-700 focus:border-brand-500 focus:outline-none"
+        >
+          <option value="" disabled>
+            Select...
           </option>
-        ))}
-      </select>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <svg
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 right-2 size-4 -translate-y-1/2 text-stone-500"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </div>
     </div>
   )
 }
@@ -352,6 +366,23 @@ export default function FlashTools() {
   const [fw, setFw] = useState(null)
   const [running, setRunning] = useState(false)
   const [customFile, setCustomFile] = useState(null)
+  const [dragOver, setDragOver] = useState(false)
+  const [dropError, setDropError] = useState(null)
+
+  const handleFirmwareDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (running) return
+    const files = [...e.dataTransfer.files]
+    if (files.length === 0) return
+    const file = files.find((f) => f.name.toLowerCase().endsWith('.bin'))
+    if (file) {
+      setCustomFile(file)
+      setDropError(null)
+    } else {
+      setDropError(`“${files[0].name}” is not a firmware file. Drop a .bin file.`)
+    }
+  }
 
   // Firmware version info (per selected device model)
   const [nightly, setNightly] = useState({ text: 'Loading...', enabled: false, version: null })
@@ -1025,6 +1056,22 @@ export default function FlashTools() {
     if (recommendedBuild) setFw((current) => current || recommendedBuild.id)
   }, [model, recommendedBuild?.id])
 
+  // Drop a selection the current device no longer offers (e.g. a build id
+  // picked from the previous device's list before the new list loaded), so
+  // step 3 never renders an empty panel.
+  const offeredFw = [
+    stableAvailable && 'crosspoint',
+    ...testBuilds.map((b) => b.id),
+    (XTEINK_PRO_MODELS.has(model) || (!DEVICE_BUILD_MODELS.includes(model) && !isReleaseHidden('stock-en'))) && 'stock-en',
+    !DEVICE_BUILD_MODELS.includes(model) && !isReleaseHidden('stock-ch') && 'stock-ch',
+    'custom',
+  ].filter(Boolean)
+  const offeredFwKey = offeredFw.join('|')
+  useEffect(() => {
+    if (running || visibilityLoading || !fw || offeredFw.includes(fw)) return
+    selectFw(recommendedBeta?.id ?? (stableAvailable ? 'crosspoint' : null))
+  }, [fw, offeredFwKey, running, visibilityLoading])
+
   return (
     <section id="flash-tools" className="relative py-12 sm:py-16">
       <div className="mx-auto max-w-3xl px-6">
@@ -1468,15 +1515,31 @@ export default function FlashTools() {
                             : 'Upload a .bin file to flash to the OTA partition.'}
                       </p>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <label className="flex min-w-0 flex-1 cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 items-center justify-center rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-2.5 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
-                          <span className="break-all">{customFile ? customFile.name : 'Choose firmware file…'}</span>
+                        <label
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = running ? 'none' : 'copy'
+                            if (!running) setDragOver(true)
+                          }}
+                          onDragLeave={() => setDragOver(false)}
+                          onDrop={handleFirmwareDrop}
+                          className={`flex min-w-0 flex-1 cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 items-center justify-center rounded-md border border-dashed px-3 py-2.5 text-sm hover:border-stone-400 hover:text-stone-700 ${
+                            dragOver ? 'border-brand-600 bg-brand-50 text-brand-700' : 'border-stone-300 bg-stone-50 text-stone-500'
+                          }`}
+                        >
+                          <span className="break-all">
+                            {dragOver ? 'Drop firmware file' : customFile ? customFile.name : 'Choose or drop firmware file…'}
+                          </span>
                           <input
                             type="file"
                             aria-label="Choose firmware file"
                             disabled={running}
                             accept=".bin"
                             className="sr-only"
-                            onChange={(e) => setCustomFile(e.target.files[0] || null)}
+                            onChange={(e) => {
+                              setCustomFile(e.target.files[0] || null)
+                              setDropError(null)
+                            }}
                           />
                         </label>
                         <button
@@ -1489,6 +1552,11 @@ export default function FlashTools() {
                           Flash
                         </button>
                       </div>
+                      {dropError && (
+                        <p role="alert" className="mt-2 text-sm text-red-600">
+                          {dropError}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
