@@ -362,6 +362,7 @@ export default function FlashTools() {
 
   // Beta builds from /api (buttons inserted before "Custom .bin")
   const [betaBuilds, setBetaBuilds] = useState([])
+  const [betasLoading, setBetasLoading] = useState(true)
 
   // Per-device visibility for the fixed release buttons on x3/x4.
   // { hidden: { crosspoint: ['x3'], ... } }
@@ -376,6 +377,9 @@ export default function FlashTools() {
   // Admin-uploaded builds for DEVICE_BUILD_MODELS (sticky, m5paper, lilygo,
   // x4pro) — each device can carry several beta builds at once.
   const [deviceBuilds, setDeviceBuilds] = useState([])
+  // Model whose device-build list has settled, so a recommendation never runs
+  // on another model's (or a still-loading) list.
+  const [deviceBuildsFor, setDeviceBuildsFor] = useState(null)
 
   // Full stable release metadata. 1.6.0+ releases ship one asset per device
   // family, so `assets: [{ name, size, devices }]` tells us which devices the
@@ -444,6 +448,9 @@ export default function FlashTools() {
         if (!cancelled && Array.isArray(builds)) setBetaBuilds(builds)
       })
       .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setBetasLoading(false)
+      })
     fetchReleaseVisibility()
       .then((v) => {
         if (!cancelled && v) setReleaseVisibility(v)
@@ -476,6 +483,9 @@ export default function FlashTools() {
           if (!cancelled) setDeviceBuilds(builds)
         })
         .catch(() => {})
+        .finally(() => {
+          if (!cancelled) setDeviceBuildsFor(model)
+        })
       // Nightly info for devices covered by the multi-device nightly build
       // (buildMeta.devices; absent on pre-multi-device builds = x3/x4 only).
       setNightly({ text: 'Loading...', enabled: false, version: null })
@@ -996,9 +1006,10 @@ export default function FlashTools() {
   // Stable unavailable for this device (admin hid it, or it ships no asset for
   // it): the admin-picked beta, else the release candidate, else the newest
   // beta (hidden stable only) takes the recommended slot and default
-  // selection instead of the "unavailable" note. Waits for the RC info so a
-  // beta isn't auto-selected just before the RC arrives.
-  const recommendedBuild = visibilityLoading || rcLoading
+  // selection instead of the "unavailable" note. Waits for the RC and beta
+  // lists so the default isn't committed before the admin pick can apply.
+  const buildsLoading = DEVICE_BUILD_MODELS.includes(model) ? deviceBuildsFor !== model : betasLoading
+  const recommendedBuild = visibilityLoading || rcLoading || buildsLoading
     ? null
     : pickRecommendedBuild({
         stableHidden: isReleaseHidden('crosspoint'),
@@ -1007,7 +1018,10 @@ export default function FlashTools() {
         pickedBetaId: releaseVisibility.recommended?.[model],
       })
   const recommendedIsRc = recommendedBuild?.id === 'rc'
-  const otherBuilds = testBuilds.filter((b) => b !== recommendedBuild)
+  // Only lift the recommended build out of "Other firmware" when its card
+  // actually renders (not behind the release-error panel).
+  const showRecommendedCard = !!recommendedBuild && !releaseLoading && !releaseError && !stableAvailable
+  const otherBuilds = testBuilds.filter((b) => !(showRecommendedCard && b === recommendedBuild))
 
   useEffect(() => {
     if (recommendedBuild) setFw((current) => current || recommendedBuild.id)
@@ -1103,7 +1117,7 @@ export default function FlashTools() {
                 <h2 className="text-base font-semibold text-stone-900">Your CrossPoint release</h2>
               </div>
               <div className="mt-4" aria-live="polite">
-                {releaseLoading || visibilityLoading || (rcLoading && !stableAvailable) ? (
+                {releaseLoading || visibilityLoading || ((rcLoading || buildsLoading) && !stableAvailable) ? (
                   <p className="text-sm/6 text-stone-600">Checking the latest stable release…</p>
                 ) : releaseError ? (
                   <div className="rounded-lg bg-amber-50 p-4 text-sm/6 text-amber-900">
