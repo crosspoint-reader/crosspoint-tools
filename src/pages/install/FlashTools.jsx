@@ -376,10 +376,10 @@ export default function FlashTools() {
 
   // Admin-uploaded builds for DEVICE_BUILD_MODELS (sticky, m5paper, lilygo,
   // x4pro) — each device can carry several beta builds at once.
-  const [deviceBuilds, setDeviceBuilds] = useState([])
-  // Model whose device-build list has settled, so a recommendation never runs
-  // on another model's (or a still-loading) list.
-  const [deviceBuildsFor, setDeviceBuildsFor] = useState(null)
+  // Stored with the model it was fetched for, so a switch never reads another
+  // model's list and a recommendation waits until this model's list settles.
+  const [deviceBuildList, setDeviceBuildList] = useState({ model: null, builds: [] })
+  const deviceBuilds = deviceBuildList.model === model ? deviceBuildList.builds : []
 
   // Full stable release metadata. 1.6.0+ releases ship one asset per device
   // family, so `assets: [{ name, size, devices }]` tells us which devices the
@@ -477,14 +477,12 @@ export default function FlashTools() {
     if (!model) return
     let cancelled = false
     if (DEVICE_BUILD_MODELS.includes(model)) {
-      setDeviceBuilds([])
       fetchDeviceBuildList(model)
         .then((builds) => {
-          if (!cancelled) setDeviceBuilds(builds)
+          if (!cancelled) setDeviceBuildList({ model, builds: Array.isArray(builds) ? builds : [] })
         })
-        .catch(() => {})
-        .finally(() => {
-          if (!cancelled) setDeviceBuildsFor(model)
+        .catch(() => {
+          if (!cancelled) setDeviceBuildList({ model, builds: [] })
         })
       // Nightly info for devices covered by the multi-device nightly build
       // (buildMeta.devices; absent on pre-multi-device builds = x3/x4 only).
@@ -1008,7 +1006,7 @@ export default function FlashTools() {
   // beta (hidden stable only) takes the recommended slot and default
   // selection instead of the "unavailable" note. Waits for the RC and beta
   // lists so the default isn't committed before the admin pick can apply.
-  const buildsLoading = DEVICE_BUILD_MODELS.includes(model) ? deviceBuildsFor !== model : betasLoading
+  const buildsLoading = DEVICE_BUILD_MODELS.includes(model) ? deviceBuildList.model !== model : betasLoading
   const recommendedBuild = visibilityLoading || rcLoading || buildsLoading
     ? null
     : pickRecommendedBuild({
