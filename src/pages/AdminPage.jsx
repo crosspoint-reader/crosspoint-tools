@@ -83,7 +83,8 @@ const FIRMWARE_DEVICES = [
 ]
 
 // Every flasher device, for the stable/nightly release toggles. Hiding stable
-// on a device makes its newest beta the recommended build in the flasher.
+// on a device makes its picked beta, else the release candidate, else its
+// newest beta the recommended build in the flasher.
 const ALL_FLASHER_DEVICES = DEVICES.map((d) => ({ id: d.id, label: d.name }))
 
 // The fixed release buttons the flasher renders. Keys match the `action` ids
@@ -1636,6 +1637,8 @@ async function fetchDeviceBetas(device) {
 }
 
 // Picks which beta is recommended on one device while its stable is hidden.
+// Leaving it on the default recommends the release candidate when one covers
+// the device, else the newest beta.
 function RecommendedBetaSelect({ device, label, value, onChange }) {
   const [options, setOptions] = useState(null)
 
@@ -1653,7 +1656,7 @@ function RecommendedBetaSelect({ device, label, value, onChange }) {
     <label className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm text-stone-700">
       <span>{label}</span>
       {options && options.length === 0 ? (
-        <span className="text-xs text-amber-700">No betas uploaded, so the stable-unavailable note shows</span>
+        <span className="text-xs text-amber-700">No betas uploaded, so the RC shows if one covers this device, else the stable-unavailable note</span>
       ) : (
         <select
           value={value || ''}
@@ -1661,7 +1664,7 @@ function RecommendedBetaSelect({ device, label, value, onChange }) {
           disabled={!options}
           className="max-w-full rounded-md border border-stone-300 bg-white px-2 py-1 text-sm"
         >
-          <option value="">{options ? 'Newest beta' : 'Loading…'}</option>
+          <option value="">{options ? 'Release candidate, else newest beta' : 'Loading…'}</option>
           {(options || []).map((o) => (
             <option key={o.id} value={o.id}>{o.label}</option>
           ))}
@@ -1743,7 +1746,8 @@ function ReleaseVisibilityCard({ secret, log }) {
           homepage flasher
         </Link>{' '}
         per device. Unchecking a box hides that option on that device. Hiding the stable release
-        makes a beta the recommended install on that device; pick which one below. Individual betas
+        makes the release candidate (if one covers the device), else a beta, the recommended install
+        on that device; picking a beta below puts it ahead of the RC. Individual betas
         are controlled in the Beta Testing card above.
       </p>
 
@@ -1766,7 +1770,7 @@ function ReleaseVisibilityCard({ secret, log }) {
       {(hidden.crosspoint || []).length > 0 && (
         <div className="mt-3 border-t border-stone-100 pt-3">
           <div className="text-sm font-medium text-stone-700">Recommended beta</div>
-          <div className="text-xs text-stone-400">Shown in place of stable on devices where stable is hidden.</div>
+          <div className="text-xs text-stone-400">Shown in place of stable on devices where stable is hidden. Leave on the default to recommend the RC when there is one.</div>
           <div className="mt-1 divide-y divide-stone-100">
             {ALL_FLASHER_DEVICES.filter((d) => hidden.crosspoint.includes(d.id)).map((d) => (
               <RecommendedBetaSelect

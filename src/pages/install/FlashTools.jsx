@@ -19,6 +19,7 @@ import {
   fetchFlashAsset,
 } from '../../lib/flasher.js'
 import { createMarkdownRenderer } from '../../lib/markdown-full.js'
+import { pickRecommendedBuild } from '../../lib/recommended.js'
 
 // Release/beta/device notes are authored in full markdown (headings, lists,
 // code blocks), so render them with the same sanitized marked pipeline the
@@ -361,6 +362,7 @@ export default function FlashTools() {
 
   // Beta builds from /api (buttons inserted before "Custom .bin")
   const [betaBuilds, setBetaBuilds] = useState([])
+  const [betasLoading, setBetasLoading] = useState(true)
 
   // Per-device visibility for the fixed release buttons on x3/x4.
   // { hidden: { crosspoint: ['x3'], ... } }
@@ -370,10 +372,14 @@ export default function FlashTools() {
   // Release-candidate channel (latest GitHub prerelease, admin-gated).
   // { enabled, release: { tag, version, publishedAt, notesUrl, assets } }
   const [rc, setRc] = useState({ enabled: false, release: null })
+  const [rcLoading, setRcLoading] = useState(true)
 
   // Admin-uploaded builds for DEVICE_BUILD_MODELS (sticky, m5paper, lilygo,
   // x4pro) — each device can carry several beta builds at once.
-  const [deviceBuilds, setDeviceBuilds] = useState([])
+  // Stored with the model it was fetched for, so a switch never reads another
+  // model's list and a recommendation waits until this model's list settles.
+  const [deviceBuildList, setDeviceBuildList] = useState({ model: null, builds: [] })
+  const deviceBuilds = deviceBuildList.model === model ? deviceBuildList.builds : []
 
   // Full stable release metadata. 1.6.0+ releases ship one asset per device
   // family, so `assets: [{ name, size, devices }]` tells us which devices the
@@ -442,6 +448,9 @@ export default function FlashTools() {
         if (!cancelled && Array.isArray(builds)) setBetaBuilds(builds)
       })
       .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setBetasLoading(false)
+      })
     fetchReleaseVisibility()
       .then((v) => {
         if (!cancelled && v) setReleaseVisibility(v)
@@ -455,6 +464,9 @@ export default function FlashTools() {
         if (!cancelled && info) setRc(info)
       })
       .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setRcLoading(false)
+      })
     return () => {
       cancelled = true
     }
@@ -465,12 +477,13 @@ export default function FlashTools() {
     if (!model) return
     let cancelled = false
     if (DEVICE_BUILD_MODELS.includes(model)) {
-      setDeviceBuilds([])
       fetchDeviceBuildList(model)
         .then((builds) => {
-          if (!cancelled) setDeviceBuilds(builds)
+          if (!cancelled) setDeviceBuildList({ model, builds: Array.isArray(builds) ? builds : [] })
         })
-        .catch(() => {})
+        .catch(() => {
+          if (!cancelled) setDeviceBuildList({ model, builds: [] })
+        })
       // Nightly info for devices covered by the multi-device nightly build
       // (buildMeta.devices; absent on pre-multi-device builds = x3/x4 only).
       setNightly({ text: 'Loading...', enabled: false, version: null })
@@ -988,19 +1001,29 @@ export default function FlashTools() {
       : visibleBetas.map((b) => ({ id: `beta-${b.id}`, title: betaLabel(b), channel: 'Beta', available: true }))),
   ].filter(Boolean)
 
-  // Admin hid stable for this device: the admin-picked beta (else the newest)
-  // takes the recommended slot and default selection instead of the
-  // "unavailable" note.
-  const pickedBetaId = releaseVisibility.recommended?.[model]
-  const recommendedBeta = !visibilityLoading && isReleaseHidden('crosspoint')
-    ? testBuilds.find((b) => b.channel === 'Beta' && b.id === pickedBetaId) ||
-      testBuilds.find((b) => b.channel === 'Beta') || null
-    : null
-  const otherBuilds = testBuilds.filter((b) => b !== recommendedBeta)
+  // Stable unavailable for this device (admin hid it, or it ships no asset for
+  // it): the admin-picked beta, else the release candidate, else the newest
+  // beta (hidden stable only) takes the recommended slot and default
+  // selection instead of the "unavailable" note. Waits for the RC and beta
+  // lists so the default isn't committed before the admin pick can apply.
+  const buildsLoading = DEVICE_BUILD_MODELS.includes(model) ? deviceBuildList.model !== model : betasLoading
+  const recommendedBuild = visibilityLoading || rcLoading || buildsLoading
+    ? null
+    : pickRecommendedBuild({
+        stableHidden: isReleaseHidden('crosspoint'),
+        stableMissing: !releaseLoading && !releaseError && !stableAvailable,
+        builds: testBuilds,
+        pickedBetaId: releaseVisibility.recommended?.[model],
+      })
+  const recommendedIsRc = recommendedBuild?.id === 'rc'
+  // Only lift the recommended build out of "Other firmware" when its card
+  // actually renders (not behind the release-error panel).
+  const showRecommendedCard = !!recommendedBuild && !releaseLoading && !releaseError && !stableAvailable
+  const otherBuilds = testBuilds.filter((b) => !(showRecommendedCard && b === recommendedBuild))
 
   useEffect(() => {
-    if (recommendedBeta) setFw((current) => current || recommendedBeta.id)
-  }, [model, recommendedBeta?.id])
+    if (recommendedBuild) setFw((current) => current || recommendedBuild.id)
+  }, [model, recommendedBuild?.id])
 
   return (
     <section id="flash-tools" className="relative py-12 sm:py-16">
@@ -1092,7 +1115,7 @@ export default function FlashTools() {
                 <h2 className="text-base font-semibold text-stone-900">Your CrossPoint release</h2>
               </div>
               <div className="mt-4" aria-live="polite">
-                {releaseLoading || visibilityLoading ? (
+                {releaseLoading || visibilityLoading || ((rcLoading || buildsLoading) && !stableAvailable) ? (
                   <p className="text-sm/6 text-stone-600">Checking the latest stable release…</p>
                 ) : releaseError ? (
                   <div className="rounded-lg bg-amber-50 p-4 text-sm/6 text-amber-900">
@@ -1109,13 +1132,17 @@ export default function FlashTools() {
                     </span>
                     <span className="mt-1 block text-sm/6 text-stone-600">The latest stable release for {MODELS.find((m) => m.id === model)?.name}. Ready for everyday reading.</span>
                   </button>
-                ) : recommendedBeta ? (
-                  <button type="button" disabled={running} onClick={() => selectFw(recommendedBeta.id)} aria-pressed={fw === recommendedBeta.id} className={`${cardClass(fw === recommendedBeta.id)} w-full`}>
+                ) : recommendedBuild ? (
+                  <button type="button" disabled={running} onClick={() => selectFw(recommendedBuild.id)} aria-pressed={fw === recommendedBuild.id} className={`${cardClass(fw === recommendedBuild.id)} w-full`}>
                     <span className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-semibold text-stone-900">{recommendedBeta.title}</span>
-                      <span className="text-sm font-medium text-brand-700">Beta · Recommended</span>
+                      <span className="font-semibold text-stone-900">{recommendedBuild.title}</span>
+                      <span className="text-sm font-medium text-brand-700">{recommendedBuild.channel} · Recommended</span>
                     </span>
-                    <span className="mt-1 block text-sm/6 text-stone-600">The recommended build for {MODELS.find((m) => m.id === model)?.name} while a stable release is on hold.</span>
+                    <span className="mt-1 block text-sm/6 text-stone-600">
+                      {recommendedIsRc
+                        ? `The latest release candidate for ${MODELS.find((m) => m.id === model)?.name}, recommended until a stable release is available.`
+                        : `The recommended build for ${MODELS.find((m) => m.id === model)?.name} while a stable release is on hold.`}
+                    </span>
                   </button>
                 ) : (
                   <p className="text-sm/6 text-stone-600">A stable release is currently unavailable for this reader. Other available firmware is listed below.</p>
