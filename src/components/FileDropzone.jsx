@@ -54,6 +54,15 @@ async function filesFromDrop(dataTransfer) {
   return out
 }
 
+function UploadIcon({ className }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614Z" />
+      <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+    </svg>
+  )
+}
+
 function selectionLabel(files, multiple) {
   if (!files?.length) return null
   if (multiple && files.length > 1) return `${files.length} files selected`
@@ -149,7 +158,7 @@ export default function FileDropzone({
       : 'border-stone-300 bg-stone-50 text-stone-500'
   const zoneCls =
     zoneClassName ??
-    `flex w-full min-w-0 items-center justify-center rounded-md border border-dashed text-center ${sizeCls} ${stateCls} ${
+    `flex w-full min-w-0 items-center justify-center gap-2 rounded-md border border-dashed text-center ${sizeCls} ${stateCls} ${
       disabled ? '' : 'hover:border-stone-400 hover:text-stone-700'
     }`
 
@@ -169,7 +178,14 @@ export default function FileDropzone({
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
         }`}
       >
-        {children ? children({ dragOver, label }) : <span className="break-all">{label}</span>}
+        {children ? (
+          children({ dragOver, label })
+        ) : (
+          <>
+            <UploadIcon className={`shrink-0 ${size === 'sm' ? 'size-3.5' : 'size-4'}`} />
+            <span className="break-all">{label}</span>
+          </>
+        )}
         <input
           ref={setRefs}
           type="file"
