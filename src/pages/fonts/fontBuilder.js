@@ -83,6 +83,8 @@ export function setFileInput(inputEl, file) {
   const dt = new DataTransfer()
   dt.items.add(file)
   inputEl.files = dt.files
+  // Let listeners (e.g. FileDropzone's filename label) see the new selection.
+  inputEl.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
 export function sanitizeFamilyName(name) {

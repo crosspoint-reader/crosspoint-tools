@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import DownloadModal from '../components/DownloadModal.jsx'
 import { Eyebrow } from '../components/ui.jsx'
+import FileDropzone from '../components/FileDropzone.jsx'
 import {
   CrossPointFlasher,
   fetchEarlyAccessFirmware,
@@ -785,26 +786,29 @@ export default function InsiderPage() {
                                       <p className="mt-0.5 text-xs text-brand-600">{file.name}</p>
                                     )}
                                   </div>
-                                  <label className="relative shrink-0">
-                                    <input
-                                      key={cfInputKeys[f.path] || 0}
-                                      type="file"
-                                      accept=".ttf,.otf"
-                                      onChange={(e) =>
-                                        handleFontFileChange(f.path, e.target.files[0])
-                                      }
-                                      className="absolute inset-0 size-full cursor-pointer opacity-0"
-                                    />
-                                    <span
-                                      className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-medium ${
-                                        file
-                                          ? 'bg-brand-100 text-brand-700'
-                                          : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                                      }`}
-                                    >
-                                      {file ? 'Change' : 'Replace'}
-                                    </span>
-                                  </label>
+                                  <FileDropzone
+                                    key={cfInputKeys[f.path] || 0}
+                                    aria-label={`Replace ${f.name}`}
+                                    accept=".ttf,.otf"
+                                    file={file || null}
+                                    className="shrink-0"
+                                    zoneClassName="block rounded-md"
+                                    onChange={(e) => handleFontFileChange(f.path, e.target.files[0])}
+                                  >
+                                    {({ dragOver }) => (
+                                      <span
+                                        className={`block rounded-md border border-dashed px-2.5 py-1 text-xs font-medium ${
+                                          dragOver
+                                            ? 'border-brand-600 bg-brand-50 text-brand-700'
+                                            : file
+                                              ? 'border-transparent bg-brand-100 text-brand-700'
+                                              : 'border-stone-300 bg-stone-100 text-stone-600 hover:bg-stone-200'
+                                        }`}
+                                      >
+                                        {dragOver ? 'Drop' : file ? 'Change' : 'Replace'}
+                                      </span>
+                                    )}
+                                  </FileDropzone>
                                   {file && (
                                     <button
                                       type="button"

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Layout from '../components/Layout.jsx'
 import { Eyebrow } from '../components/ui.jsx'
+import FileDropzone from '../components/FileDropzone.jsx'
 import {
   analyzeFontFolder,
   setFileInput,
@@ -16,12 +17,6 @@ import {
 
 const textInputCls =
   'mt-1.5 block w-full rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 focus:outline-none'
-const fileInputBrandCls =
-  'mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100'
-const fileInputStoneCls =
-  'mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-200'
-const fileInputWhiteCls =
-  'mt-1.5 block w-full text-sm text-stone-500 file:mr-3 file:rounded-md file:border-0 file:bg-stone-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-stone-700 hover:file:bg-stone-100'
 
 const LOG_COLORS = { info: 'text-stone-500', success: 'text-brand-600', error: 'text-red-600' }
 
@@ -466,18 +461,17 @@ export default function FontsPage() {
 
             {/* Font file inputs */}
             <div className="mb-4">
-              <label className="block text-sm/6 font-medium text-stone-700">
+              <label htmlFor="fontFolder" className="block text-sm/6 font-medium text-stone-700">
                 Quick add from folder
               </label>
               <p className="mt-1 text-xs text-stone-400">
                 Select all font files at once. Styles are detected from filenames (e.g.
                 FontName-Bold.ttf, FontName-BoldItalic.otf).
               </p>
-              <input
-                type="file"
+              <FileDropzone
                 id="fontFolder"
                 accept=".ttf,.otf,.TTF,.OTF"
-                webkitdirectory=""
+                directory
                 onChange={(e) =>
                   handleFolder(e, {
                     regularRef,
@@ -488,7 +482,7 @@ export default function FontsPage() {
                     setResult: setAutoDetectResult,
                   })
                 }
-                className={fileInputBrandCls}
+                className="mt-1.5"
               />
               {autoDetectResult !== null && (
                 <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-stone-600">
@@ -510,51 +504,47 @@ export default function FontsPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-sm/6 font-medium text-stone-700">
+                <label htmlFor="fontRegular" className="block text-sm/6 font-medium text-stone-700">
                   Regular <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="file"
+                <FileDropzone
                   id="fontRegular"
-                  ref={regularRef}
+                  inputRef={regularRef}
                   accept=".ttf,.otf,.TTF,.OTF"
-                  className={fileInputStoneCls}
+                  className="mt-1.5"
                 />
               </div>
               <div>
-                <label className="block text-sm/6 font-medium text-stone-700">
+                <label htmlFor="fontBold" className="block text-sm/6 font-medium text-stone-700">
                   Bold <span className="text-xs text-stone-400">(optional)</span>
                 </label>
-                <input
-                  type="file"
+                <FileDropzone
                   id="fontBold"
-                  ref={boldRef}
+                  inputRef={boldRef}
                   accept=".ttf,.otf,.TTF,.OTF"
-                  className={fileInputStoneCls}
+                  className="mt-1.5"
                 />
               </div>
               <div>
-                <label className="block text-sm/6 font-medium text-stone-700">
+                <label htmlFor="fontItalic" className="block text-sm/6 font-medium text-stone-700">
                   Italic <span className="text-xs text-stone-400">(optional)</span>
                 </label>
-                <input
-                  type="file"
+                <FileDropzone
                   id="fontItalic"
-                  ref={italicRef}
+                  inputRef={italicRef}
                   accept=".ttf,.otf,.TTF,.OTF"
-                  className={fileInputStoneCls}
+                  className="mt-1.5"
                 />
               </div>
               <div>
-                <label className="block text-sm/6 font-medium text-stone-700">
+                <label htmlFor="fontBoldItalic" className="block text-sm/6 font-medium text-stone-700">
                   Bold Italic <span className="text-xs text-stone-400">(optional)</span>
                 </label>
-                <input
-                  type="file"
+                <FileDropzone
                   id="fontBoldItalic"
-                  ref={boldItalicRef}
+                  inputRef={boldItalicRef}
                   accept=".ttf,.otf,.TTF,.OTF"
-                  className={fileInputStoneCls}
+                  className="mt-1.5"
                 />
               </div>
             </div>
@@ -596,18 +586,17 @@ export default function FontsPage() {
                 </p>
 
                 <div className="mt-4">
-                  <label className="block text-sm/6 font-medium text-stone-700">
+                  <label htmlFor="fallbackFontFolder" className="block text-sm/6 font-medium text-stone-700">
                     Quick add fallback family 1 from folder
                   </label>
                   <p className="mt-1 text-xs text-stone-400">
                     Picks the regular file from the detected fallback family and ignores bold or
                     italic variants.
                   </p>
-                  <input
-                    type="file"
+                  <FileDropzone
                     id="fallbackFontFolder"
                     accept=".ttf,.otf,.TTF,.OTF"
-                    webkitdirectory=""
+                    directory
                     onChange={(e) =>
                       handleFolder(e, {
                         regularRef: fallbackRegularRef,
@@ -615,7 +604,7 @@ export default function FontsPage() {
                         setResult: setFallbackAutoDetectResult,
                       })
                     }
-                    className={fileInputBrandCls}
+                    className="mt-1.5"
                   />
                   {fallbackAutoDetectResult !== null && (
                     <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-stone-600 ring-1 ring-stone-200 ring-inset">
@@ -626,16 +615,15 @@ export default function FontsPage() {
 
                 <div className="mt-4">
                   <div>
-                    <label className="block text-sm/6 font-medium text-stone-700">
+                    <label htmlFor="fallbackFontRegular" className="block text-sm/6 font-medium text-stone-700">
                       Fallback 1 Regular{' '}
                       <span className="text-xs text-stone-400">(required if used)</span>
                     </label>
-                    <input
-                      type="file"
+                    <FileDropzone
                       id="fallbackFontRegular"
-                      ref={fallbackRegularRef}
+                      inputRef={fallbackRegularRef}
                       accept=".ttf,.otf,.TTF,.OTF"
-                      className={fileInputWhiteCls}
+                      className="mt-1.5"
                     />
                   </div>
                 </div>
@@ -661,17 +649,16 @@ export default function FontsPage() {
                 </p>
 
                 <div className="mt-4">
-                  <label className="block text-sm/6 font-medium text-stone-700">
+                  <label htmlFor="fallback2FontFolder" className="block text-sm/6 font-medium text-stone-700">
                     Quick add fallback family 2 from folder
                   </label>
                   <p className="mt-1 text-xs text-stone-400">
                     Again, only the detected regular file is used.
                   </p>
-                  <input
-                    type="file"
+                  <FileDropzone
                     id="fallback2FontFolder"
                     accept=".ttf,.otf,.TTF,.OTF"
-                    webkitdirectory=""
+                    directory
                     onChange={(e) =>
                       handleFolder(e, {
                         regularRef: fallback2RegularRef,
@@ -679,7 +666,7 @@ export default function FontsPage() {
                         setResult: setFallback2AutoDetectResult,
                       })
                     }
-                    className={fileInputBrandCls}
+                    className="mt-1.5"
                   />
                   {fallback2AutoDetectResult !== null && (
                     <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 font-mono text-xs whitespace-pre-wrap text-stone-600 ring-1 ring-stone-200 ring-inset">
@@ -690,16 +677,15 @@ export default function FontsPage() {
 
                 <div className="mt-4">
                   <div>
-                    <label className="block text-sm/6 font-medium text-stone-700">
+                    <label htmlFor="fallback2FontRegular" className="block text-sm/6 font-medium text-stone-700">
                       Fallback 2 Regular{' '}
                       <span className="text-xs text-stone-400">(required if used)</span>
                     </label>
-                    <input
-                      type="file"
+                    <FileDropzone
                       id="fallback2FontRegular"
-                      ref={fallback2RegularRef}
+                      inputRef={fallback2RegularRef}
                       accept=".ttf,.otf,.TTF,.OTF"
-                      className={fileInputWhiteCls}
+                      className="mt-1.5"
                     />
                   </div>
                 </div>

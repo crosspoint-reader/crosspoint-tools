@@ -1618,6 +1618,33 @@
     kids.forEach((c) => { if (c != null) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
     return e;
   }
+  // Vanilla counterpart of components/FileDropzone.jsx: a dashed pick-or-drop
+  // target wrapping a hidden file input.
+  function fileDrop({ accept, label, onFile }) {
+    const tokens = accept.split(',').map((t) => t.trim().toLowerCase());
+    const ok = (f) => tokens.some((t) => (t.startsWith('.') ? f.name.toLowerCase().endsWith(t) : f.type === t));
+    const idle = 'border-stone-300 bg-stone-50 text-stone-500 hover:border-stone-400 hover:text-stone-700';
+    const active = 'border-brand-600 bg-brand-50 text-brand-700';
+    const text = el('span', { class: 'truncate' }, ['Choose or drop…']);
+    const input = el('input', { type: 'file', accept, class: 'sr-only', 'aria-label': 'Icon file for ' + label });
+    const zone = el('label', { class: 'flex min-w-0 cursor-pointer items-center justify-center rounded-md border border-dashed px-2 py-1 text-[11px] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600 ' + idle }, [text, input]);
+    const setActive = (on) => { zone.className = zone.className.replace(on ? idle : active, on ? active : idle); };
+    const pick = (file) => { text.textContent = file ? file.name : 'Choose or drop…'; zone.title = file ? file.name : ''; onFile(file || undefined); };
+    input.addEventListener('change', () => pick(input.files[0]));
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setActive(true); });
+    zone.addEventListener('dragleave', (e) => { if (!zone.contains(e.relatedTarget)) setActive(false); });
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      setActive(false);
+      const file = [...e.dataTransfer.files].find(ok);
+      if (!file) { text.textContent = 'Drop an .svg or .png'; return; }
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      pick(file);
+    });
+    return zone;
+  }
   function fieldRow(label, control) {
     return el('label', { class: 'flex items-center justify-between gap-3 py-1.5' }, [el('span', { class: 'text-xs text-stone-600' }, [label]), control]);
   }
@@ -1775,8 +1802,8 @@
     iconBody.push(el('p', { class: 'text-[11px] text-stone-500' }, ['Icons are converted to firmware-exact 1-bit BMPs by the official CrossPoint Python script (run in CI), not in the browser. Leave all blank to use the standard Lyra icon set, or upload custom SVG/PNG icons to override individual keys.']));
     const grid = el('div', { class: 'mt-2 grid grid-cols-2 gap-x-4 gap-y-1' }, ICON_KEYS.map((key) => {
       const label = el('span', { class: 'text-xs text-stone-600' }, [key]);
-      const input = el('input', { type: 'file', accept: '.svg,.png,image/svg+xml,image/png', class: 'block w-full text-[11px] text-stone-500 file:mr-2 file:rounded file:border-0 file:bg-stone-100 file:px-2 file:py-0.5 file:text-[11px] file:font-medium file:text-stone-700 hover:file:bg-stone-200', onchange: (e) => { state.customIcons[key] = e.target.files[0] || undefined; if (!e.target.files[0]) delete state.customIcons[key]; } });
-      return el('label', { class: 'flex flex-col gap-0.5 py-1' }, [label, input]);
+      const zone = fileDrop({ accept: '.svg,.png,image/svg+xml,image/png', label: key, onFile: (file) => { if (file) state.customIcons[key] = file; else delete state.customIcons[key]; } });
+      return el('div', { class: 'flex flex-col gap-0.5 py-1' }, [label, zone]);
     }));
     iconBody.push(grid);
     iconBody.push(el('button', { type: 'button', class: 'mt-3 rounded-md bg-stone-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-stone-700', onclick: startIconBuild }, ['Build icons via CI']));
