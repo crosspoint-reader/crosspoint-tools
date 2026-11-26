@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import DownloadModal from '../components/DownloadModal.jsx'
 import { Eyebrow } from '../components/ui.jsx'
+import FileDropzone from '../components/FileDropzone.jsx'
 import {
   CrossPointFlasher,
   X3_PARTITION_TABLE,
@@ -71,9 +72,6 @@ const btnBase =
 const btnPrimary = `${btnBase} bg-brand-700 text-white hover:bg-brand-800 focus-visible:outline-brand-500`
 const btnDark = `${btnBase} bg-stone-900 text-white shadow-sm hover:bg-stone-700 focus-visible:outline-stone-900`
 const btnOutline = `${btnBase} bg-stone-50 text-stone-700 ring-1 ring-stone-300 hover:bg-stone-50`
-
-const inputClass =
-  'min-w-0 flex-1 rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 file:mr-3 file:rounded file:border-0 file:bg-stone-100 file:px-2 file:py-1 file:font-mono file:text-xs file:text-stone-600'
 
 function PartitionTable({ partitions, title, highlight = false }) {
   return (
@@ -955,13 +953,14 @@ export default function DebugPage() {
                 <label htmlFor="repair-bootloader" className="block text-sm font-semibold text-stone-900">
                   Custom bootloader <span className="font-normal text-stone-400">(optional)</span>
                 </label>
-                <input
+                <FileDropzone
                   id="repair-bootloader"
                   name="repair-bootloader"
-                  ref={repairBootloaderRef}
-                  type="file"
+                  inputRef={repairBootloaderRef}
                   accept=".bin,application/octet-stream"
-                  className={`${inputClass} mt-2 w-full`}
+                  disabled={busy}
+                  placeholder="Choose or drop a bootloader .bin…"
+                  className="mt-2"
                 />
               </div>
 
@@ -1037,13 +1036,13 @@ export default function DebugPage() {
                       </option>
                     ))}
                   </select>
-                  <input
-                    ref={fullFlashFileRef}
+                  <FileDropzone
+                    inputRef={fullFlashFileRef}
                     name="full-flash-image"
                     aria-label="Full flash image"
-                    type="file"
                     accept=".bin,application/octet-stream"
-                    className={inputClass}
+                    disabled={busy}
+                    placeholder="Choose or drop a flash image…"
                   />
                   <button type="button" onClick={writeFullFlash} disabled={busy} className={btnDark}>
                     Write full flash

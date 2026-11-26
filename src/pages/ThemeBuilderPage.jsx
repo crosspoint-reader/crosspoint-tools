@@ -5,6 +5,7 @@
 import { useEffect } from 'react'
 import Layout from '../components/Layout.jsx'
 import { Eyebrow } from '../components/ui.jsx'
+import FileDropzone from '../components/FileDropzone.jsx'
 import { initThemeBuilder } from '../lib/theme-builder.js'
 
 function Code({ children }) {
@@ -63,13 +64,23 @@ export default function ThemeBuilderPage() {
               Load preset
             </button>
             <div className="ml-auto">
-              <label
-                htmlFor="importInput"
-                className="cursor-pointer rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-stone-700 shadow-sm ring-1 ring-stone-950/10 transition hover:bg-stone-50 hover:text-stone-900"
+              <FileDropzone
+                id="importInput"
+                accept=".json,application/json"
+                zoneClassName="block rounded-md"
               >
-                Import theme.json&hellip;
-              </label>
-              <input id="importInput" type="file" accept=".json,application/json" className="hidden" />
+                {({ dragOver }) => (
+                  <span
+                    className={`block rounded-md border border-dashed px-3 py-1.5 text-sm font-semibold shadow-sm transition ${
+                      dragOver
+                        ? 'border-brand-600 bg-brand-50 text-brand-700'
+                        : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-50 hover:text-stone-900'
+                    }`}
+                  >
+                    {dragOver ? 'Drop theme.json' : <>Import or drop theme.json&hellip;</>}
+                  </span>
+                )}
+              </FileDropzone>
             </div>
           </div>
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../components/Layout.jsx'
 import { Button, Eyebrow } from '../components/ui.jsx'
+import FileDropzone from '../components/FileDropzone.jsx'
 import { readJsonResponse, describeFailure, formatMB, inputCls, inputClsXs } from './admin/api.js'
 import { getAccessoryType, getProductLinks } from '../lib/accessories.ts'
 import { DEVICES } from '../lib/devices.ts'
@@ -668,16 +669,14 @@ function AccessoriesCard({ secret, log }) {
           Coming soon (links show as &ldquo;Learn More&rdquo;)
         </label>
         <div className="flex gap-2">
-          <label className="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
-            <span className="truncate">{image ? image.name : 'Choose image...'}</span>
-            <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => setImage(e.target.files[0] || null)}
-            />
-          </label>
+          <FileDropzone
+            inputRef={imageInputRef}
+            accept="image/*"
+            file={image}
+            placeholder="Choose or drop an image…"
+            className="flex-1"
+            onChange={(e) => setImage(e.target.files[0] || null)}
+          />
           <Button
             as="button"
             variant="primary"
@@ -813,17 +812,13 @@ function AccessoriesCard({ secret, log }) {
                       />
                       Coming soon (links show as &ldquo;Learn More&rdquo;)
                     </label>
-                    <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-xs text-stone-500 hover:border-stone-400 hover:text-stone-700">
-                      <span className="truncate">
-                        {edit.image ? edit.image.name : 'Replace image (optional)...'}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => setEditField(a.id, 'image', e.target.files[0] || null)}
-                      />
-                    </label>
+                    <FileDropzone
+                      accept="image/*"
+                      file={edit.image}
+                      placeholder="Replace or drop an image (optional)…"
+                      size="sm"
+                      onChange={(e) => setEditField(a.id, 'image', e.target.files[0] || null)}
+                    />
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -1178,16 +1173,14 @@ function BetaCard({ secret, log }) {
           </div>
         ) : mode === 'upload' ? (
           <div className="flex gap-2">
-            <label className="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
-              <span className="truncate">{file ? file.name : 'Choose .bin file...'}</span>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".bin"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files[0] || null)}
-              />
-            </label>
+            <FileDropzone
+              inputRef={fileInputRef}
+              accept=".bin"
+              file={file}
+              placeholder="Choose or drop a .bin file…"
+              className="flex-1"
+              onChange={(e) => setFile(e.target.files[0] || null)}
+            />
             <Button
               as="button"
               variant="primary"
@@ -1380,17 +1373,13 @@ function BetaCard({ secret, log }) {
                           beta's binary plus its linked device builds in place.
                         </p>
                       ) : edit.replacementMode === 'upload' ? (
-                        <label className="flex cursor-pointer items-center justify-center rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-xs text-stone-500 hover:border-stone-400 hover:text-stone-700">
-                          <span className="truncate">
-                            {edit.firmware ? edit.firmware.name : 'Choose a replacement .bin...'}
-                          </span>
-                          <input
-                            type="file"
-                            accept=".bin"
-                            className="hidden"
-                            onChange={(e) => setEditField(b.id, 'firmware', e.target.files[0] || null)}
-                          />
-                        </label>
+                        <FileDropzone
+                          accept=".bin"
+                          file={edit.firmware}
+                          placeholder="Choose or drop a replacement .bin…"
+                          size="sm"
+                          onChange={(e) => setEditField(b.id, 'firmware', e.target.files[0] || null)}
+                        />
                       ) : (
                         <div className="space-y-1.5">
                           <input
@@ -1963,16 +1952,14 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
           className={`${inputCls} resize-none`}
         />
         <div className="flex gap-2">
-          <label className="flex flex-1 cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
-            <span className="truncate">{file ? file.name : 'Choose .bin file...'}</span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".bin"
-              className="hidden"
-              onChange={(e) => setFile(e.target.files[0] || null)}
-            />
-          </label>
+          <FileDropzone
+            inputRef={fileInputRef}
+            accept=".bin"
+            file={file}
+            placeholder="Choose or drop a .bin file…"
+            className="flex-1"
+            onChange={(e) => setFile(e.target.files[0] || null)}
+          />
           <Button
             as="button"
             variant="primary"
@@ -2040,17 +2027,12 @@ function DeviceBuildCard({ secret, log, label, description, infoUrl, uploadUrl, 
                     rows={2}
                     className={`${inputCls} resize-none`}
                   />
-                  <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-sm text-stone-500 hover:border-stone-400 hover:text-stone-700">
-                    <span className="truncate">
-                      {edit.file ? edit.file.name : 'Replace .bin (optional)...'}
-                    </span>
-                    <input
-                      type="file"
-                      accept=".bin"
-                      className="hidden"
-                      onChange={(e) => setEdit({ ...edit, file: e.target.files[0] || null })}
-                    />
-                  </label>
+                  <FileDropzone
+                    accept=".bin"
+                    file={edit.file}
+                    placeholder="Replace or drop a .bin (optional)…"
+                    onChange={(e) => setEdit({ ...edit, file: e.target.files[0] || null })}
+                  />
                   {edit.file && <NotifyToggle checked={edit.notify} onChange={(v) => setEdit({ ...edit, notify: v })} />}
                   <div className="flex gap-2">
                     <button
