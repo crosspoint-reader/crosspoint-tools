@@ -102,6 +102,8 @@ export default function FileDropzone({
   children,
 }) {
   const ownRef = useRef(null)
+  // Bumped on every selection so a slow folder drop can't overwrite a newer pick.
+  const selectionRef = useRef(0)
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState(null)
   const [ownLabel, setOwnLabel] = useState(null)
@@ -115,6 +117,7 @@ export default function FileDropzone({
   }
 
   const handleChange = (e) => {
+    selectionRef.current += 1
     setError(null)
     setOwnLabel(selectionLabel(e.target.files, many))
     onChange?.(e)
@@ -124,7 +127,15 @@ export default function FileDropzone({
     e.preventDefault()
     setDragOver(false)
     if (disabled) return
-    const dropped = directory ? await filesFromDrop(e.dataTransfer) : [...e.dataTransfer.files]
+    const token = ++selectionRef.current
+    let dropped
+    try {
+      dropped = directory ? await filesFromDrop(e.dataTransfer) : [...e.dataTransfer.files]
+    } catch {
+      if (token === selectionRef.current) setError('Could not read the dropped folder. Try again or use the picker.')
+      return
+    }
+    if (token !== selectionRef.current) return
     if (!dropped.length) return
     const accepted = dropped.filter((f) => matchesAccept(f, tokens))
     if (!accepted.length) {
