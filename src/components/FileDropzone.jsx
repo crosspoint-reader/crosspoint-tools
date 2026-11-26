@@ -194,7 +194,7 @@ export default function FileDropzone({
         ) : (
           <>
             <UploadIcon className={`shrink-0 ${size === 'sm' ? 'size-3.5' : 'size-4'}`} />
-            <span className="break-all">{label}</span>
+            <span className="wrap-anywhere">{label}</span>
           </>
         )}
         <input
