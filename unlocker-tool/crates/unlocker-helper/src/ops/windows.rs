@@ -13,6 +13,7 @@ use crate::proto::DhcpLease;
 use crate::state;
 use anyhow::{anyhow, bail, Context, Result};
 use tokio::process::Command;
+use unlocker_core::types::HotspotSetup;
 
 async fn run_powershell(script: &str) -> Result<String> {
     let out = Command::new("powershell.exe")
@@ -52,7 +53,7 @@ function Await($WinRtTask, $ResultType) {
 }
 "#;
 
-pub async fn is_enable(ssid: &str, psk: &str) -> Result<()> {
+pub async fn is_enable(ssid: &str, psk: &str) -> Result<HotspotSetup> {
     if ssid.is_empty() {
         bail!("ssid empty");
     }
@@ -115,7 +116,7 @@ Write-Output 'ok'
         );
     }
     tracing::info!(%ssid, "Mobile Hotspot configured and started");
-    Ok(())
+    Ok(HotspotSetup::default())
 }
 
 pub async fn is_disable() -> Result<()> {

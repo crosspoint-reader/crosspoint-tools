@@ -148,9 +148,11 @@ async fn dispatch(req: Request, servers: &ServerHolder) -> Response {
             "version": env!("CARGO_PKG_VERSION"),
         })),
 
-        Request::IsEnable { ssid, psk } => ops::is_enable(&ssid, &psk)
-            .await
-            .map(|_| serde_json::json!({"ssid": ssid})),
+        Request::IsEnable { ssid, psk } => ops::is_enable(&ssid, &psk).await.map(|setup| {
+            let mut v = serde_json::json!(setup);
+            v["ssid"] = ssid.into();
+            v
+        }),
         Request::IsDisable => ops::is_disable().await.map(|_| serde_json::json!({})),
         Request::PfctlAdd { from_port, to_port } => ops::pfctl_add(from_port, to_port)
             .await
